@@ -137,6 +137,8 @@ local DEFAULTS = {
         timer = true,
         databar = true,
         stats = true,
+        nameplates = true,
+        character = true,
     },
     positions = {},
 }
@@ -273,6 +275,14 @@ function B:Initials(v)
 end
 
 function B:GetAbilityIcon(nameOrId)
+    local s = string.lower(nameOrId or "")
+    if string.find(s, "melee") or string.find(s, "attack") or string.find(s, "swing") then
+        if GetInventoryItemTexture then
+            local wTex = GetInventoryItemTexture("player", 16)
+            if wTex and wTex ~= "" then return wTex end
+        end
+        return "Interface\\Icons\\INV_Sword_04"
+    end
     return "Interface\\Icons\\INV_Misc_QuestionMark"
 end
 

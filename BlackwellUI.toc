@@ -16,4 +16,6 @@ Meter.lua
 Timer.lua
 DataBar.lua
 Stats.lua
+Nameplates.lua
+Character.lua
 Options.lua

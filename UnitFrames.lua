@@ -178,6 +178,45 @@ function mod:Create()
     tgtPBar:SetHeight(6)
     tgt.pBar = tgtPBar
 
+    -- Target Debuffs (2 rows of 8 icons, 18x18, 1px border, zoom coords)
+    local debuffs = {}
+    for i = 1, 16 do
+        local d = CreateFrame("Button", "BUI_TargetDebuff" .. i, tgt)
+        d:SetWidth(18)
+        d:SetHeight(18)
+        d:EnableMouse(true)
+        B:Backdrop(d, 0.90)
+
+        local dIcon = d:CreateTexture(nil, "ARTWORK")
+        dIcon:SetPoint("TOPLEFT", d, "TOPLEFT", 1, -1)
+        dIcon:SetPoint("BOTTOMRIGHT", d, "BOTTOMRIGHT", -1, 1)
+        dIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        d.icon = dIcon
+
+        local dCount = B:Font(d, 9, "RIGHT")
+        dCount:SetPoint("BOTTOMRIGHT", d, "BOTTOMRIGHT", -1, 0)
+        dCount:SetTextColor(1, 1, 1)
+        d.count = dCount
+
+        d.debuffIndex = i
+        d:SetScript("OnEnter", function()
+            if UnitExists("target") and this.debuffIndex then
+                GameTooltip:SetOwner(this, "ANCHOR_BOTTOMRIGHT")
+                GameTooltip:SetUnitDebuff("target", this.debuffIndex)
+                GameTooltip:Show()
+            end
+        end)
+        d:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+        local row = math.floor((i - 1) / 8)
+        local col = math.mod(i - 1, 8)
+        d:SetPoint("TOPLEFT", tgt, "BOTTOMLEFT", col * 20, -5 - row * 20)
+
+        d:Hide()
+        debuffs[i] = d
+    end
+    tgt.debuffs = debuffs
+
     tgt:Hide()
     B:RegisterMover(tgt, "target", "Target Frame", "BOTTOM", "BOTTOM", 240, 140)
     self.target = tgt
@@ -269,7 +308,7 @@ function mod:Create()
 
     local rows = {}
     for i = 1, MAX_ENCOUNTER_ROWS do
-        local r = CreateFrame("Frame", nil, enc)
+        local r = CreateFrame("Button", nil, enc)
         r:SetWidth(ENC_WIDTH - 8)
         r:SetHeight(18)
         r:SetPoint("TOPLEFT", enc, "TOPLEFT", 4, -22 - (i - 1) * 21)
@@ -296,7 +335,24 @@ function mod:Create()
         rNameFs:SetHeight(12)
         r.nameFs = rNameFs
 
+        -- Hover highlight
+        local hl = r:CreateTexture(nil, "HIGHLIGHT")
+        B:Solid(hl, 1, 1, 1, 0.15)
+        hl:SetAllPoints(r)
+        r.hl = hl
+
         r:EnableMouse(true)
+        r:RegisterForClicks("LeftButtonUp")
+        r:SetScript("OnClick", function()
+            if this.unitName and this.unitName ~= "" then
+                ClearTarget()
+                TargetByName(this.unitName, true)
+                if not UnitExists("target") then
+                    TargetByName(this.unitName, false)
+                end
+            end
+        end)
+
         r:SetScript("OnEnter", function()
             if this.unitName then
                 GameTooltip:SetOwner(this, "ANCHOR_TOP")
@@ -305,6 +361,7 @@ function mod:Create()
                 if this.unitHp and this.unitHpm then
                     GameTooltip:AddLine(string.format("Health: %d / %d (%d%%)", this.unitHp, this.unitHpm, this.unitPct or 0), 1, 0.82, 0)
                 end
+                GameTooltip:AddLine("Click to target", 0, 0.9, 1)
                 GameTooltip:Show()
             end
         end)
@@ -407,6 +464,9 @@ function mod:Update(state)
 
     if not hasAzsTarget and not hasBlizzTarget then
         tgt:Hide()
+        if tgt.debuffs then
+            for i = 1, 16 do tgt.debuffs[i]:Hide() end
+        end
         if self.tot then self.tot:Hide() end
     else
         tgt:Show()
@@ -513,6 +573,42 @@ function mod:Update(state)
             local tpColor = POWER_COLORS[tpType] or POWER_COLORS[0]
             B:SetBarColor(tgt.pBar, tpColor.r, tpColor.g, tpColor.b)
             tgt.pBar:Show()
+        end
+
+        -- Target Debuffs update
+        if tgt.debuffs then
+            if UnitExists("target") then
+                local DEBUFF_COLORS = {
+                    ["Curse"]   = { r = 0.60, g = 0.00, b = 1.00 },
+                    ["Disease"] = { r = 0.60, g = 0.40, b = 0.00 },
+                    ["Magic"]   = { r = 0.20, g = 0.60, b = 1.00 },
+                    ["Poison"]  = { r = 0.00, g = 0.65, b = 0.10 },
+                    ["none"]    = { r = 0.85, g = 0.15, b = 0.15 },
+                }
+                for i = 1, 16 do
+                    local d = tgt.debuffs[i]
+                    local tex, count, debuffType = UnitDebuff("target", i)
+                    if tex then
+                        d.icon:SetTexture(tex)
+                        d.debuffIndex = i
+                        local col = DEBUFF_COLORS[debuffType or "none"] or DEBUFF_COLORS["none"]
+                        B:Border(d, col.r, col.g, col.b, 1)
+                        if count and count > 1 then
+                            d.count:SetText(tostring(count))
+                            d.count:Show()
+                        else
+                            d.count:Hide()
+                        end
+                        d:Show()
+                    else
+                        d:Hide()
+                    end
+                end
+            else
+                for i = 1, 16 do
+                    tgt.debuffs[i]:Hide()
+                end
+            end
         end
 
         -- Target of Target update
