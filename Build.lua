@@ -214,6 +214,83 @@ local function NormalizeName(str)
     return s
 end
 
+local ABILITY_DESCRIPTIONS = {
+    ["cleave"] = { name = "Cleave", cost = "20 Rage", range = "Melee Range", cast = "Instant", desc = "A sweeping attack that strikes the target and an additional nearby ally, dealing weapon damage plus bonus damage." },
+    ["whirlwind"] = { name = "Whirlwind", cost = "25 Rage", range = "8 yd radius", cast = "Instant", desc = "In a whirlwind of steel, attacks up to 4 nearby enemies, dealing weapon damage." },
+    ["mortal_strike"] = { name = "Mortal Strike", cost = "30 Rage", range = "Melee Range", cast = "Instant", desc = "A vicious strike that deals weapon damage and wounds the target, reducing healing received by 50% for 10 sec." },
+    ["thunder_clap"] = { name = "Thunder Clap", cost = "20 Rage", range = "8 yd radius", cast = "Instant", desc = "Blasts nearby enemies with thunder, increasing the time between their attacks by 10% and dealing Nature damage." },
+    ["demo_shout"] = { name = "Demoralizing Shout", cost = "10 Rage", range = "10 yd radius", cast = "Instant", desc = "Reduces the melee attack power of all nearby enemies for 30 sec." },
+    ["demoralizing_shout"] = { name = "Demoralizing Shout", cost = "10 Rage", range = "10 yd radius", cast = "Instant", desc = "Reduces the melee attack power of all nearby enemies for 30 sec." },
+    ["battle_shout"] = { name = "Battle Shout", cost = "10 Rage", range = "20 yd radius", cast = "Instant", desc = "Increases the melee attack power of party members within 20 yards for 2 min." },
+    ["bloodthirst"] = { name = "Bloodthirst", cost = "30 Rage", range = "Melee Range", cast = "Instant", desc = "Instantly attack the target for damage. In addition, the next 5 successful melee attacks restore health." },
+    ["rend"] = { name = "Rend", cost = "10 Rage", range = "Melee Range", cast = "Instant", desc = "Wounds the target causing them to bleed for physical damage over 15 sec." },
+    ["shield_slam"] = { name = "Shield Slam", cost = "20 Rage", range = "Melee Range", cast = "Instant", desc = "Slams the target with your shield, dealing damage modified by shield block value and dispelling 1 magic effect." },
+    ["execute"] = { name = "Execute", cost = "15 Rage", range = "Melee Range", cast = "Instant", desc = "Attempts to finish off a wounded enemy, dealing massive physical damage. Only usable on enemies with less than 20% health." },
+    ["bloodrage"] = { name = "Bloodrage", cost = "Health", range = "Self", cast = "Instant", desc = "Generates Rage immediately and over time at the cost of health." },
+    ["charge"] = { name = "Charge", cost = "None", range = "8-25 yd range", cast = "Instant", desc = "Charges an enemy, generating Rage and stunning it for 1 sec." },
+    ["rampage"] = { name = "Rampage", cost = "20 Rage", range = "Self", cast = "Instant", desc = "Goes on a rampage, increasing attack power and causing successful melee attacks to increase attack power further." },
+    ["flurry"] = { name = "Flurry", cost = "Passive", range = "Self", cast = "Passive", desc = "Increases attack speed by 30% for your next 3 swings after dealing a critical strike." },
+    ["sweeping_strikes"] = { name = "Sweeping Strikes", cost = "30 Rage", range = "Self", cast = "Instant", desc = "Your next 5 melee attacks strike an additional nearby opponent." },
+    ["consecration"] = { name = "Consecration", cost = "Mana", range = "8 yd radius", cast = "Instant", desc = "Consecrates the land beneath the caster, dealing Holy damage over 8 sec to all enemies who enter the area." },
+    ["exorcism"] = { name = "Exorcism", cost = "Mana", range = "30 yd range", cast = "Instant", desc = "Causes Holy damage to an Undead or Demon target." },
+    ["hammer_of_wrath"] = { name = "Hammer of Wrath", cost = "Mana", range = "30 yd range", cast = "Instant", desc = "Hurls a hammer that strikes an enemy for Holy damage. Only usable on enemies with less than 20% health." },
+    ["holy_shock"] = { name = "Holy Shock", cost = "Mana", range = "20 yd range", cast = "Instant", desc = "Blasts the target with Holy energy, causing Holy damage to an enemy or healing an ally." },
+    ["holy_wrath"] = { name = "Holy Wrath", cost = "Mana", range = "10 yd radius", cast = "Instant", desc = "Sends bolts of holy power in all directions, causing Holy damage to all Undead and Demon targets and stunning them." },
+    ["judgement"] = { name = "Judgement", cost = "Mana", range = "10 yd range", cast = "Instant", desc = "Unleashes the energy of a Seal upon an enemy, dealing damage or applying a debilitating judgement." },
+    ["hammer_of_justice"] = { name = "Hammer of Justice", cost = "Mana", range = "10 yd range", cast = "Instant", desc = "Stuns the target for up to 6 sec." },
+    ["divine_shield"] = { name = "Divine Shield", cost = "Mana", range = "Self", cast = "Instant", desc = "Protects the paladin from all damage and spells for 12 sec, but reduces attack speed by 50%." },
+    ["auto_shot"] = { name = "Auto Shot", cost = "None", range = "8-35 yd range", cast = "Ranged", desc = "Continuously shoots the target with the equipped ranged weapon." },
+    ["arcane_shot"] = { name = "Arcane Shot", cost = "Mana", range = "8-35 yd range", cast = "Instant", desc = "An instant shot that causes Arcane damage." },
+    ["multi_shot"] = { name = "Multi-Shot", cost = "Mana", range = "8-35 yd range", cast = "Instant", desc = "Fires several missiles, hitting up to 3 targets for physical damage." },
+    ["serpent_sting"] = { name = "Serpent Sting", cost = "Mana", range = "8-35 yd range", cast = "Instant", desc = "Stings the target, causing Nature damage over 15 sec." },
+    ["volley"] = { name = "Volley", cost = "Mana", range = "35 yd range", cast = "Channeled", desc = "Continuously fires a volley of ammo into the target area, dealing damage to all targets every second for 6 sec." },
+    ["explosive_trap"] = { name = "Explosive Trap", cost = "Mana", range = "Melee Range", cast = "Instant", desc = "Places a fire trap that explodes when an enemy approaches, causing Fire damage and burning nearby enemies." },
+    ["concussive_shot"] = { name = "Concussive Shot", cost = "Mana", range = "8-35 yd range", cast = "Instant", desc = "Dazes the target, slowing movement speed by 50% for 4 sec." },
+    ["aimed_shot"] = { name = "Aimed Shot", cost = "Mana", range = "8-35 yd range", cast = "3 sec cast", desc = "An aimed shot that increases ranged damage and reduces healing done to the target by 50%." },
+    ["sinister_strike"] = { name = "Sinister Strike", cost = "45 Energy", range = "Melee Range", cast = "Instant", desc = "A vicious strike that deals physical weapon damage to the target." },
+    ["eviscerate"] = { name = "Eviscerate", cost = "35 Energy", range = "Melee Range", cast = "Instant", desc = "Finishing move that causes damage per combo point." },
+    ["blade_flurry"] = { name = "Blade Flurry", cost = "25 Energy", range = "Self", cast = "Instant", desc = "Increases attack speed by 20%. In addition, attacks strike an additional nearby opponent." },
+    ["rupture"] = { name = "Rupture", cost = "25 Energy", range = "Melee Range", cast = "Instant", desc = "Finishing move that causes damage over time based on combo points." },
+    ["gouge"] = { name = "Gouge", cost = "45 Energy", range = "Melee Range", cast = "Instant", desc = "Causes damage and incapacitates the opponent for up to 4 sec. Must be facing target." },
+    ["adrenaline_rush"] = { name = "Adrenaline Rush", cost = "None", range = "Self", cast = "Instant", desc = "Increases energy regeneration rate by 100% for 15 sec." },
+    ["backstab"] = { name = "Backstab", cost = "60 Energy", range = "Melee Range", cast = "Instant", desc = "Backstab the target, causing 150% weapon damage plus additional damage. Must be behind the target." },
+    ["slice_and_dice"] = { name = "Slice and Dice", cost = "25 Energy", range = "Self", cast = "Instant", desc = "Finishing move that increases melee attack speed by 30%." },
+    ["smite"] = { name = "Smite", cost = "Mana", range = "30 yd range", cast = "2.5 sec cast", desc = "Smites an enemy for Holy damage." },
+    ["sw_pain"] = { name = "Shadow Word: Pain", cost = "Mana", range = "30 yd range", cast = "Instant", desc = "A word of darkness that causes Shadow damage over 18 sec." },
+    ["shadow_word_pain"] = { name = "Shadow Word: Pain", cost = "Mana", range = "30 yd range", cast = "Instant", desc = "A word of darkness that causes Shadow damage over 18 sec." },
+    ["mind_blast"] = { name = "Mind Blast", cost = "Mana", range = "30 yd range", cast = "1.5 sec cast", desc = "Blasts the target with shadowy energy for Shadow damage." },
+    ["holy_nova"] = { name = "Holy Nova", cost = "Mana", range = "10 yd radius", cast = "Instant", desc = "Causes an explosion of holy light, dealing Holy damage to all nearby enemies and healing nearby party members." },
+    ["pw_shield"] = { name = "Power Word: Shield", cost = "Mana", range = "40 yd range", cast = "Instant", desc = "Draws on the soul of the friendly target to shield them, absorbing damage for 30 sec." },
+    ["renew"] = { name = "Renew", cost = "Mana", range = "40 yd range", cast = "Instant", desc = "Heals the target for health over 15 sec." },
+    ["mind_flay"] = { name = "Mind Flay", cost = "Mana", range = "20 yd range", cast = "Channeled", desc = "Assaults the target's mind with Shadow energy, causing Shadow damage over 3 sec and slowing movement speed by 50%." },
+    ["lightning_bolt"] = { name = "Lightning Bolt", cost = "Mana", range = "30 yd range", cast = "3 sec cast", desc = "Casts a bolt of lightning at the target for Nature damage." },
+    ["chain_lightning"] = { name = "Chain Lightning", cost = "Mana", range = "30 yd range", cast = "2.5 sec cast", desc = "Hurls a lightning bolt at the enemy, dealing Nature damage and then jumping to nearby enemies." },
+    ["earth_shock"] = { name = "Earth Shock", cost = "Mana", range = "20 yd range", cast = "Instant", desc = "Instantly shocks the target with concussive force, causing Nature damage and interrupting spellcasting." },
+    ["flame_shock"] = { name = "Flame Shock", cost = "Mana", range = "20 yd range", cast = "Instant", desc = "Instantly burns the enemy with Fire damage and additional Fire damage over 12 sec." },
+    ["frost_shock"] = { name = "Frost Shock", cost = "Mana", range = "20 yd range", cast = "Instant", desc = "Instantly shocks the target with frost, dealing Frost damage and slowing movement speed by 50% for 8 sec." },
+    ["lightning_shield"] = { name = "Lightning Shield", cost = "Mana", range = "Self", cast = "Instant", desc = "Surrounds the caster with 3 balls of lightning that damage attackers." },
+    ["fireball"] = { name = "Fireball", cost = "Mana", range = "35 yd range", cast = "3 sec cast", desc = "Hurls a fiery ball that causes Fire damage and burns the target for additional Fire damage over 8 sec." },
+    ["frostbolt"] = { name = "Frostbolt", cost = "Mana", range = "30 yd range", cast = "2.5 sec cast", desc = "Launches a bolt of frost at the enemy, causing Frost damage and slowing movement speed by 40% for 9 sec." },
+    ["arcane_missiles"] = { name = "Arcane Missiles", cost = "Mana", range = "30 yd range", cast = "Channeled", desc = "Launches magical missiles at the enemy, dealing Arcane damage every second for 5 sec." },
+    ["frost_nova"] = { name = "Frost Nova", cost = "Mana", range = "10 yd radius", cast = "Instant", desc = "Blasts enemies near the caster for Frost damage and freezes them in place for up to 8 sec." },
+    ["arcane_explosion"] = { name = "Arcane Explosion", cost = "Mana", range = "10 yd radius", cast = "Instant", desc = "Causes an explosion of arcane magic around the caster, dealing Arcane damage to all targets within 10 yds." },
+    ["blizzard"] = { name = "Blizzard", cost = "Mana", range = "30 yd range", cast = "Channeled", desc = "Ice shards pelt the target area, dealing Frost damage over 8 sec and slowing movement speed by 30%." },
+    ["flamestrike"] = { name = "Flamestrike", cost = "Mana", range = "30 yd range", cast = "3 sec cast", desc = "Calls down a pillar of fire, burning all enemies in the area for Fire damage and additional Fire damage over 8 sec." },
+    ["pyroblast"] = { name = "Pyroblast", cost = "Mana", range = "35 yd range", cast = "6 sec cast", desc = "Hurls an immense fiery boulder that causes huge Fire damage and burns the target over 12 sec." },
+    ["shadow_bolt"] = { name = "Shadow Bolt", cost = "Mana", range = "30 yd range", cast = "3 sec cast", desc = "Sends a shadowy bolt at the enemy, causing Shadow damage." },
+    ["corruption"] = { name = "Corruption", cost = "Mana", range = "30 yd range", cast = "Instant", desc = "Corrupts the target, causing Shadow damage over 18 sec." },
+    ["immolate"] = { name = "Immolate", cost = "Mana", range = "30 yd range", cast = "2 sec cast", desc = "Burns the enemy for Fire damage and an additional Fire damage over 15 sec." },
+    ["curse_of_agony"] = { name = "Curse of Agony", cost = "Mana", range = "30 yd range", cast = "Instant", desc = "Curses the target with agony, causing Shadow damage over 24 sec." },
+    ["rain_of_fire"] = { name = "Rain of Fire", cost = "Mana", range = "30 yd range", cast = "Channeled", desc = "Calls down a fiery rain to burn enemies in the area of effect for Fire damage over 8 sec." },
+    ["hellfire"] = { name = "Hellfire", cost = "Mana", range = "Self", cast = "Channeled", desc = "Ignites the area surrounding the caster, dealing Fire damage to both enemies and the caster every second for 15 sec." },
+    ["death_coil"] = { name = "Death Coil", cost = "Mana", range = "30 yd range", cast = "Instant", desc = "Causes the enemy target to flee in terror for 3 sec and deals Shadow damage, healing the caster for 100% of damage dealt." },
+    ["drain_life"] = { name = "Drain Life", cost = "Mana", range = "20 yd range", cast = "Channeled", desc = "Drains health from the target over 5 sec, transferring health to the caster." },
+    ["moonfire"] = { name = "Moonfire", cost = "Mana", range = "30 yd range", cast = "Instant", desc = "Burns the enemy for Arcane damage and then an additional Arcane damage over 12 sec." },
+    ["starfire"] = { name = "Starfire", cost = "Mana", range = "30 yd range", cast = "3.5 sec cast", desc = "Causes Arcane damage to the target." },
+    ["hurricane"] = { name = "Hurricane", cost = "Mana", range = "30 yd range", cast = "Channeled", desc = "Creates a violent storm in the target area, dealing Nature damage to enemies every second for 10 sec." },
+    ["swipe"] = { name = "Swipe", cost = "20 Rage", range = "Melee Range", cast = "Instant", desc = "Swipes nearby enemies, dealing physical damage to up to 3 targets." },
+}
+
 local function GetAbilityIcon(nameOrId)
     if not nameOrId or nameOrId == "" then
         return nil
@@ -628,23 +705,46 @@ function mod:Create()
         rankFs:Hide()
         tile.rankFs = rankFs
 
-        -- Tooltip handling (Full ability tooltip via GameTooltip:SetSpell)
+        -- Tooltip handling (Full ability tooltip with descriptions)
         tile:SetScript("OnEnter", function()
             local sn = this.spellName
             if sn and sn ~= "" then
                 GameTooltip:SetOwner(this, "ANCHOR_TOP")
-                local sId = spellBookIds[sn] or spellBookIds[NormalizeName(sn)] or spellBookIds[string.lower(sn)]
-                if sId then
+                local norm = NormalizeName(sn)
+                local sId = spellBookIds[sn] or spellBookIds[norm] or spellBookIds[string.lower(sn)]
+                if sId and type(GameTooltip.SetSpell) == "function" then
                     GameTooltip:SetSpell(sId, BOOKTYPE_SPELL)
                 else
                     GameTooltip:ClearLines()
-                    GameTooltip:AddLine(sn, 1, 1, 1)
-                    if this.spellRank and tonumber(this.spellRank) and tonumber(this.spellRank) > 0 then
-                        GameTooltip:AddLine("Rank " .. tostring(this.spellRank), 0.8, 0.8, 0.8)
+                    local info = ABILITY_DESCRIPTIONS[norm] or ABILITY_DESCRIPTIONS[string.lower(sn)]
+                    local title = (info and info.name) or sn
+                    local rankStr = (this.spellRank and tonumber(this.spellRank) and tonumber(this.spellRank) > 0) and ("Rank " .. tostring(this.spellRank)) or nil
+
+                    if rankStr and GameTooltip.AddDoubleLine then
+                        GameTooltip:AddDoubleLine(title, rankStr, 1, 1, 1, 0.6, 0.6, 0.6)
+                    else
+                        GameTooltip:AddLine(title, 1, 1, 1)
+                        if rankStr then GameTooltip:AddLine(rankStr, 0.6, 0.6, 0.6) end
+                    end
+
+                    if info then
+                        if info.cost and info.range and GameTooltip.AddDoubleLine then
+                            GameTooltip:AddDoubleLine(info.cost, info.range, 1, 1, 1, 1, 1, 1)
+                        elseif info.cost then
+                            GameTooltip:AddLine(info.cost, 1, 1, 1)
+                        end
+                        if info.cast then
+                            GameTooltip:AddLine(info.cast, 1, 1, 1)
+                        end
+                        if info.desc then
+                            GameTooltip:AddLine(info.desc, 1.0, 0.82, 0.0, 1)
+                        end
                     end
                 end
                 if this.cdRest and this.cdRest > 0 then
-                    GameTooltip:AddLine(string.format("Cooldown: %.1fs", this.cdRest), 1, 0.82, 0)
+                    GameTooltip:AddLine(string.format("Cooldown remaining: %.1fs", this.cdRest), 0, 0.90, 1)
+                elseif this.cdMax and this.cdMax > 0 then
+                    GameTooltip:AddLine(string.format("Cooldown: %.1fs", this.cdMax), 0.7, 0.7, 0.7)
                 end
                 GameTooltip:Show()
             end

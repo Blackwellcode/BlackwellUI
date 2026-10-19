@@ -7,14 +7,60 @@
 local B = BlackwellUI
 local mod = {}
 mod.label = "Nameplates"
-mod.alwaysActive = false
+mod.alwaysActive = true
 
 local function SkinPlate(plate)
     if plate.buiSkinned then return end
 
-    local border, glow, name, level, boss, raid, elite = plate:GetRegions()
-    if not border or type(border.GetTexture) ~= "function" then return end
-    if border:GetTexture() ~= "Interface\\Tooltips\\Nameplate-Border" then return end
+    local regions = { plate:GetRegions() }
+    local nRegions = table.getn(regions)
+    local border, glow, nameFs, levelFs, bossIcon, raidIcon, eliteIcon
+
+    for i = 1, nRegions do
+        local r = regions[i]
+        if r and r.GetObjectType then
+            local oType = r:GetObjectType()
+            if oType == "Texture" then
+                local tex = r:GetTexture()
+                if tex == "Interface\\Tooltips\\Nameplate-Border" then
+                    border = r
+                elseif tex == "Interface\\Tooltips\\Nameplate-Glow" then
+                    glow = r
+                elseif tex and (string.find(tex, "Elite") or string.find(tex, "Dragon")) then
+                    eliteIcon = r
+                elseif tex and string.find(tex, "Boss") then
+                    bossIcon = r
+                elseif tex and (string.find(tex, "TargetingFrame") or string.find(tex, "RaidIcon")) then
+                    raidIcon = r
+                end
+            elseif oType == "FontString" then
+                if not nameFs then
+                    nameFs = r
+                else
+                    levelFs = r
+                end
+            end
+        end
+    end
+
+    if not border then return end
+
+    -- Find child StatusBar frames
+    local children = { plate:GetChildren() }
+    local nChildren = table.getn(children)
+    local healthBar, castBar
+    for i = 1, nChildren do
+        local c = children[i]
+        if c and type(c.GetStatusBarTexture) == "function" then
+            if not healthBar then
+                healthBar = c
+            else
+                castBar = c
+            end
+        end
+    end
+
+    if not healthBar then return end
 
     plate.buiSkinned = true
 
@@ -22,15 +68,12 @@ local function SkinPlate(plate)
     border:SetAlpha(0)
     if glow then glow:SetAlpha(0) end
 
-    local healthBar, castBar = plate:GetChildren()
-    if not healthBar or type(healthBar.SetStatusBarTexture) ~= "function" then return end
-
     plate.healthBar = healthBar
-    plate.nameFs = name
-    plate.levelFs = level
-    plate.bossIcon = boss
-    plate.raidIcon = raid
-    plate.eliteIcon = elite
+    plate.nameFs = nameFs
+    plate.levelFs = levelFs
+    plate.bossIcon = bossIcon
+    plate.raidIcon = raidIcon
+    plate.eliteIcon = eliteIcon
 
     -- Reskin HealthBar
     healthBar:SetStatusBarTexture(B:GetBarTexture())
@@ -54,23 +97,23 @@ local function SkinPlate(plate)
     plate.hpFs = hpFs
 
     -- Style Name font
-    if name then
-        name:SetFont(B:GetFontPath(), 9, "OUTLINE")
-        name:ClearAllPoints()
-        name:SetPoint("BOTTOM", healthBar, "TOP", 0, 3)
+    if nameFs then
+        nameFs:SetFont(B:GetFontPath(), 9, "OUTLINE")
+        nameFs:ClearAllPoints()
+        nameFs:SetPoint("BOTTOM", healthBar, "TOP", 0, 3)
     end
 
     -- Style Level font
-    if level then
-        level:SetFont(B:GetFontPath(), 8, "OUTLINE")
-        level:ClearAllPoints()
-        level:SetPoint("RIGHT", healthBar, "LEFT", -3, 0)
+    if levelFs then
+        levelFs:SetFont(B:GetFontPath(), 8, "OUTLINE")
+        levelFs:ClearAllPoints()
+        levelFs:SetPoint("RIGHT", healthBar, "LEFT", -3, 0)
     end
 
     -- Style Raid Icon
-    if raid then
-        raid:ClearAllPoints()
-        raid:SetPoint("BOTTOM", name, "TOP", 0, 2)
+    if raidIcon then
+        raidIcon:ClearAllPoints()
+        raidIcon:SetPoint("BOTTOM", healthBar, "TOP", 0, 14)
     end
 
     -- Style CastBar if present
@@ -161,6 +204,7 @@ function mod:Create()
             end
         end
     end)
+    self.frame = scanner
     self.scanner = scanner
 end
 

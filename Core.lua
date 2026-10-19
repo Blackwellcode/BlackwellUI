@@ -274,15 +274,165 @@ function B:Initials(v)
     return out
 end
 
+local function CoreNormalize(name)
+    if not name then return "" end
+    local s = string.lower(name)
+    s = string.gsub(s, "^%d+%.%s*", "")
+    s = string.gsub(s, "%s*%([%w%s]+%)%s*$", "")
+    s = string.gsub(s, "[%s%-%p]+", "_")
+    s = string.gsub(s, "^_+", "")
+    s = string.gsub(s, "_+$", "")
+    return s
+end
+
+local MASTER_ABILITY_ICONS = {
+    -- Warrior
+    ["cleave"] = "Interface\\Icons\\Ability_Warrior_Cleave",
+    ["whirlwind"] = "Interface\\Icons\\Ability_Whirlwind",
+    ["thunder_clap"] = "Interface\\Icons\\Spell_Nature_ThunderClap",
+    ["mortal_strike"] = "Interface\\Icons\\Ability_Warrior_SavageBlow",
+    ["execute"] = "Interface\\Icons\\INV_Sword_48",
+    ["demo_shout"] = "Interface\\Icons\\Ability_Warrior_WarCry",
+    ["demoralizing_shout"] = "Interface\\Icons\\Ability_Warrior_WarCry",
+    ["battle_shout"] = "Interface\\Icons\\Ability_Warrior_BattleShout",
+    ["bloodthirst"] = "Interface\\Icons\\Spell_Nature_BloodLust",
+    ["rend"] = "Interface\\Icons\\Ability_Gouge",
+    ["shield_slam"] = "Interface\\Icons\\INV_Shield_05",
+    ["bloodrage"] = "Interface\\Icons\\Ability_Racial_BloodRage",
+    ["charge"] = "Interface\\Icons\\Ability_Warrior_Charge",
+    ["rampage"] = "Interface\\Icons\\Ability_Warrior_Rampage",
+    ["flurry"] = "Interface\\Icons\\Ability_GhoulFrenzy",
+    ["sweeping_strikes"] = "Interface\\Icons\\Ability_Rogue_SliceDice",
+    ["overpower"] = "Interface\\Icons\\Ability_MeleeDamage",
+    ["slam"] = "Interface\\Icons\\Ability_Warrior_DecisiveStrike",
+    ["hamstring"] = "Interface\\Icons\\Ability_ShockWave",
+    ["shield_wall"] = "Interface\\Icons\\Ability_Warrior_ShieldWall",
+    ["recklessness"] = "Interface\\Icons\\Ability_CriticalStrike",
+
+    -- Paladin
+    ["consecration"] = "Interface\\Icons\\Spell_Holy_InnerFire",
+    ["exorcism"] = "Interface\\Icons\\Spell_Holy_Excorcism_02",
+    ["hammer_of_wrath"] = "Interface\\Icons\\Ability_ThunderClap",
+    ["holy_shock"] = "Interface\\Icons\\Spell_Holy_SearingLight",
+    ["holy_wrath"] = "Interface\\Icons\\Spell_Holy_Excorcism",
+    ["judgement"] = "Interface\\Icons\\Spell_Holy_RighteousFury",
+    ["hammer_of_justice"] = "Interface\\Icons\\Spell_Holy_SealOfMight",
+    ["holy_light"] = "Interface\\Icons\\Spell_Holy_HolyBolt",
+    ["divine_shield"] = "Interface\\Icons\\Spell_Holy_DivineIntervention",
+    ["holy_shield"] = "Interface\\Icons\\Spell_Holy_BlessingOfProtection",
+
+    -- Hunter
+    ["auto_shot"] = "Interface\\Icons\\INV_Weapon_Bow_07",
+    ["arcane_shot"] = "Interface\\Icons\\Ability_ImpalingBolt",
+    ["multi_shot"] = "Interface\\Icons\\Ability_UpgradeMoonGlaive",
+    ["serpent_sting"] = "Interface\\Icons\\Ability_Hunter_Quickshot",
+    ["volley"] = "Interface\\Icons\\Ability_Marksmanship",
+    ["explosive_trap"] = "Interface\\Icons\\Spell_Fire_SelfDestruct",
+    ["concussive_shot"] = "Interface\\Icons\\Spell_Frost_Stun",
+    ["aimed_shot"] = "Interface\\Icons\\INV_Spear_07",
+
+    -- Rogue
+    ["sinister_strike"] = "Interface\\Icons\\Spell_Shadow_RitualOfSacrifice",
+    ["eviscerate"] = "Interface\\Icons\\Ability_Rogue_Eviscerate",
+    ["blade_flurry"] = "Interface\\Icons\\Ability_Warrior_PunishingBlow",
+    ["rupture"] = "Interface\\Icons\\Ability_Rogue_Rupture",
+    ["kidney_shot"] = "Interface\\Icons\\Ability_Rogue_KidneyShot",
+    ["gouge"] = "Interface\\Icons\\Ability_Gouge",
+    ["adrenaline_rush"] = "Interface\\Icons\\Spell_Shadow_ShadowWordDominate",
+    ["backstab"] = "Interface\\Icons\\Ability_BackStab",
+    ["slice_and_dice"] = "Interface\\Icons\\Ability_Rogue_SliceDice",
+
+    -- Priest
+    ["smite"] = "Interface\\Icons\\Spell_Holy_HolySmite",
+    ["sw_pain"] = "Interface\\Icons\\Spell_Shadow_ShadowWordPain",
+    ["shadow_word_pain"] = "Interface\\Icons\\Spell_Shadow_ShadowWordPain",
+    ["mind_blast"] = "Interface\\Icons\\Spell_Shadow_UnholyFrenzy",
+    ["holy_nova"] = "Interface\\Icons\\Spell_Holy_HolyNova",
+    ["pw_shield"] = "Interface\\Icons\\Spell_Holy_PowerWordShield",
+    ["power_word_shield"] = "Interface\\Icons\\Spell_Holy_PowerWordShield",
+    ["renew"] = "Interface\\Icons\\Spell_Holy_Renew",
+    ["mind_flay"] = "Interface\\Icons\\Spell_Shadow_SiphonMana",
+
+    -- Shaman
+    ["lightning_bolt"] = "Interface\\Icons\\Spell_Nature_Lightning",
+    ["chain_lightning"] = "Interface\\Icons\\Spell_Nature_ChainLightning",
+    ["earth_shock"] = "Interface\\Icons\\Spell_Nature_EarthShock",
+    ["flame_shock"] = "Interface\\Icons\\Spell_Fire_FlameShock",
+    ["frost_shock"] = "Interface\\Icons\\Spell_Frost_FrostShock",
+    ["lightning_shield"] = "Interface\\Icons\\Spell_Nature_LightningShield",
+
+    -- Mage
+    ["fireball"] = "Interface\\Icons\\Spell_Fire_FlameBolt",
+    ["frostbolt"] = "Interface\\Icons\\Spell_Frost_FrostBolt02",
+    ["arcane_missiles"] = "Interface\\Icons\\Spell_Nature_StarFall",
+    ["frost_nova"] = "Interface\\Icons\\Spell_Frost_FrostNova",
+    ["arcane_explosion"] = "Interface\\Icons\\Spell_Nature_WispSplode",
+    ["blizzard"] = "Interface\\Icons\\Spell_Frost_IceStorm",
+    ["flamestrike"] = "Interface\\Icons\\Spell_Fire_SelfDestruct",
+    ["pyroblast"] = "Interface\\Icons\\Spell_Fire_Fireball02",
+
+    -- Warlock
+    ["shadow_bolt"] = "Interface\\Icons\\Spell_Shadow_ShadowBolt",
+    ["corruption"] = "Interface\\Icons\\Spell_Shadow_AbominationExplosion",
+    ["immolate"] = "Interface\\Icons\\Spell_Fire_Immolation",
+    ["curse_of_agony"] = "Interface\\Icons\\Spell_Shadow_CurseOfSargeras",
+    ["rain_of_fire"] = "Interface\\Icons\\Spell_Shadow_RainOfFire",
+    ["hellfire"] = "Interface\\Icons\\Spell_Fire_Incinerate",
+    ["death_coil"] = "Interface\\Icons\\Spell_Shadow_DeathCoil",
+    ["drain_life"] = "Interface\\Icons\\Spell_Shadow_LifeDrain02",
+
+    -- Druid
+    ["wrath"] = "Interface\\Icons\\Spell_Nature_AbolishMagic",
+    ["moonfire"] = "Interface\\Icons\\Spell_Nature_StarFall",
+    ["starfire"] = "Interface\\Icons\\Spell_Arcane_StarFire",
+    ["hurricane"] = "Interface\\Icons\\Spell_Nature_Cyclone",
+    ["swipe"] = "Interface\\Icons\\INV_Misc_MonsterClaw_03",
+    ["thorns"] = "Interface\\Icons\\Spell_Nature_Thorns",
+
+    -- Racials
+    ["blood_fury"] = "Interface\\Icons\\Racial_Orc_BerserkerStrength",
+    ["berserking"] = "Interface\\Icons\\Racial_Troll_Berserk",
+    ["war_stomp"] = "Interface\\Icons\\Ability_WarStomp",
+    ["will_of_the_forsaken"] = "Interface\\Icons\\Spell_Shadow_RaiseDead",
+    ["stoneform"] = "Interface\\Icons\\Spell_Shadow_UnholyStrength",
+}
+B.MASTER_ABILITY_ICONS = MASTER_ABILITY_ICONS
+
 function B:GetAbilityIcon(nameOrId)
     local s = string.lower(nameOrId or "")
-    if string.find(s, "melee") or string.find(s, "attack") or string.find(s, "swing") then
+    local norm = CoreNormalize(nameOrId)
+
+    -- Dynamic weapon icon for Melee / Weapon swings
+    if norm == "melee" or norm == "attack" or norm == "auto_attack" or norm == "autoattack" or norm == "swing" or norm == "physical" or norm == "hero_melee" or string.find(s, "melee") or string.find(s, "attack") or string.find(s, "swing") then
         if GetInventoryItemTexture then
             local wTex = GetInventoryItemTexture("player", 16)
             if wTex and wTex ~= "" then return wTex end
         end
         return "Interface\\Icons\\INV_Sword_04"
     end
+
+    -- Dynamic weapon icon for Ranged / Auto Shot
+    if norm == "shoot" or norm == "auto_shot" or norm == "autoshot" or norm == "ranged" or norm == "bow" then
+        if GetInventoryItemTexture then
+            local rTex = GetInventoryItemTexture("player", 18)
+            if rTex and rTex ~= "" then return rTex end
+        end
+        return "Interface\\Icons\\INV_Weapon_Bow_07"
+    end
+
+    -- Direct dictionary match
+    if MASTER_ABILITY_ICONS[nameOrId] then return MASTER_ABILITY_ICONS[nameOrId] end
+    if MASTER_ABILITY_ICONS[norm] then return MASTER_ABILITY_ICONS[norm] end
+
+    -- Fallback prefix match
+    if string.len(norm) >= 4 then
+        for k, v in pairs(MASTER_ABILITY_ICONS) do
+            if string.find(k, "^" .. norm) or string.find(norm, "^" .. k) then
+                return v
+            end
+        end
+    end
+
     return "Interface\\Icons\\INV_Misc_QuestionMark"
 end
 
