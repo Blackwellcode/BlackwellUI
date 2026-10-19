@@ -315,6 +315,7 @@ function mod:Create()
 
         local bar = B:Bar(r, nil, 0.8, 0.2, 0.2)
         bar:SetAllPoints(r)
+        bar:EnableMouse(false)
         r.bar = bar
 
         local badgeFs = B:Font(bar, 9, "LEFT")
@@ -342,14 +343,16 @@ function mod:Create()
         r.hl = hl
 
         r:EnableMouse(true)
-        r:RegisterForClicks("LeftButtonUp")
+        r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         r:SetScript("OnClick", function()
-            if this.unitName and this.unitName ~= "" then
+            local uName = this.unitName
+            if uName and uName ~= "" then
                 ClearTarget()
-                TargetByName(this.unitName, true)
+                TargetByName(uName, true)
                 if not UnitExists("target") then
-                    TargetByName(this.unitName, false)
+                    TargetByName(uName, false)
                 end
+                B:Tick()
             end
         end)
 
@@ -375,6 +378,15 @@ function mod:Create()
     enc:Hide()
     B:RegisterMover(enc, "encounters", "Elites & Bosses", "TOPRIGHT", "TOPRIGHT", -12, -280)
     self.enc = enc
+
+    local ufWatcher = CreateFrame("Frame")
+    ufWatcher:RegisterEvent("PLAYER_TARGET_CHANGED")
+    ufWatcher:RegisterEvent("UNIT_AURA")
+    ufWatcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+    ufWatcher:SetScript("OnEvent", function()
+        if B and B.Tick then B:Tick() end
+    end)
+    self.ufWatcher = ufWatcher
 end
 
 function mod:Update(state)
