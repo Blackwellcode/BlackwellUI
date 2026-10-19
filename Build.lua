@@ -218,17 +218,65 @@ local function GetAbilityIcon(nameOrId)
     if not nameOrId or nameOrId == "" then
         return nil
     end
+
+    local norm = NormalizeName(nameOrId)
+
+    -- Dynamic weapon icon for Melee / Weapon swings
+    if norm == "melee" or norm == "attack" or norm == "auto_attack" or norm == "autoattack" or norm == "swing" or norm == "physical" or norm == "hero_melee" then
+        if GetInventoryItemTexture then
+            local wTex = GetInventoryItemTexture("player", 16)
+            if wTex and wTex ~= "" then
+                return wTex
+            end
+        end
+        return "Interface\\Icons\\INV_Sword_04"
+    end
+
+    -- Dynamic weapon icon for Ranged / Auto Shot
+    if norm == "shoot" or norm == "auto_shot" or norm == "autoshot" or norm == "ranged" or norm == "bow" then
+        if GetInventoryItemTexture then
+            local rTex = GetInventoryItemTexture("player", 18)
+            if rTex and rTex ~= "" then
+                return rTex
+            end
+        end
+        return "Interface\\Icons\\INV_Weapon_Bow_07"
+    end
+
+    -- Dynamic weapon icon for Wand
+    if norm == "wand" or norm == "shoot_wand" then
+        if GetInventoryItemTexture then
+            local wandTex = GetInventoryItemTexture("player", 18)
+            if wandTex and wandTex ~= "" then
+                return wandTex
+            end
+        end
+        return "Interface\\Icons\\INV_Wand_01"
+    end
+
+    -- 1. Direct dictionary match
     if ABILITY_ICONS[nameOrId] then
         return ABILITY_ICONS[nameOrId]
     end
-    local norm = NormalizeName(nameOrId)
     if ABILITY_ICONS[norm] then
         return ABILITY_ICONS[norm]
     end
+
+    -- 2. Scanned spellbook icons
+    if spellIcons and spellIcons[nameOrId] then
+        return spellIcons[nameOrId]
+    end
+    if spellIcons and spellIcons[norm] then
+        return spellIcons[norm]
+    end
+
+    -- 3. Stripped trailing punctuation/rank
     local stripped = string.gsub(norm, "_+$", "")
     if ABILITY_ICONS[stripped] then
         return ABILITY_ICONS[stripped]
     end
+
+    -- 4. Prefix search in dictionary
     if string.len(stripped) >= 4 then
         for k, v in pairs(ABILITY_ICONS) do
             if string.find(k, "^" .. stripped) then
@@ -236,11 +284,25 @@ local function GetAbilityIcon(nameOrId)
             end
         end
     end
+
+    -- 5. Spell Buff DB match
+    if SPELL_BUFF_DB and SPELL_BUFF_DB[nameOrId] then
+        return SPELL_BUFF_DB[nameOrId].icon
+    end
+    if SPELL_BUFF_DB and SPELL_BUFF_DB[norm] then
+        return SPELL_BUFF_DB[norm].icon
+    end
+
     return nil
 end
 
 B.GetAbilityIcon = function(self, nameOrId)
     local ic = GetAbilityIcon(nameOrId)
+    if not ic and GetInventoryItemTexture then
+        -- Last resort fallback for physical attacks: check mainhand
+        local wTex = GetInventoryItemTexture("player", 16)
+        if wTex and wTex ~= "" then return wTex end
+    end
     return ic or "Interface\\Icons\\INV_Misc_QuestionMark"
 end
 
@@ -487,7 +549,12 @@ end
 -------------------------------------------------------------------------------
 --  Live Spellbook Scanner
 -------------------------------------------------------------------------------
+local spellIcons = {}
+local spellBookIds = {}
+
 local function ScanSpellbook()
+    spellIcons = {}
+    spellBookIds = {}
     local i = 1
     while true do
         local name, rank = GetSpellName(i, BOOKTYPE_SPELL)
@@ -497,6 +564,9 @@ local function ScanSpellbook()
             spellIcons[name] = tex
             local norm = NormalizeName(name)
             spellIcons[norm] = tex
+            spellBookIds[name] = i
+            spellBookIds[norm] = i
+            spellBookIds[string.lower(name)] = i
         end
         i = i + 1
     end
@@ -558,15 +628,20 @@ function mod:Create()
         rankFs:Hide()
         tile.rankFs = rankFs
 
-        -- Tooltip handling
+        -- Tooltip handling (Full ability tooltip via GameTooltip:SetSpell)
         tile:SetScript("OnEnter", function()
             local sn = this.spellName
             if sn and sn ~= "" then
                 GameTooltip:SetOwner(this, "ANCHOR_TOP")
-                GameTooltip:ClearLines()
-                GameTooltip:AddLine(sn, 1, 1, 1)
-                if this.spellRank and tonumber(this.spellRank) and tonumber(this.spellRank) > 0 then
-                    GameTooltip:AddLine("Rank " .. tostring(this.spellRank), 0.8, 0.8, 0.8)
+                local sId = spellBookIds[sn] or spellBookIds[NormalizeName(sn)] or spellBookIds[string.lower(sn)]
+                if sId then
+                    GameTooltip:SetSpell(sId, BOOKTYPE_SPELL)
+                else
+                    GameTooltip:ClearLines()
+                    GameTooltip:AddLine(sn, 1, 1, 1)
+                    if this.spellRank and tonumber(this.spellRank) and tonumber(this.spellRank) > 0 then
+                        GameTooltip:AddLine("Rank " .. tostring(this.spellRank), 0.8, 0.8, 0.8)
+                    end
                 end
                 if this.cdRest and this.cdRest > 0 then
                     GameTooltip:AddLine(string.format("Cooldown: %.1fs", this.cdRest), 1, 0.82, 0)

@@ -339,6 +339,8 @@ local function BuildOptionsFrame()
         { key = "timer",      label = "Run Clock, Phase & Schedule" },
         { key = "databar",    label = "Top Telemetry Data Bar" },
         { key = "stats",      label = "Left Multipliers & Stats" },
+        { key = "nameplates", label = "Cyberpunk Nameplates" },
+        { key = "character",  label = "Character Matrix ('C' Key)" },
     }
 
     for i = 1, table.getn(modDefs) do
