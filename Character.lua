@@ -64,8 +64,15 @@ local function StyleSubWidgets(parent)
             if string.find(string.lower(cName), "stats") or isSidePanel then
                 c.buiSkinned = true
                 CleanFrameTextures(c)
-                B:Backdrop(c, 0.95)
+                B:Backdrop(c, 0.96)
                 B:Border(c, 0, 0, 0, 1)
+
+                -- Align Run Stats panel flush with CharacterFrame
+                c:ClearAllPoints()
+                c:SetPoint("TOPLEFT", CharacterFrame, "TOPRIGHT", 4, 0)
+                c:SetPoint("BOTTOMLEFT", CharacterFrame, "BOTTOMRIGHT", 4, 0)
+                c:SetWidth(155)
+
                 local sideTop = c:CreateTexture(nil, "ARTWORK")
                 sideTop.buiKeep = true
                 sideTop:SetPoint("TOPLEFT", c, "TOPLEFT", 1, -1)
@@ -213,7 +220,7 @@ local function SkinCharacterFrame()
         end
     end
 
-    -- 8. Tabs at the bottom
+    -- 8. Tabs at the bottom (cleanly placed underneath the frame with 0 overlap)
     for i = 1, 5 do
         local tab = _G["CharacterFrameTab" .. i]
         if tab then
@@ -226,9 +233,27 @@ local function SkinCharacterFrame()
             B:Backdrop(tab, 0.95)
             B:Border(tab, 0.20, 0.20, 0.20, 1)
             tab:SetHeight(22)
+            tab:SetWidth(74)
+            tab:ClearAllPoints()
+            if i == 1 then
+                tab:SetPoint("TOPLEFT", CharacterFrame, "BOTTOMLEFT", 12, -2)
+            else
+                local prevTab = _G["CharacterFrameTab" .. (i - 1)]
+                if prevTab then
+                    tab:SetPoint("LEFT", prevTab, "RIGHT", 4, 0)
+                end
+            end
             local tabFs = tab:GetFontString()
             if tabFs then
                 tabFs:SetFont(B:GetFontPath(), 10, "OUTLINE")
+            end
+            if not tab.buiHooked then
+                tab.buiHooked = true
+                local origClick = tab:GetScript("OnClick")
+                tab:SetScript("OnClick", function()
+                    if origClick then origClick() end
+                    SkinCharacterFrame()
+                end)
             end
         end
     end
@@ -294,6 +319,20 @@ function mod:Create()
                 UpdateEquipment()
                 StyleSubWidgets(CharacterFrame)
                 if PaperDollFrame then StyleSubWidgets(PaperDollFrame) end
+                for i = 1, 5 do
+                    local tab = _G["CharacterFrameTab" .. i]
+                    if tab then
+                        tab:ClearAllPoints()
+                        if i == 1 then
+                            tab:SetPoint("TOPLEFT", CharacterFrame, "BOTTOMLEFT", 12, -2)
+                        else
+                            local prevTab = _G["CharacterFrameTab" .. (i - 1)]
+                            if prevTab then
+                                tab:SetPoint("LEFT", prevTab, "RIGHT", 4, 0)
+                            end
+                        end
+                    end
+                end
             end
         end)
 

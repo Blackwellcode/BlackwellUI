@@ -17,6 +17,49 @@ local MAX_METER_ROWS = 8
 local ROW_HEIGHT = 18
 local METER_WIDTH = 260
 
+B.meterOffsets = { done = {}, taken = {}, baseTime = 0, active = false }
+
+function B:ResetMeter(restoreAll)
+    if restoreAll then
+        self.meterOffsets.done = {}
+        self.meterOffsets.taken = {}
+        self.meterOffsets.baseTime = 0
+        self.meterOffsets.active = false
+        return
+    end
+
+    local s = self:GetState()
+    self.meterOffsets.done = {}
+    self.meterOffsets.taken = {}
+    self.meterOffsets.active = true
+
+    local curT = 0
+    if s and s.run and s.run.t then
+        curT = tonumber(s.run.t) or 0
+    elseif s and s.time then
+        curT = tonumber(s.time) or 0
+    else
+        curT = GetTime()
+    end
+    self.meterOffsets.baseTime = curT
+
+    local rawDone = (s and s.meter) or (type(AZS_METER) == "table" and AZS_METER) or {}
+    for i = 1, table.getn(rawDone) do
+        local item = rawDone[i]
+        if item and item.name then
+            self.meterOffsets.done[item.name] = tonumber(item.dmg) or 0
+        end
+    end
+
+    local rawTaken = (s and s.taken) or (type(AZS_TAKEN) == "table" and AZS_TAKEN) or {}
+    for i = 1, table.getn(rawTaken) do
+        local item = rawTaken[i]
+        if item and item.source then
+            self.meterOffsets.taken[item.source] = tonumber(item.dmg) or 0
+        end
+    end
+end
+
 function mod:Create()
     local f = CreateFrame("Frame", "BUI_MeterFrame", UIParent)
     EUI_MeterFrame = f -- Compatibility alias
@@ -51,8 +94,59 @@ function mod:Create()
     titleFs:SetTextColor(0.95, 0.95, 0.95)
     hdrBtn.title = titleFs
 
+    -- Reset / Refresh Button on the far right of header
+    local resetBtn = CreateFrame("Button", "BUI_MeterResetBtn", hdrBtn)
+    resetBtn:SetWidth(14)
+    resetBtn:SetHeight(14)
+    resetBtn:SetPoint("RIGHT", hdrBtn, "RIGHT", -4, 0)
+    resetBtn:EnableMouse(true)
+    B:Backdrop(resetBtn, 0.90)
+    B:Border(resetBtn, 0.35, 0.35, 0.35, 1)
+
+    local resetFs = B:Font(resetBtn, 9, "CENTER")
+    resetFs:SetPoint("CENTER", resetBtn, "CENTER", 0, 0)
+    resetFs:SetText("R")
+    resetFs:SetTextColor(0.85, 0.85, 0.85)
+    resetBtn.fs = resetFs
+
+    resetBtn:SetScript("OnEnter", function()
+        B:Border(this, 1.0, 0.82, 0.10, 1)
+        this.fs:SetTextColor(1.0, 0.82, 0.10)
+        GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+        GameTooltip:ClearLines()
+        GameTooltip:AddLine("Reset Damage Meter", 1.0, 0.82, 0.10)
+        GameTooltip:AddLine("Left-Click: Reset session damage & DPS to 0", 0.85, 0.85, 0.85)
+        GameTooltip:AddLine("Right-Click: Restore full run totals", 0.60, 0.60, 0.60)
+        GameTooltip:Show()
+    end)
+    resetBtn:SetScript("OnLeave", function()
+        B:Border(this, 0.35, 0.35, 0.35, 1)
+        this.fs:SetTextColor(0.85, 0.85, 0.85)
+        GameTooltip:Hide()
+    end)
+
+    if resetBtn.RegisterForClicks then
+        resetBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    end
+    resetBtn:SetScript("OnClick", function()
+        local btn = arg1
+        if btn == "RightButton" then
+            B:ResetMeter(true)
+            if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+                DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[BlackwellUI]|r Damage Meter: Full run totals restored.")
+            end
+        else
+            B:ResetMeter(false)
+            if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+                DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[BlackwellUI]|r Damage Meter: Session reset to 0.")
+            end
+        end
+        B:Tick()
+    end)
+    hdrBtn.resetBtn = resetBtn
+
     local valFs = B:Font(hdrBtn, 10, "RIGHT")
-    valFs:SetPoint("RIGHT", hdrBtn, "RIGHT", -8, 0)
+    valFs:SetPoint("RIGHT", resetBtn, "LEFT", -6, 0)
     B:Accent(valFs, "text")
     hdrBtn.value = valFs
 
@@ -135,25 +229,42 @@ function mod:Update(state)
     end
 
     if mode == "taken" then
-        f.header.title:SetText("DAMAGE TAKEN")
-        local takenList = state.taken or {}
-        local count = table.getn(takenList)
+        if B.meterOffsets and B.meterOffsets.active then
+            f.header.title:SetText("DMG TAKEN (SESSION)")
+        else
+            f.header.title:SetText("DAMAGE TAKEN")
+        end
+        local rawTaken = state.taken or {}
+        local count = table.getn(rawTaken)
 
+        local takenList = {}
         local totalTaken = 0
         local maxVal = 0
+
         for i = 1, count do
-            local d = tonumber(takenList[i].dmg) or 0
-            totalTaken = totalTaken + d
-            if d > maxVal then maxVal = d end
+            local item = rawTaken[i]
+            local rawD = tonumber(item.dmg) or 0
+            local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.taken and B.meterOffsets.taken[item.source]) or 0
+            local d = rawD - base
+            if d < 0 then d = 0 end
+            if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
+                table.insert(takenList, { source = item.source, dmg = d })
+                totalTaken = totalTaken + d
+                if d > maxVal then maxVal = d end
+            end
         end
+
+        table.sort(takenList, function(a, b) return a.dmg > b.dmg end)
+        local displayCount = table.getn(takenList)
+
         f.header.value:SetText(B:Short(totalTaken))
 
         local shown = 0
         for i = 1, MAX_METER_ROWS do
             local r = rows[i]
-            if i <= count then
+            if i <= displayCount then
                 local item = takenList[i]
-                local d = tonumber(item.dmg) or 0
+                local d = item.dmg
                 local pctMax = (maxVal > 0) and (d / maxVal) or 0
                 if pctMax > 1 then pctMax = 1 end
 
@@ -184,23 +295,46 @@ function mod:Update(state)
         f:SetHeight(h)
 
     else
-        f.header.title:SetText("DAMAGE DONE")
-        local meterList = state.meter or {}
-        local count = table.getn(meterList)
+        if B.meterOffsets and B.meterOffsets.active then
+            f.header.title:SetText("DMG DONE (SESSION)")
+        else
+            f.header.title:SetText("DAMAGE DONE")
+        end
+        local rawMeter = state.meter or {}
+        local count = table.getn(rawMeter)
 
+        local meterList = {}
         local totalDmg = 0
         local maxVal = 0
+
         for i = 1, count do
-            local d = tonumber(meterList[i].dmg) or 0
-            totalDmg = totalDmg + d
-            if d > maxVal then maxVal = d end
+            local item = rawMeter[i]
+            local rawD = tonumber(item.dmg) or 0
+            local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.done and B.meterOffsets.done[item.name]) or 0
+            local d = rawD - base
+            if d < 0 then d = 0 end
+            if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
+                table.insert(meterList, { name = item.name, dmg = d })
+                totalDmg = totalDmg + d
+                if d > maxVal then maxVal = d end
+            end
         end
 
-        local runSec = 0
+        table.sort(meterList, function(a, b) return a.dmg > b.dmg end)
+        local displayCount = table.getn(meterList)
+
+        local curT = 0
         if state and state.run and state.run.t then
-            runSec = tonumber(state.run.t) or 0
+            curT = tonumber(state.run.t) or 0
+        elseif state and state.time then
+            curT = tonumber(state.time) or 0
         end
-        local totalDps = (runSec > 0) and math.floor(totalDmg / runSec) or 0
+        local runSec = curT
+        if B.meterOffsets and B.meterOffsets.active then
+            runSec = curT - (B.meterOffsets.baseTime or 0)
+        end
+        if runSec < 1 then runSec = 1 end
+        local totalDps = math.floor(totalDmg / runSec)
         f.header.value:SetText(string.format("%s (%s/s)", B:Short(totalDmg), B:Short(totalDps)))
 
         local shown = 0
@@ -209,10 +343,10 @@ function mod:Update(state)
 
         for i = 1, MAX_METER_ROWS do
             local r = rows[i]
-            if i <= count then
+            if i <= displayCount then
                 local item = meterList[i]
-                local d = tonumber(item.dmg) or 0
-                local dps = tonumber(item.dps) or 0
+                local d = item.dmg
+                local dps = math.floor(d / runSec)
                 local pctMax = (maxVal > 0) and (d / maxVal) or 0
                 if pctMax > 1 then pctMax = 1 end
 

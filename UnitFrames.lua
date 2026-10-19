@@ -19,6 +19,185 @@ mod.alwaysActive = true
 
 local MAX_ENCOUNTER_ROWS = 20
 local ENC_WIDTH = 260
+local MAX_TARGET_DEBUFFS = 6
+local DEBUFF_BAR_WIDTH = 208
+local DEBUFF_BAR_HEIGHT = 16
+
+local lastTickDamage = {
+    ["rend"] = 450,
+    ["deep wounds"] = 890,
+    ["corruption"] = 1240,
+    ["shadow word: pain"] = 720,
+    ["immolate"] = 980,
+    ["moonfire"] = 560,
+    ["serpent sting"] = 340,
+    ["thunder clap"] = 620,
+}
+
+local debuffTimers = {}
+local DEBUFF_DURATIONS = {
+    ["rend"] = 15,
+    ["deep wounds"] = 12,
+    ["corruption"] = 18,
+    ["shadow word: pain"] = 18,
+    ["immolate"] = 15,
+    ["moonfire"] = 12,
+    ["serpent sting"] = 15,
+    ["insect swarm"] = 12,
+    ["rip"] = 16,
+    ["garrote"] = 18,
+    ["deadly poison"] = 12,
+    ["thunder clap"] = 30,
+    ["demoralizing shout"] = 30,
+    ["curse of agony"] = 24,
+    ["siphon life"] = 30,
+    ["gouge"] = 5.5,
+    ["kidney shot"] = 6,
+    ["blind"] = 10,
+    ["hamstring"] = 15,
+    ["frostbolt"] = 9,
+    ["cone of cold"] = 8,
+    ["blizzard"] = 8,
+    ["chilled"] = 5,
+}
+
+local function ParsePeriodicDamage(msg)
+    if not msg or msg == "" then return end
+
+    -- Pattern 1 (EN): "X suffers 450 Fire damage from your Immolation."
+    local _, _, dmg, spell = string.find(msg, "suffers (%d+).-damage from your ([^%.]+)")
+    if dmg and spell then
+        local d = tonumber(dmg)
+        if d then
+            lastTickDamage[string.lower(spell)] = d
+            return
+        end
+    end
+
+    -- Pattern 2 (EN): "suffers 450 ... from your Rend"
+    local _, _, dmg2, spell2 = string.find(msg, "suffers (%d+).-from your ([^%.]+)")
+    if dmg2 and spell2 then
+        local d = tonumber(dmg2)
+        if d then
+            lastTickDamage[string.lower(spell2)] = d
+            return
+        end
+    end
+
+    -- Pattern 3 (DE): "X erleidet 450 Feuerschaden durch Euer/Eure/Euren Feuerbrand."
+    local _, _, dmgDe, spellDe = string.find(msg, "erleidet (%d+).-durch Euer.- ([^%.]+)")
+    if dmgDe and spellDe then
+        local d = tonumber(dmgDe)
+        if d then
+            lastTickDamage[string.lower(spellDe)] = d
+            return
+        end
+    end
+
+    -- Pattern 4 (DE): "X erleidet 450 Schaden von Eurem Feuerbrand."
+    local _, _, dmgDe2, spellDe2 = string.find(msg, "erleidet (%d+).-von Euer.- ([^%.]+)")
+    if dmgDe2 and spellDe2 then
+        local d = tonumber(dmgDe2)
+        if d then
+            lastTickDamage[string.lower(spellDe2)] = d
+            return
+        end
+    end
+end
+
+local function GetSpellTickDamage(name)
+    if not name then return nil end
+    local lowerName = string.lower(name)
+    local val = lastTickDamage[lowerName]
+
+    if not val then
+        for k, v in pairs(lastTickDamage) do
+            if string.find(lowerName, k) or string.find(k, lowerName) then
+                val = v
+                break
+            end
+        end
+    end
+
+    if not val and type(AZS_METER) == "table" then
+        for i = 1, table.getn(AZS_METER) do
+            local item = AZS_METER[i]
+            if item.name and string.lower(item.name) == lowerName then
+                if item.dps and item.dps > 0 then
+                    val = math.floor(tonumber(item.dps) + 0.5)
+                end
+                break
+            end
+        end
+    end
+    return val
+end
+
+local function GetOrInitDebuffTimer(name, now)
+    local key = name and string.lower(name) or "default"
+    if not debuffTimers[key] then
+        local dur = DEBUFF_DURATIONS[key] or 15
+        debuffTimers[key] = { start = now, dur = dur }
+    end
+    return debuffTimers[key]
+end
+
+local debuffScanTooltip = nil
+local function GetTargetDebuffName(index, tex)
+    local name = nil
+    if not debuffScanTooltip then
+        debuffScanTooltip = CreateFrame("GameTooltip", "BUI_TargetDebuffScanTooltip", UIParent, "GameTooltipTemplate")
+        debuffScanTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+    end
+    if debuffScanTooltip.SetUnitDebuff then
+        debuffScanTooltip:ClearLines()
+        debuffScanTooltip:SetUnitDebuff("target", index)
+        local fs = getglobal("BUI_TargetDebuffScanTooltipTextLeft1")
+        if fs and fs.GetText then
+            name = fs:GetText()
+        end
+    end
+    if (not name or name == "") and tex then
+        local _, _, file = string.find(tex, "[^\\]+$")
+        if file then
+            name = string.gsub(file, "^Ability_", "")
+            name = string.gsub(name, "^Spell_", "")
+            name = string.gsub(name, "_", " ")
+        end
+    end
+    return name or ("Debuff " .. tostring(index))
+end
+
+local DEBUFF_TYPE_COLORS = {
+    ["Curse"]   = { r = 0.65, g = 0.20, b = 0.95 },
+    ["Disease"] = { r = 0.65, g = 0.40, b = 0.10 },
+    ["Magic"]   = { r = 0.20, g = 0.65, b = 1.00 },
+    ["Poison"]  = { r = 0.15, g = 0.75, b = 0.20 },
+    ["none"]    = { r = 0.85, g = 0.20, b = 0.25 },
+}
+
+local function GetDebuffBarColor(debuffType, name)
+    if debuffType and DEBUFF_TYPE_COLORS[debuffType] then
+        return DEBUFF_TYPE_COLORS[debuffType]
+    end
+    if name then
+        local s = string.lower(name)
+        if string.find(s, "fire") or string.find(s, "burn") or string.find(s, "immolat") or string.find(s, "flame") then
+            return { r = 1.00, g = 0.45, b = 0.10 }
+        elseif string.find(s, "frost") or string.find(s, "ice") or string.find(s, "chill") or string.find(s, "cold") then
+            return { r = 0.25, g = 0.75, b = 1.00 }
+        elseif string.find(s, "shadow") or string.find(s, "pain") or string.find(s, "curse") or string.find(s, "dark") then
+            return { r = 0.65, g = 0.20, b = 0.95 }
+        elseif string.find(s, "thunder") or string.find(s, "nature") or string.find(s, "lightning") then
+            return { r = 0.30, g = 0.75, b = 0.95 }
+        elseif string.find(s, "poison") or string.find(s, "venom") or string.find(s, "toxin") then
+            return { r = 0.15, g = 0.75, b = 0.20 }
+        elseif string.find(s, "shout") or string.find(s, "roar") then
+            return { r = 0.85, g = 0.50, b = 0.18 }
+        end
+    end
+    return DEBUFF_TYPE_COLORS["none"]
+end
 
 local POWER_COLORS = {
     [0] = { r = 0.00, g = 0.55, b = 1.00 }, -- Mana
@@ -178,44 +357,74 @@ function mod:Create()
     tgtPBar:SetHeight(6)
     tgt.pBar = tgtPBar
 
-    -- Target Debuffs (2 rows of 8 icons, 18x18, 1px border, zoom coords)
-    local debuffs = {}
-    for i = 1, 16 do
-        local d = CreateFrame("Button", "BUI_TargetDebuff" .. i, tgt)
-        d:SetWidth(18)
-        d:SetHeight(18)
-        d:EnableMouse(true)
-        B:Backdrop(d, 0.90)
+    -- Target Debuff Bars (Stacked above Target Frame, matching center Buff Bars)
+    -- 16px high aura bars with 16x16 icon on left, Name on left, Tick damage in center, Time/stacks on right
+    local debuffBars = {}
+    for i = 1, MAX_TARGET_DEBUFFS do
+        local r = CreateFrame("Button", "BUI_TargetDebuffBar" .. i, tgt)
+        r:SetWidth(DEBUFF_BAR_WIDTH)
+        r:SetHeight(DEBUFF_BAR_HEIGHT)
+        r:SetPoint("BOTTOMLEFT", tgt, "TOPLEFT", 1, 6 + (i - 1) * (DEBUFF_BAR_HEIGHT + 2))
+        r:EnableMouse(true)
 
-        local dIcon = d:CreateTexture(nil, "ARTWORK")
-        dIcon:SetPoint("TOPLEFT", d, "TOPLEFT", 1, -1)
-        dIcon:SetPoint("BOTTOMRIGHT", d, "BOTTOMRIGHT", -1, 1)
-        dIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        d.icon = dIcon
+        -- Square Icon tile on the left (16x16)
+        local iconFrame = CreateFrame("Frame", nil, r)
+        iconFrame:SetWidth(DEBUFF_BAR_HEIGHT)
+        iconFrame:SetHeight(DEBUFF_BAR_HEIGHT)
+        iconFrame:SetPoint("LEFT", r, "LEFT", 0, 0)
+        B:Border(iconFrame, 0, 0, 0, 1)
 
-        local dCount = B:Font(d, 9, "RIGHT")
-        dCount:SetPoint("BOTTOMRIGHT", d, "BOTTOMRIGHT", -1, 0)
-        dCount:SetTextColor(1, 1, 1)
-        d.count = dCount
+        local icon = iconFrame:CreateTexture(nil, "ARTWORK")
+        icon:SetAllPoints(iconFrame)
+        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        r.icon = icon
 
-        d.debuffIndex = i
-        d:SetScript("OnEnter", function()
+        -- Status bar on the right of the icon
+        local bar = B:Bar(r, nil)
+        bar:ClearAllPoints()
+        bar:SetPoint("TOPLEFT", iconFrame, "TOPRIGHT", 2, 0)
+        bar:SetPoint("BOTTOMRIGHT", r, "BOTTOMRIGHT", 0, 0)
+        bar:EnableMouse(false)
+        r.bar = bar
+
+        -- Debuff Name on the left
+        local nameFs = B:Font(bar, 9, "LEFT")
+        nameFs:SetPoint("LEFT", bar, "LEFT", 4, 0)
+        nameFs:SetWidth(95)
+        nameFs:SetHeight(12)
+        r.nameFs = nameFs
+
+        -- Tick Damage in the center
+        local centerFs = B:Font(bar, 10, "CENTER")
+        centerFs:SetPoint("CENTER", bar, "CENTER", 0, 0)
+        centerFs:SetTextColor(1.0, 0.85, 0.20)
+        r.centerFs = centerFs
+
+        -- Time / Stacks on the right
+        local timeFs = B:Font(bar, 9, "RIGHT")
+        timeFs:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
+        timeFs:SetWidth(44)
+        timeFs:SetHeight(12)
+        r.timeFs = timeFs
+
+        r.debuffIndex = i
+        r:SetScript("OnEnter", function()
             if UnitExists("target") and this.debuffIndex then
-                GameTooltip:SetOwner(this, "ANCHOR_BOTTOMRIGHT")
+                GameTooltip:SetOwner(this, "ANCHOR_TOP")
                 GameTooltip:SetUnitDebuff("target", this.debuffIndex)
+                if this.tickDmg and this.tickDmg > 0 then
+                    GameTooltip:AddLine(string.format("Tick Damage: %d", this.tickDmg), 1.0, 0.85, 0.20)
+                end
                 GameTooltip:Show()
             end
         end)
-        d:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        r:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-        local row = math.floor((i - 1) / 8)
-        local col = math.mod(i - 1, 8)
-        d:SetPoint("TOPLEFT", tgt, "BOTTOMLEFT", col * 20, -5 - row * 20)
-
-        d:Hide()
-        debuffs[i] = d
+        r:Hide()
+        debuffBars[i] = r
     end
-    tgt.debuffs = debuffs
+    tgt.debuffBars = debuffBars
+    tgt.debuffs = debuffBars
 
     tgt:Hide()
     B:RegisterMover(tgt, "target", "Target Frame", "BOTTOM", "BOTTOM", 240, 140)
@@ -387,6 +596,20 @@ function mod:Create()
         if B and B.Tick then B:Tick() end
     end)
     self.ufWatcher = ufWatcher
+
+    local cmbWatcher = CreateFrame("Frame")
+    cmbWatcher:RegisterEvent("CHAT_MSG_SPELL_PERIODIC_CREATURE_DAMAGE")
+    cmbWatcher:RegisterEvent("CHAT_MSG_SPELL_PERIODIC_HOSTILEPLAYER_DAMAGE")
+    cmbWatcher:RegisterEvent("CHAT_MSG_SPELL_SELF_DAMAGE")
+    cmbWatcher:RegisterEvent("PLAYER_TARGET_CHANGED")
+    cmbWatcher:SetScript("OnEvent", function()
+        if event == "PLAYER_TARGET_CHANGED" then
+            debuffTimers = {}
+        elseif arg1 then
+            ParsePeriodicDamage(arg1)
+        end
+    end)
+    self.cmbWatcher = cmbWatcher
 end
 
 function mod:Update(state)
@@ -476,8 +699,8 @@ function mod:Update(state)
 
     if not hasAzsTarget and not hasBlizzTarget then
         tgt:Hide()
-        if tgt.debuffs then
-            for i = 1, 16 do tgt.debuffs[i]:Hide() end
+        if tgt.debuffBars then
+            for i = 1, MAX_TARGET_DEBUFFS do tgt.debuffBars[i]:Hide() end
         end
         if self.tot then self.tot:Hide() end
     else
@@ -587,38 +810,106 @@ function mod:Update(state)
             tgt.pBar:Show()
         end
 
-        -- Target Debuffs update
-        if tgt.debuffs then
-            if UnitExists("target") then
-                local DEBUFF_COLORS = {
-                    ["Curse"]   = { r = 0.60, g = 0.00, b = 1.00 },
-                    ["Disease"] = { r = 0.60, g = 0.40, b = 0.00 },
-                    ["Magic"]   = { r = 0.20, g = 0.60, b = 1.00 },
-                    ["Poison"]  = { r = 0.00, g = 0.65, b = 0.10 },
-                    ["none"]    = { r = 0.85, g = 0.15, b = 0.15 },
+        -- Target Debuff Bars update (Cyberpunk Aura Bars with Tick Damage)
+        if tgt.debuffBars then
+            local shownCount = 0
+            if (state and state.demo) or (B.unlocked and not UnitExists("target")) then
+                local demoDebuffs = {
+                    { name = "Rend", icon = "Interface\\Icons\\Ability_Gouge", left = 11.4, max = 15, tick = 450, color = { r = 0.85, g = 0.25, b = 0.20 } },
+                    { name = "Deep Wounds", icon = "Interface\\Icons\\Ability_BackStab", left = 7.8, max = 12, tick = 890, color = { r = 0.95, g = 0.35, b = 0.15 } },
+                    { name = "Thunder Clap", icon = "Interface\\Icons\\Spell_Nature_ThunderClap", left = 18.2, max = 30, tick = 620, color = { r = 0.25, g = 0.75, b = 1.00 } },
+                    { name = "Demoralizing Shout", icon = "Interface\\Icons\\Ability_Warrior_WarCry", left = 24.0, max = 30, tick = 0, color = { r = 0.85, g = 0.50, b = 0.18 } },
                 }
-                for i = 1, 16 do
-                    local d = tgt.debuffs[i]
+                shownCount = table.getn(demoDebuffs)
+                for i = 1, MAX_TARGET_DEBUFFS do
+                    local r = tgt.debuffBars[i]
+                    if i <= shownCount then
+                        local d = demoDebuffs[i]
+                        r.icon:SetTexture(d.icon)
+                        r.nameFs:SetText(d.name)
+                        local pct = d.left / d.max
+                        if pct > 1 then pct = 1 elseif pct < 0 then pct = 0 end
+                        r.bar:SetValue(pct)
+                        B:SetBarColor(r.bar, d.color.r, d.color.g, d.color.b)
+                        local bg = r.bar.buiBg or r.bar.euiBg
+                        if bg then
+                            bg:SetVertexColor(d.color.r * 0.25, d.color.g * 0.25, d.color.b * 0.25)
+                            bg:SetAlpha(0.85)
+                        end
+                        if d.tick and d.tick > 0 then
+                            r.centerFs:SetText(tostring(d.tick))
+                            r.tickDmg = d.tick
+                        else
+                            r.centerFs:SetText("")
+                            r.tickDmg = nil
+                        end
+                        r.timeFs:SetText(string.format("%.1fs", d.left))
+                        r:Show()
+                    else
+                        r:Hide()
+                    end
+                end
+            elseif UnitExists("target") then
+                local now = GetTime()
+                for i = 1, MAX_TARGET_DEBUFFS do
+                    local r = tgt.debuffBars[i]
                     local tex, count, debuffType = UnitDebuff("target", i)
                     if tex then
-                        d.icon:SetTexture(tex)
-                        d.debuffIndex = i
-                        local col = DEBUFF_COLORS[debuffType or "none"] or DEBUFF_COLORS["none"]
-                        B:Border(d, col.r, col.g, col.b, 1)
-                        if count and count > 1 then
-                            d.count:SetText(tostring(count))
-                            d.count:Show()
-                        else
-                            d.count:Hide()
+                        r.debuffIndex = i
+                        r.icon:SetTexture(tex)
+
+                        -- Resolve debuff name via tooltip scanner or texture
+                        local dName = GetTargetDebuffName(i, tex)
+                        r.nameFs:SetText(dName or "Debuff")
+
+                        -- Duration tracking
+                        local timer = GetOrInitDebuffTimer(dName, now)
+                        local elapsed = now - timer.start
+                        local left = timer.dur - elapsed
+                        if left <= 0 then
+                            timer.start = now
+                            left = timer.dur
+                            elapsed = 0
                         end
-                        d:Show()
+                        local pct = left / timer.dur
+                        if pct > 1 then pct = 1 elseif pct < 0 then pct = 0 end
+                        r.bar:SetValue(pct)
+
+                        -- Color
+                        local col = GetDebuffBarColor(debuffType, dName)
+                        B:SetBarColor(r.bar, col.r, col.g, col.b)
+                        local bg = r.bar.buiBg or r.bar.euiBg
+                        if bg then
+                            bg:SetVertexColor(col.r * 0.25, col.g * 0.25, col.b * 0.25)
+                            bg:SetAlpha(0.85)
+                        end
+
+                        -- Tick Damage in Center
+                        local tickVal = GetSpellTickDamage(dName)
+                        if tickVal and tickVal > 0 then
+                            r.centerFs:SetText(tostring(tickVal))
+                            r.tickDmg = tickVal
+                        else
+                            r.centerFs:SetText("")
+                            r.tickDmg = nil
+                        end
+
+                        -- Time / Stacks on Right
+                        if count and count > 1 then
+                            r.timeFs:SetText(string.format("%.1fs (%d)", left, count))
+                        else
+                            r.timeFs:SetText(string.format("%.1fs", left))
+                        end
+
+                        r:Show()
+                        shownCount = shownCount + 1
                     else
-                        d:Hide()
+                        r:Hide()
                     end
                 end
             else
-                for i = 1, 16 do
-                    tgt.debuffs[i]:Hide()
+                for i = 1, MAX_TARGET_DEBUFFS do
+                    tgt.debuffBars[i]:Hide()
                 end
             end
         end
