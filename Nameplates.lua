@@ -1,6 +1,7 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Nameplates.lua
 --  Cyberpunk-styled Nameplates (1px border, smooth statusbar, custom font, reaction colors).
+--  Filter: Exclusively Bosses, Rares / Elites, and active player target.
 --  Lua 5.0 / WoW 1.12.1: no '#', no '%', no string methods.
 -------------------------------------------------------------------------------
 
@@ -10,13 +11,14 @@ mod.label = "Nameplates"
 mod.alwaysActive = true
 
 -------------------------------------------------------------------------------
---  Azeroth Survivors Boss & Rare Dictionaries
+--  Azeroth Survivors Boss & Rare Dictionaries (Static Fallbacks)
 -------------------------------------------------------------------------------
 local BOSS_NAMES = {
     -- Elwynn Forest
     ["Hogger"] = true, ["Mother Fang"] = true, ["Rhahk'Zor"] = true, ["Mr. Smite"] = true, ["Edwin VanCleef"] = true,
     -- Duskwood
-    ["Naraxis"] = true, ["Mor'Ladim"] = true, ["Stitches"] = true, ["Lupos"] = true, ["Morbent Fel"] = true,
+    ["Morbent's Herald"] = true, ["Naraxis"] = true, ["Mor'Ladim"] = true, ["Stitches"] = true,
+    ["Lupos"] = true, ["Eliza"] = true, ["Stalvan Mistmantle"] = true, ["Morbent Fel"] = true,
     -- Warsong Gulch
     ["Doomguard Commander"] = true, ["Mannoroth's Herald"] = true, ["Varimathras"] = true, ["Lord Hel'nurath"] = true, ["Lord Kazzak"] = true,
     -- Arathi Basin
@@ -38,6 +40,7 @@ local RARE_NAMES = {
     ["Kobold Taskmaster"] = true, ["Gruff Swiftbite"] = true, ["Bellygrub"] = true,
     -- Duskwood
     ["Nightbane Worgen Alpha"] = true, ["Carrion Recluse"] = true, ["Flesh Eating Abomination"] = true,
+    ["Rotting Ghoul"] = true, ["Shrine Warden"] = true, ["Skeletal Fiend"] = true,
     -- Warsong
     ["Felguard Elite"] = true, ["Infernal"] = true, ["Doomguard"] = true,
     -- Arathi
@@ -54,47 +57,84 @@ local RARE_NAMES = {
     ["Qiraji Champion"] = true, ["Anubisath Sentinel"] = true, ["Obsidian Destroyer"] = true,
 }
 
-local function IsBossOrRare(plate, nameStr)
-    local isBoss = false
-    local isRare = false
+-------------------------------------------------------------------------------
+--  Dynamic AZS Unit Telemetry Cache
+-------------------------------------------------------------------------------
+local liveKinds = {}
+local lastUnitsUpdated = nil
+local lastScheduleUpdated = nil
 
-    if plate.bossIcon and plate.bossIcon:IsShown() then
-        isBoss = true
-    end
-    if plate.eliteIcon and plate.eliteIcon:IsShown() then
-        isRare = true
-    end
-
-    if nameStr and nameStr ~= "" then
-        if BOSS_NAMES[nameStr] then
-            isBoss = true
-        elseif RARE_NAMES[nameStr] then
-            isRare = true
-        end
-
-        -- Check live AZS units table if available
-        if not isBoss and not isRare and AZS_UNITS and type(AZS_UNITS) == "table" then
-            local nUnits = table.getn(AZS_UNITS)
-            for i = 1, nUnits do
-                local u = AZS_UNITS[i]
-                if type(u) == "table" then
-                    local uName = u.name or u[3]
-                    local uKind = u.kind or u[1]
-                    if uName and uName == nameStr then
-                        if uKind == "boss" or uKind == "final" then
-                            isBoss = true
-                            break
-                        elseif uKind == "elite" or uKind == "guardian" then
-                            isRare = true
-                            break
-                        end
+local function RefreshLiveKinds()
+    if AZS_UNITS and AZS_UNITS_UPDATED ~= lastUnitsUpdated then
+        lastUnitsUpdated = AZS_UNITS_UPDATED
+        local n = table.getn(AZS_UNITS)
+        for i = 1, n do
+            local u = AZS_UNITS[i]
+            if type(u) == "table" then
+                local uName = u.name or u[3]
+                local uKind = u.kind or u[1]
+                if uName and uName ~= "" and uKind then
+                    if uKind == "boss" or uKind == "final" then
+                        liveKinds[uName] = "boss"
+                    elseif uKind == "guardian" or uKind == "elite" then
+                        liveKinds[uName] = "rare"
                     end
                 end
             end
         end
+    end
 
-        -- Check target classification if this plate is our current target
-        if not isBoss and not isRare and UnitExists("target") and UnitName("target") == nameStr then
+    if AZS_SCHEDULE and AZS_SCHEDULE_UPDATED ~= lastScheduleUpdated then
+        lastScheduleUpdated = AZS_SCHEDULE_UPDATED
+        local n = table.getn(AZS_SCHEDULE)
+        for i = 1, n do
+            local b = AZS_SCHEDULE[i]
+            if type(b) == "table" then
+                local bName = b.name or b[3]
+                if bName and bName ~= "" then
+                    liveKinds[bName] = "boss"
+                end
+            end
+        end
+    end
+end
+
+local function IsBossOrRare(plate, nameStr)
+    RefreshLiveKinds()
+
+    local isBoss = false
+    local isRare = false
+
+    -- 1. Skull Icon (Level -1 / Boss ?? in WoW 1.12)
+    if plate.skullIcon and plate.skullIcon:IsShown() then
+        isBoss = true
+    end
+
+    -- 2. Check name against dynamic and static databases
+    if nameStr and nameStr ~= "" then
+        local lk = liveKinds[nameStr]
+        if lk == "boss" then
+            isBoss = true
+        elseif lk == "rare" then
+            isRare = true
+        elseif BOSS_NAMES[nameStr] then
+            isBoss = true
+        elseif RARE_NAMES[nameStr] then
+            isRare = true
+        end
+    end
+
+    -- 3. Check target classification if plate matches current target
+    if not isBoss and not isRare and UnitExists("target") and nameStr and nameStr == UnitName("target") then
+        if AZS_UnitKind then
+            local k = AZS_UnitKind("target")
+            if k == "boss" or k == "final" then
+                isBoss = true
+            elseif k == "guardian" or k == "elite" then
+                isRare = true
+            end
+        end
+        if not isBoss and not isRare then
             local c = UnitClassification("target")
             if c == "worldboss" then
                 isBoss = true
@@ -107,13 +147,101 @@ local function IsBossOrRare(plate, nameStr)
     return isBoss, isRare, (isBoss or isRare)
 end
 
+local function UpdatePlate(plate)
+    if not plate or not plate.buiSkinned or not plate:IsShown() then return end
+
+    local healthBar = plate.healthBar
+    local hpFs = plate.hpFs
+    local name = plate.nameFs
+    local level = plate.levelFs
+    local nameStr = name and name:GetText()
+
+    local isBoss, isRare, isImportant = IsBossOrRare(plate, nameStr)
+    local isTarget = false
+    if UnitExists("target") and nameStr and nameStr == UnitName("target") then
+        local a = plate:GetAlpha()
+        if a and a >= 0.95 then
+            isTarget = true
+        end
+    end
+
+    -- Filter: Only show Nameplates of Bosses and Rares (and player's current target)
+    if not isImportant and not isTarget then
+        plate.buiFiltered = true
+        if healthBar:IsShown() then
+            healthBar:Hide()
+        end
+        healthBar:SetAlpha(0)
+        if name and name:IsShown() then name:Hide(); name:SetAlpha(0) end
+        if level and level:IsShown() then level:Hide(); level:SetAlpha(0) end
+        if hpFs and hpFs:IsShown() then hpFs:Hide(); hpFs:SetAlpha(0) end
+        if plate.castBar and plate.castBar:IsShown() then plate.castBar:Hide(); plate.castBar:SetAlpha(0) end
+        return
+    end
+
+    -- Unfilter if previously filtered
+    if plate.buiFiltered then
+        plate.buiFiltered = nil
+        healthBar:Show()
+        healthBar:SetAlpha(1)
+        if name then name:Show(); name:SetAlpha(1) end
+        if level then level:Show(); level:SetAlpha(1) end
+        if hpFs then hpFs:Show(); hpFs:SetAlpha(1) end
+    end
+
+    -- Value & Percentage
+    local cur = healthBar:GetValue() or 0
+    local minv, maxv = healthBar:GetMinMaxValues()
+    if maxv and maxv > 0 then
+        local pct = math.floor(cur / maxv * 100 + 0.5)
+        hpFs:SetText(tostring(pct) .. "%")
+    end
+
+    -- Color enhancement: Bosses take Violet/Crimson, Rares take Amber/Gold, others standard
+    if isBoss then
+        B:SetBarColor(healthBar, 0.85, 0.20, 0.40)
+    elseif isRare then
+        B:SetBarColor(healthBar, 1.00, 0.65, 0.12)
+    else
+        local r, g, b = healthBar:GetStatusBarColor()
+        if r and g and b then
+            if r > 0.8 and g < 0.2 and b < 0.2 then
+                -- Hostile: Neon Red
+                B:SetBarColor(healthBar, 0.92, 0.15, 0.15)
+            elseif r > 0.8 and g > 0.8 and b < 0.2 then
+                -- Neutral: Cyber Gold
+                B:SetBarColor(healthBar, 0.95, 0.78, 0.12)
+            elseif g > 0.7 and r < 0.2 then
+                -- Friendly: Cyber Green
+                B:SetBarColor(healthBar, 0.15, 0.85, 0.35)
+            elseif r > 0.4 and r < 0.6 and g > 0.4 and g < 0.6 and b > 0.4 and b < 0.6 then
+                -- Tapped / Gray
+                B:SetBarColor(healthBar, 0.50, 0.50, 0.50)
+            end
+        end
+    end
+
+    -- Target indicator border
+    if isTarget then
+        local ar, ag, ab = B:GetAccent()
+        B:SetBorderColor(healthBar, ar, ag, ab, 1)
+    else
+        B:SetBorderColor(healthBar, 0, 0, 0, 1)
+    end
+
+    -- Elite / Boss indicator text styling
+    if (isBoss or isRare) and level then
+        level:SetTextColor(1.0, 0.82, 0.10)
+    end
+end
+
 local function SkinPlate(plate)
     if not plate or plate.buiSkinned then return end
     if type(plate.GetRegions) ~= "function" or type(plate.GetChildren) ~= "function" then return end
 
     local regions = { plate:GetRegions() }
     local nRegions = table.getn(regions)
-    local border, glow, nameFs, levelFs, bossIcon, raidIcon, eliteIcon
+    local border, glow, nameFs, levelFs, skullIcon, raidIcon
 
     for i = 1, nRegions do
         local r = regions[i]
@@ -125,10 +253,8 @@ local function SkinPlate(plate)
                     border = r
                 elseif tex == "Interface\\Tooltips\\Nameplate-Glow" then
                     glow = r
-                elseif tex and (string.find(tex, "Elite", 1, true) or string.find(tex, "Dragon", 1, true)) then
-                    eliteIcon = r
-                elseif tex and string.find(tex, "Boss", 1, true) then
-                    bossIcon = r
+                elseif tex and string.find(tex, "Skull", 1, true) then
+                    skullIcon = r
                 elseif tex and (string.find(tex, "TargetingFrame", 1, true) or string.find(tex, "RaidIcon", 1, true)) then
                     raidIcon = r
                 end
@@ -170,9 +296,8 @@ local function SkinPlate(plate)
     plate.healthBar = healthBar
     plate.nameFs = nameFs
     plate.levelFs = levelFs
-    plate.bossIcon = bossIcon
+    plate.skullIcon = skullIcon
     plate.raidIcon = raidIcon
-    plate.eliteIcon = eliteIcon
 
     -- Reskin HealthBar
     healthBar:SetStatusBarTexture(B:GetBarTexture())
@@ -226,95 +351,40 @@ local function SkinPlate(plate)
         local cbg = castBar:CreateTexture(nil, "BACKGROUND")
         B:Solid(cbg, 0.05, 0.05, 0.05, 0.85)
         cbg:SetAllPoints(castBar)
+        plate.castBar = castBar
     end
-end
 
-local function UpdatePlate(plate)
-    if not plate.buiSkinned or not plate:IsShown() then return end
-
-    local healthBar = plate.healthBar
-    local hpFs = plate.hpFs
-    local name = plate.nameFs
-    local level = plate.levelFs
-    local nameStr = name and name:GetText()
-
-    local isBoss, isRare, isImportant = IsBossOrRare(plate, nameStr)
-    local isTarget = UnitExists("target") and nameStr and nameStr == UnitName("target")
-
-    -- Filter: Only show Nameplates of Bosses and Rares (and player's current target)
-    if not isImportant and not isTarget then
-        if not plate.buiFiltered then
-            healthBar:Hide()
-            if name then name:Hide() end
-            if level then level:Hide() end
-            if hpFs then hpFs:Hide() end
-            if plate.castBar then plate.castBar:Hide() end
-            plate.buiFiltered = true
+    -- Hook healthBar:OnShow to suppress C++ engine re-shows whenever plate is filtered
+    healthBar:SetScript("OnShow", function()
+        if plate.buiFiltered then
+            this:Hide()
+            this:SetAlpha(0)
+            if plate.nameFs then plate.nameFs:Hide(); plate.nameFs:SetAlpha(0) end
+            if plate.levelFs then plate.levelFs:Hide(); plate.levelFs:SetAlpha(0) end
+            if plate.hpFs then plate.hpFs:Hide(); plate.hpFs:SetAlpha(0) end
+            if plate.castBar then plate.castBar:Hide(); plate.castBar:SetAlpha(0) end
         end
-        return
-    elseif plate.buiFiltered then
-        healthBar:Show()
-        if name then name:Show() end
-        if level then level:Show() end
-        if hpFs then hpFs:Show() end
-        plate.buiFiltered = nil
-    end
+    end)
 
-    -- Value & Percentage
-    local cur = healthBar:GetValue() or 0
-    local minv, maxv = healthBar:GetMinMaxValues()
-    if maxv and maxv > 0 then
-        local pct = math.floor(cur / maxv * 100 + 0.5)
-        hpFs:SetText(tostring(pct) .. "%")
-    end
+    -- Attach per-frame watcher child frame for instantaneous response to movement/targeting
+    local watcher = CreateFrame("Frame", nil, plate)
+    watcher:SetScript("OnUpdate", function()
+        UpdatePlate(plate)
+    end)
+    plate.buiWatcher = watcher
 
-    -- Color enhancement: Bosses take Violet/Crimson, Rares take Amber/Gold, others standard
-    if isBoss then
-        B:SetBarColor(healthBar, 0.85, 0.20, 0.40)
-    elseif isRare then
-        B:SetBarColor(healthBar, 1.00, 0.65, 0.12)
-    else
-        local r, g, b = healthBar:GetStatusBarColor()
-        if r and g and b then
-            if r > 0.8 and g < 0.2 and b < 0.2 then
-                -- Hostile: Neon Red
-                B:SetBarColor(healthBar, 0.92, 0.15, 0.15)
-            elseif r > 0.8 and g > 0.8 and b < 0.2 then
-                -- Neutral: Cyber Gold
-                B:SetBarColor(healthBar, 0.95, 0.78, 0.12)
-            elseif g > 0.7 and r < 0.2 then
-                -- Friendly: Cyber Green
-                B:SetBarColor(healthBar, 0.15, 0.85, 0.35)
-            elseif r > 0.4 and r < 0.6 and g > 0.4 and g < 0.6 and b > 0.4 and b < 0.6 then
-                -- Tapped / Gray
-                B:SetBarColor(healthBar, 0.50, 0.50, 0.50)
-            end
-        end
-    end
-
-    -- Target indicator border (safe re-coloring without creating new textures)
-    if isTarget then
-        local ar, ag, ab = B:GetAccent()
-        B:SetBorderColor(healthBar, ar, ag, ab, 1)
-    else
-        B:SetBorderColor(healthBar, 0, 0, 0, 1)
-    end
-
-    -- Elite / Boss indicator text styling
-    if (isBoss or isRare or (plate.eliteIcon and plate.eliteIcon:IsShown())) and level then
-        level:SetTextColor(1.0, 0.82, 0.10)
-    end
+    -- Initial evaluation
+    UpdatePlate(plate)
 end
 
 function mod:Create()
-    local scanner = CreateFrame("Frame", "BUI_NameplateScanner", UIParent)
-    local elapsed = 0
-    scanner:SetScript("OnUpdate", function()
-        local dt = arg1 or 0
-        elapsed = elapsed + dt
-        if elapsed < 0.10 then return end
-        elapsed = 0
+    -- Ensure enemy nameplates are turned on in the WoW client
+    if type(ShowNameplates) == "function" then
+        ShowNameplates()
+    end
 
+    local scanner = CreateFrame("Frame", "BUI_NameplateScanner", UIParent)
+    scanner:SetScript("OnUpdate", function()
         if not B:IsEnabled("nameplates") then return end
         if not WorldFrame then return end
 
@@ -325,19 +395,26 @@ function mod:Create()
             if c and c.IsShown and c:IsShown() then
                 if not c.buiSkinned then
                     SkinPlate(c)
-                end
-                if c.buiSkinned then
+                else
                     UpdatePlate(c)
                 end
             end
         end
     end)
+
+    scanner:RegisterEvent("PLAYER_ENTERING_WORLD")
+    scanner:SetScript("OnEvent", function()
+        if type(ShowNameplates) == "function" and B:IsEnabled("nameplates") then
+            ShowNameplates()
+        end
+    end)
+
     self.frame = scanner
     self.scanner = scanner
 end
 
 function mod:Update(state)
-    -- Nameplates are driven via OnUpdate scanner
+    -- Nameplates are driven via OnUpdate scanner & per-plate watchers
 end
 
 B:RegisterModule("nameplates", mod)
