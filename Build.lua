@@ -658,6 +658,135 @@ spellbookWatcher:SetScript("OnEvent", function()
     ScanSpellbook()
 end)
 
+-------------------------------------------------------------------------------
+--  Realtime DoT, Debuff & Totem Tracking Engine
+-------------------------------------------------------------------------------
+local dotTicks = {}    -- [normSpell] = { timestamp1, timestamp2, ... }
+local shoutCasts = {}  -- [normSpell] = { at = time, last = time, count = N }
+local fearHits = {}    -- [normSpell] = { timestamp1, timestamp2, ... }
+
+local FEAR_NAMES = {
+    ["psychic_scream"] = 3.5,
+    ["intimidating_shout"] = 3.5,
+    ["howl_of_terror"] = 3.5,
+    ["fear"] = 3.5,
+}
+
+local dotWatcher = CreateFrame("Frame")
+dotWatcher:RegisterEvent("CHAT_MSG_SPELL_PERIODIC_CREATURE_DAMAGE")
+dotWatcher:RegisterEvent("CHAT_MSG_SPELL_PERIODIC_HOSTILEPLAYER_DAMAGE")
+dotWatcher:RegisterEvent("CHAT_MSG_SPELL_SELF_DAMAGE")
+dotWatcher:RegisterEvent("PLAYER_REGEN_ENABLED")
+dotWatcher:SetScript("OnEvent", function()
+    local msg = arg1 or ""
+    local ev = event
+    if ev == "PLAYER_REGEN_ENABLED" then
+        dotTicks = {}
+        shoutCasts = {}
+        fearHits = {}
+        return
+    end
+
+    if ev == "CHAT_MSG_SPELL_SELF_DAMAGE" then
+        local _, _, spell, target = string.find(msg, "^Your (.-) hits (.-) for %d+")
+        if not spell then
+            _, _, spell, target = string.find(msg, "^Your (.-) crits (.-) for %d+")
+        end
+        if spell then
+            local norm = NormalizeName(spell)
+            local now = GetTime()
+            if norm == "demoralizing_shout" or norm == "demo_shout" then
+                local cast = shoutCasts[norm]
+                if not cast or (now - cast.last > 0.6) then
+                    cast = { at = now, last = now, count = 0 }
+                    shoutCasts[norm] = cast
+                end
+                cast.last = now
+                cast.count = cast.count + 1
+            elseif FEAR_NAMES[norm] then
+                if not fearHits[norm] then fearHits[norm] = {} end
+                table.insert(fearHits[norm], now)
+            end
+        end
+        return
+    end
+
+    local _, _, spell = string.find(msg, " suffers %d+ .- from your (.-)%.")
+    if not spell then
+        _, _, spell = string.find(msg, " suffers %d+ .- damage from your (.-)%.")
+    end
+    if spell then
+        local norm = NormalizeName(spell)
+        if not dotTicks[norm] then dotTicks[norm] = {} end
+        table.insert(dotTicks[norm], GetTime())
+    end
+end)
+
+local function GetActiveDotCount(normSpell)
+    if not normSpell or normSpell == "" then return 0 end
+    local now = GetTime()
+
+    if normSpell == "demoralizing_shout" or normSpell == "demo_shout" then
+        local cast = shoutCasts["demoralizing_shout"] or shoutCasts["demo_shout"]
+        if cast and (now - cast.at <= 6.0) then
+            return cast.count
+        end
+        return 0
+    end
+
+    if FEAR_NAMES[normSpell] then
+        local fList = fearHits[normSpell]
+        if fList then
+            local dur = FEAR_NAMES[normSpell]
+            local valid = 0
+            local cleaned = {}
+            local n = table.getn(fList)
+            for i = 1, n do
+                local t = fList[i]
+                if (now - t) <= dur then
+                    table.insert(cleaned, t)
+                    valid = valid + 1
+                end
+            end
+            fearHits[normSpell] = cleaned
+            return valid
+        end
+        return 0
+    end
+
+    local tList = dotTicks[normSpell]
+    if tList then
+        local cleaned = {}
+        local n = table.getn(tList)
+        local countInWindow = 0
+        local lastTick = 0
+        for i = 1, n do
+            local t = tList[i]
+            if (now - t) <= 2.5 then
+                table.insert(cleaned, t)
+                if t > lastTick then lastTick = t end
+                if (now - t) <= 2.0 then
+                    countInWindow = countInWindow + 1
+                end
+            end
+        end
+        dotTicks[normSpell] = cleaned
+
+        if countInWindow > 0 and (now - lastTick <= 2.5) then
+            local haste = tonumber(AZS_STATS and AZS_STATS.doth) or 0
+            if haste < 0 then haste = 0 end
+            local interval = 1.0 / (1.0 + haste)
+            local expectedTicksPerMob = 2.0 / interval
+            if expectedTicksPerMob <= 0 then expectedTicksPerMob = 2.0 end
+            local mobs = math.floor((countInWindow / expectedTicksPerMob) + 0.5)
+            if mobs < 1 then mobs = 1 end
+            return mobs
+        end
+    end
+
+    return 0
+end
+
 function mod:Create()
     local f = CreateFrame("Frame", "BUI_BuildFrame", UIParent)
     EUI_BuildFrame = f -- Compatibility alias
@@ -707,6 +836,13 @@ function mod:Create()
         rankFs:SetTextColor(1.0, 0.82, 0.10)
         rankFs:Hide()
         tile.rankFs = rankFs
+
+        -- DoT / Active Debuff Counter badge (top-right corner, bold)
+        local dotFs = B:Font(tile, 10, "RIGHT")
+        dotFs:SetPoint("TOPRIGHT", tile, "TOPRIGHT", -2, -1)
+        dotFs:SetTextColor(1.0, 0.40, 0.20)
+        dotFs:Hide()
+        tile.dotFs = dotFs
 
         -- Tooltip handling (Full ability tooltip with descriptions)
         tile:SetScript("OnEnter", function()
@@ -814,6 +950,47 @@ function mod:Create()
     end
     f.buffBars = buffBars
 
+    ---------------------------------------------------------------------------
+    --  Stored Level-Up Button (Cyberpunk pulse style)
+    ---------------------------------------------------------------------------
+    local lvlUpBtn = CreateFrame("Button", "BUI_LevelUpButton", f)
+    lvlUpBtn:SetWidth(180)
+    lvlUpBtn:SetHeight(22)
+    lvlUpBtn:SetPoint("BOTTOM", f, "TOP", 0, 4)
+    B:Backdrop(lvlUpBtn, 0.92)
+    B:Border(lvlUpBtn, 1.0, 0.82, 0.10, 1)
+
+    local lvlUpFs = B:Font(lvlUpBtn, 10, "CENTER")
+    lvlUpFs:SetPoint("CENTER", lvlUpBtn, "CENTER", 0, 0)
+    lvlUpFs:SetTextColor(1.0, 0.88, 0.30)
+    lvlUpBtn.fs = lvlUpFs
+
+    lvlUpBtn:EnableMouse(true)
+    if lvlUpBtn.RegisterForClicks then
+        lvlUpBtn:RegisterForClicks("LeftButtonUp")
+    end
+    lvlUpBtn:SetScript("OnClick", function()
+        if AZS_OpenStoredLevels then
+            AZS_OpenStoredLevels()
+        end
+    end)
+    lvlUpBtn:SetScript("OnEnter", function()
+        B:Border(this, 0.0, 0.90, 1.0, 1)
+        this.fs:SetTextColor(0.0, 0.90, 1.0)
+        GameTooltip:SetOwner(this, "ANCHOR_TOP")
+        GameTooltip:ClearLines()
+        GameTooltip:AddLine("Level Up Choices Ready", 1.0, 0.82, 0.10)
+        GameTooltip:AddLine("Click or press [Y] to choose your talent cards.", 0.85, 0.85, 0.85)
+        GameTooltip:Show()
+    end)
+    lvlUpBtn:SetScript("OnLeave", function()
+        B:Border(this, 1.0, 0.82, 0.10, 1)
+        this.fs:SetTextColor(1.0, 0.88, 0.30)
+        GameTooltip:Hide()
+    end)
+    lvlUpBtn:Hide()
+    f.lvlUpBtn = lvlUpBtn
+
     -- Perfectly centered horizontally between Player (-240) and Target (+240) at Y = 140
     B:RegisterMover(f, "build", "Build & Cooldowns", "BOTTOM", "BOTTOM", 0, 140)
 end
@@ -867,6 +1044,18 @@ function mod:Update(state)
 
             tile.icon:SetTexture(iconTex)
             tile.icon:Show()
+
+            -- DoT / Active Debuff Counter badge in top-right corner
+            local normName = NormalizeName(lookup)
+            local dotCount = GetActiveDotCount(normName)
+            if dotCount > 0 then
+                tile.dotFs:SetText(tostring(dotCount))
+                local dotCol = GetSpellColor(lookup)
+                tile.dotFs:SetTextColor(dotCol.r, dotCol.g, dotCol.b)
+                tile.dotFs:Show()
+            else
+                tile.dotFs:Hide()
+            end
 
             -- Cooldown calculations
             local cd = tonumber(sp.cd) or 0
@@ -961,6 +1150,24 @@ function mod:Update(state)
             r:Show()
         else
             r:Hide()
+        end
+    end
+
+    -- Update Stored Level-Ups Button
+    if f.lvlUpBtn then
+        local stored = (AZS_GetStoredLevels and tonumber(AZS_GetStoredLevels())) or 0
+        if stored > 0 then
+            f.lvlUpBtn.fs:SetText(string.format("LEVEL UP READY (%d) [Y]", stored))
+            if maxRows > 0 and f.buffBars[1] and f.buffBars[1]:IsShown() then
+                f.lvlUpBtn:ClearAllPoints()
+                f.lvlUpBtn:SetPoint("BOTTOM", f.buffContainer, "TOP", 0, 4)
+            else
+                f.lvlUpBtn:ClearAllPoints()
+                f.lvlUpBtn:SetPoint("BOTTOM", f, "TOP", 0, 4)
+            end
+            f.lvlUpBtn:Show()
+        else
+            f.lvlUpBtn:Hide()
         end
     end
 end

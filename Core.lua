@@ -15,7 +15,7 @@ BlackwallUI = BlackwellUI -- Backwards compatibility alias
 EllesmereUI = BlackwellUI -- Backwards compatibility alias
 local E = BlackwellUI
 
-B.version = "2.0.0-azs"
+B.version = "2.2.0-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -126,9 +126,14 @@ local DEFAULTS = {
     hideLoot = false,
     meterMode = "done",
     colorHealthByClass = true,
+    pinCaches = true,
+    pinLairs = true,
+    pinEdge = "clamp",
+    filterChatSpam = true,
     modules = {
         actionbars = false,
         minimap = true,
+        pins = true,
         unitframes = true,
         chat = true,
         castbar = true,
@@ -139,6 +144,7 @@ local DEFAULTS = {
         stats = true,
         nameplates = true,
         character = true,
+        loot = true,
     },
     positions = {},
 }
