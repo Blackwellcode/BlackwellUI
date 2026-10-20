@@ -15,7 +15,7 @@ BlackwallUI = BlackwellUI -- Backwards compatibility alias
 EllesmereUI = BlackwellUI -- Backwards compatibility alias
 local E = BlackwellUI
 
-B.version = "2.2.0-azs"
+B.version = "2.3.0-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -841,6 +841,14 @@ local function BuildDemo()
         },
         meterTotal = 1845200,
         meterDps = 3521,
+        bossMeter = {
+            { name = "Mortal Strike", dmg = 185000, dps = 353, share = 45, proc = 0 },
+            { name = "Whirlwind", dmg = 120000, dps = 229, share = 29, proc = 0 },
+            { name = "Deep Wounds", dmg = 68000, dps = 129, share = 16, proc = 1 },
+            { name = "Bladestorm", dmg = 42000, dps = 80, share = 10, proc = 0 },
+        },
+        bossMeterTotal = 415000,
+        bossMeterDps = 792,
         taken = {
             { source = "Stitches", dmg = 19400 },
             { source = "Skeletal Fiend", dmg = 12800 },
@@ -940,9 +948,16 @@ function B:GetState()
     if type(AZS_GetMeter) == "function" then
         meter, total, dps = AZS_GetMeter()
     end
-    s.meter = meter or (type(AZS_METER) == "table" and AZS_METER) or {}
-    s.meterTotal = total or 0
-    s.meterDps = dps or 0
+    s.meter = (type(meter) == "table" and meter) or (type(AZS_METER) == "table" and AZS_METER) or {}
+    s.meterTotal = tonumber(total) or 0
+    s.meterDps = tonumber(dps) or 0
+    local bossMeter, bossTotal, bossDps = nil, 0, 0
+    if type(AZS_GetBossMeter) == "function" then
+        bossMeter, bossTotal, bossDps = AZS_GetBossMeter()
+    end
+    s.bossMeter = (type(bossMeter) == "table" and bossMeter) or (type(AZS_BOSSMETER) == "table" and AZS_BOSSMETER) or {}
+    s.bossMeterTotal = tonumber(bossTotal) or 0
+    s.bossMeterDps = tonumber(bossDps) or 0
     s.taken = AZS_TAKEN or {}
     s.target = AZS_TARGET or { kind = "none" }
     return s
@@ -1042,6 +1057,9 @@ function B:InitTooltip()
         })
         tt:SetBackdropColor(0.05, 0.05, 0.05, 0.92)
         tt:SetBackdropBorderColor(0.20, 0.20, 0.20, 1.0)
+        if type(tt.SetScale) == "function" then
+            tt:SetScale(0.82)
+        end
     end
 
     SkinTooltip(GameTooltip)
@@ -1063,14 +1081,10 @@ function B:InitTooltip()
             if tooltip and parent then
                 tooltip:ClearAllPoints()
                 local anchorFrame = nil
-                if BUI_MeterFrame and BUI_MeterFrame:IsShown() then
-                    anchorFrame = BUI_MeterFrame
-                elseif BUI_EncounterFrame and BUI_EncounterFrame:IsShown() then
+                if BUI_EncounterFrame and BUI_EncounterFrame:IsShown() then
                     anchorFrame = BUI_EncounterFrame
                 elseif BUI_TimerFrame and BUI_TimerFrame:IsShown() then
                     anchorFrame = BUI_TimerFrame
-                elseif EUI_MeterFrame and EUI_MeterFrame:IsShown() then
-                    anchorFrame = EUI_MeterFrame
                 elseif EUI_EncounterFrame and EUI_EncounterFrame:IsShown() then
                     anchorFrame = EUI_EncounterFrame
                 elseif EUI_TimerFrame and EUI_TimerFrame:IsShown() then
@@ -1079,6 +1093,10 @@ function B:InitTooltip()
 
                 if anchorFrame then
                     tooltip:SetPoint("TOPRIGHT", anchorFrame, "BOTTOMRIGHT", 0, -8)
+                elseif BUI_BossMeterFrame and BUI_BossMeterFrame:IsShown() then
+                    tooltip:SetPoint("BOTTOMRIGHT", BUI_BossMeterFrame, "TOPRIGHT", 0, 8)
+                elseif BUI_MeterFrame and BUI_MeterFrame:IsShown() then
+                    tooltip:SetPoint("BOTTOMRIGHT", BUI_MeterFrame, "TOPRIGHT", 0, 8)
                 else
                     tooltip:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -12, 28)
                 end

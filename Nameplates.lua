@@ -9,6 +9,104 @@ local mod = {}
 mod.label = "Nameplates"
 mod.alwaysActive = true
 
+-------------------------------------------------------------------------------
+--  Azeroth Survivors Boss & Rare Dictionaries
+-------------------------------------------------------------------------------
+local BOSS_NAMES = {
+    -- Elwynn Forest
+    ["Hogger"] = true, ["Mother Fang"] = true, ["Rhahk'Zor"] = true, ["Mr. Smite"] = true, ["Edwin VanCleef"] = true,
+    -- Duskwood
+    ["Naraxis"] = true, ["Mor'Ladim"] = true, ["Stitches"] = true, ["Lupos"] = true, ["Morbent Fel"] = true,
+    -- Warsong Gulch
+    ["Doomguard Commander"] = true, ["Mannoroth's Herald"] = true, ["Varimathras"] = true, ["Lord Hel'nurath"] = true, ["Lord Kazzak"] = true,
+    -- Arathi Basin
+    ["Patchwerk"] = true, ["Lord Blackwood"] = true, ["Baron Rivendare"] = true, ["Anub'Rekhan"] = true, ["Kel'Thuzad"] = true,
+    -- Feralas
+    ["Zevrim Thornhoof"] = true, ["Alzzin the Wildshaper"] = true, ["Tendris Warpwood"] = true, ["Immol'thar"] = true, ["King Gordok"] = true,
+    -- Gurubashi Arena
+    ["High Priestess Jeklik"] = true, ["High Priest Venoxis"] = true, ["Bloodlord Mandokir"] = true, ["Jin'do the Hexxer"] = true, ["Hakkar the Soulflayer"] = true,
+    -- Alterac Valley
+    ["Korrak the Bloodrager"] = true, ["Ivus the Forest Lord"] = true, ["Lokholar the Ice Lord"] = true, ["Glacius the Frozen Titan"] = true, ["Azuregos"] = true,
+    -- Blackrock Mountain
+    ["General Angerforge"] = true, ["Warchief Rend Blackhand"] = true, ["Emperor Dagran Thaurissan"] = true, ["Majordomo Executus"] = true, ["Nefarian"] = true,
+    -- Gates of Ahn'Qiraj
+    ["Kurinnaxx"] = true, ["General Rajaxx"] = true, ["Princess Huhuran"] = true, ["Ossirian the Unscarred"] = true, ["C'Thun"] = true,
+}
+
+local RARE_NAMES = {
+    -- Elwynn
+    ["Kobold Taskmaster"] = true, ["Gruff Swiftbite"] = true, ["Bellygrub"] = true,
+    -- Duskwood
+    ["Nightbane Worgen Alpha"] = true, ["Carrion Recluse"] = true, ["Flesh Eating Abomination"] = true,
+    -- Warsong
+    ["Felguard Elite"] = true, ["Infernal"] = true, ["Doomguard"] = true,
+    -- Arathi
+    ["Crypt Fiend"] = true, ["Bone Golem"] = true, ["Death Knight Captain"] = true,
+    -- Feralas
+    ["Gordunni Brute"] = true, ["Warpwood Treant"] = true, ["Ironbark Protector"] = true,
+    -- Gurubashi
+    ["Gurubashi Berserker"] = true, ["Zulian Crocolisk"] = true, ["Gurubashi Champion"] = true,
+    -- Alterac
+    ["Alterac Yeti Lord"] = true, ["Mountain Giant"] = true, ["Winterax Warlord"] = true,
+    -- Blackrock
+    ["Core Hound"] = true, ["Black Drake"] = true, ["Molten Giant"] = true,
+    -- Ahn'Qiraj
+    ["Qiraji Champion"] = true, ["Anubisath Sentinel"] = true, ["Obsidian Destroyer"] = true,
+}
+
+local function IsBossOrRare(plate, nameStr)
+    local isBoss = false
+    local isRare = false
+
+    if plate.bossIcon and plate.bossIcon:IsShown() then
+        isBoss = true
+    end
+    if plate.eliteIcon and plate.eliteIcon:IsShown() then
+        isRare = true
+    end
+
+    if nameStr and nameStr ~= "" then
+        if BOSS_NAMES[nameStr] then
+            isBoss = true
+        elseif RARE_NAMES[nameStr] then
+            isRare = true
+        end
+
+        -- Check live AZS units table if available
+        if not isBoss and not isRare and AZS_UNITS and type(AZS_UNITS) == "table" then
+            local nUnits = table.getn(AZS_UNITS)
+            for i = 1, nUnits do
+                local u = AZS_UNITS[i]
+                if type(u) == "table" then
+                    local uName = u.name or u[3]
+                    local uKind = u.kind or u[1]
+                    if uName and uName == nameStr then
+                        if uKind == "boss" or uKind == "final" then
+                            isBoss = true
+                            break
+                        elseif uKind == "elite" or uKind == "guardian" then
+                            isRare = true
+                            break
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Check target classification if this plate is our current target
+        if not isBoss and not isRare and UnitExists("target") and UnitName("target") == nameStr then
+            local c = UnitClassification("target")
+            if c == "worldboss" then
+                isBoss = true
+            elseif c == "elite" or c == "rareelite" or c == "rare" then
+                isRare = true
+            end
+        end
+    end
+
+    return isBoss, isRare, (isBoss or isRare)
+end
+
 local function SkinPlate(plate)
     if not plate or plate.buiSkinned then return end
     if type(plate.GetRegions) ~= "function" or type(plate.GetChildren) ~= "function" then return end
@@ -138,6 +236,29 @@ local function UpdatePlate(plate)
     local hpFs = plate.hpFs
     local name = plate.nameFs
     local level = plate.levelFs
+    local nameStr = name and name:GetText()
+
+    local isBoss, isRare, isImportant = IsBossOrRare(plate, nameStr)
+    local isTarget = UnitExists("target") and nameStr and nameStr == UnitName("target")
+
+    -- Filter: Only show Nameplates of Bosses and Rares (and player's current target)
+    if not isImportant and not isTarget then
+        if not plate.buiFiltered then
+            healthBar:Hide()
+            if name then name:Hide() end
+            if level then level:Hide() end
+            if hpFs then hpFs:Hide() end
+            if plate.castBar then plate.castBar:Hide() end
+            plate.buiFiltered = true
+        end
+        return
+    elseif plate.buiFiltered then
+        healthBar:Show()
+        if name then name:Show() end
+        if level then level:Show() end
+        if hpFs then hpFs:Show() end
+        plate.buiFiltered = nil
+    end
 
     -- Value & Percentage
     local cur = healthBar:GetValue() or 0
@@ -147,34 +268,40 @@ local function UpdatePlate(plate)
         hpFs:SetText(tostring(pct) .. "%")
     end
 
-    -- Color enhancement (Cyberpunk neon tones)
-    local r, g, b = healthBar:GetStatusBarColor()
-    if r and g and b then
-        if r > 0.8 and g < 0.2 and b < 0.2 then
-            -- Hostile: Neon Red
-            B:SetBarColor(healthBar, 0.92, 0.15, 0.15)
-        elseif r > 0.8 and g > 0.8 and b < 0.2 then
-            -- Neutral: Cyber Gold
-            B:SetBarColor(healthBar, 0.95, 0.78, 0.12)
-        elseif g > 0.7 and r < 0.2 then
-            -- Friendly: Cyber Green
-            B:SetBarColor(healthBar, 0.15, 0.85, 0.35)
-        elseif r > 0.4 and r < 0.6 and g > 0.4 and g < 0.6 and b > 0.4 and b < 0.6 then
-            -- Tapped / Gray
-            B:SetBarColor(healthBar, 0.50, 0.50, 0.50)
+    -- Color enhancement: Bosses take Violet/Crimson, Rares take Amber/Gold, others standard
+    if isBoss then
+        B:SetBarColor(healthBar, 0.85, 0.20, 0.40)
+    elseif isRare then
+        B:SetBarColor(healthBar, 1.00, 0.65, 0.12)
+    else
+        local r, g, b = healthBar:GetStatusBarColor()
+        if r and g and b then
+            if r > 0.8 and g < 0.2 and b < 0.2 then
+                -- Hostile: Neon Red
+                B:SetBarColor(healthBar, 0.92, 0.15, 0.15)
+            elseif r > 0.8 and g > 0.8 and b < 0.2 then
+                -- Neutral: Cyber Gold
+                B:SetBarColor(healthBar, 0.95, 0.78, 0.12)
+            elseif g > 0.7 and r < 0.2 then
+                -- Friendly: Cyber Green
+                B:SetBarColor(healthBar, 0.15, 0.85, 0.35)
+            elseif r > 0.4 and r < 0.6 and g > 0.4 and g < 0.6 and b > 0.4 and b < 0.6 then
+                -- Tapped / Gray
+                B:SetBarColor(healthBar, 0.50, 0.50, 0.50)
+            end
         end
     end
 
     -- Target indicator border (safe re-coloring without creating new textures)
-    if UnitExists("target") and name and name:GetText() == UnitName("target") then
+    if isTarget then
         local ar, ag, ab = B:GetAccent()
         B:SetBorderColor(healthBar, ar, ag, ab, 1)
     else
         B:SetBorderColor(healthBar, 0, 0, 0, 1)
     end
 
-    -- Elite indicator
-    if plate.eliteIcon and plate.eliteIcon:IsShown() and level then
+    -- Elite / Boss indicator text styling
+    if (isBoss or isRare or (plate.eliteIcon and plate.eliteIcon:IsShown())) and level then
         level:SetTextColor(1.0, 0.82, 0.10)
     end
 end

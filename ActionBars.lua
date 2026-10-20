@@ -29,11 +29,11 @@ function mod:HideBlizzardArt()
 
     -- Reparent and hide BonusActionBarFrame (stances/stealth bar)
     if BonusActionBarFrame then
-        BonusActionBarFrame:SetParent(hiddenSink)
-        BonusActionBarFrame:ClearAllPoints()
-        BonusActionBarFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 1000, 1000)
-        BonusActionBarFrame:Hide()
-        BonusActionBarFrame:SetScript("OnShow", function() this:Hide() end)
+        if type(BonusActionBarFrame.SetParent) == "function" then BonusActionBarFrame:SetParent(hiddenSink) end
+        if type(BonusActionBarFrame.ClearAllPoints) == "function" then BonusActionBarFrame:ClearAllPoints() end
+        if type(BonusActionBarFrame.SetPoint) == "function" then BonusActionBarFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 1000, 1000) end
+        if type(BonusActionBarFrame.Hide) == "function" then BonusActionBarFrame:Hide() end
+        if type(BonusActionBarFrame.SetScript) == "function" then BonusActionBarFrame:SetScript("OnShow", function() this:Hide() end) end
     end
 
     -- Reparent and hide bags & micro menu individually if detached
@@ -66,30 +66,30 @@ function mod:HideBlizzardArt()
     for i = 1, table.getn(framesToSink) do
         local f = framesToSink[i]
         if f then
-            f:SetParent(hiddenSink)
-            f:ClearAllPoints()
-            f:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 1000, 1000)
-            f:Hide()
-            f:SetScript("OnShow", function() this:Hide() end)
+            if type(f.SetParent) == "function" then f:SetParent(hiddenSink) end
+            if type(f.ClearAllPoints) == "function" then f:ClearAllPoints() end
+            if type(f.SetPoint) == "function" then f:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 1000, 1000) end
+            if type(f.Hide) == "function" then f:Hide() end
+            if type(f.SetScript) == "function" then f:SetScript("OnShow", function() this:Hide() end) end
         end
     end
 
     for i = 1, 12 do
         local ab = getglobal("ActionButton" .. i)
         if ab then
-            ab:SetParent(hiddenSink)
-            ab:ClearAllPoints()
-            ab:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 1000, 1000)
-            ab:Hide()
-            ab:SetScript("OnShow", function() this:Hide() end)
+            if type(ab.SetParent) == "function" then ab:SetParent(hiddenSink) end
+            if type(ab.ClearAllPoints) == "function" then ab:ClearAllPoints() end
+            if type(ab.SetPoint) == "function" then ab:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 1000, 1000) end
+            if type(ab.Hide) == "function" then ab:Hide() end
+            if type(ab.SetScript) == "function" then ab:SetScript("OnShow", function() this:Hide() end) end
         end
         local bab = getglobal("BonusActionButton" .. i)
         if bab then
-            bab:SetParent(hiddenSink)
-            bab:ClearAllPoints()
-            bab:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 1000, 1000)
-            bab:Hide()
-            bab:SetScript("OnShow", function() this:Hide() end)
+            if type(bab.SetParent) == "function" then bab:SetParent(hiddenSink) end
+            if type(bab.ClearAllPoints) == "function" then bab:ClearAllPoints() end
+            if type(bab.SetPoint) == "function" then bab:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 1000, 1000) end
+            if type(bab.Hide) == "function" then bab:Hide() end
+            if type(bab.SetScript) == "function" then bab:SetScript("OnShow", function() this:Hide() end) end
         end
     end
 end

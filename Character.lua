@@ -267,8 +267,8 @@ function mod:Create()
     self.frame = watcher
     self.watcher = watcher
 
-    if CharacterFrame then
-        local origOnShow = CharacterFrame:GetScript("OnShow")
+    if CharacterFrame and type(CharacterFrame.SetScript) == "function" then
+        local origOnShow = (type(CharacterFrame.GetScript) == "function" and CharacterFrame:GetScript("OnShow")) or nil
         CharacterFrame:SetScript("OnShow", function()
             local sf = BUI_StatsFrame or EUI_StatsFrame
             if sf then sf:Hide() end
@@ -282,7 +282,7 @@ function mod:Create()
             end
         end)
 
-        local origOnHide = CharacterFrame:GetScript("OnHide")
+        local origOnHide = (type(CharacterFrame.GetScript) == "function" and CharacterFrame:GetScript("OnHide")) or nil
         CharacterFrame:SetScript("OnHide", function()
             if origOnHide then origOnHide() end
             local sf = BUI_StatsFrame or EUI_StatsFrame
