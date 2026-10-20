@@ -88,6 +88,10 @@ end
 
 function mod:Update(state)
     local f = self.frame
+    if CharacterFrame and CharacterFrame:IsShown() then
+        f:Hide()
+        return
+    end
     local s = AZS_STATS
 
     if not s or (state and state.demo) or B.unlocked then

@@ -47,59 +47,107 @@ local function UpdateSlotQuality(slot)
     end
 end
 
-local function StyleSubWidgets(parent)
-    if not parent or not parent.GetChildren then return end
-    local children = { parent:GetChildren() }
-    local n = table.getn(children)
-    for i = 1, n do
-        local c = children[i]
-        if c and not c.buiSkinned then
-            local cName = c:GetName() or ""
-            -- Check for Run Stats or side panels
-            local isSidePanel = false
-            local pt, rel, relPt, x, y = c:GetPoint()
-            if pt and (pt == "TOPLEFT" or pt == "LEFT") and (rel == CharacterFrame or relPt == "TOPRIGHT" or relPt == "RIGHT") then
-                isSidePanel = true
+local function SkinRunStatsPanel()
+    local p = AZSMoreStats or _G["AZSMoreStats"]
+    if not p then return end
+
+    CleanFrameTextures(p)
+    B:Backdrop(p, 0.94)
+    B:Border(p, 0, 0, 0, 1)
+
+    -- Dock cleanly to the right of CharacterFrame
+    p:ClearAllPoints()
+    p:SetPoint("TOPLEFT", CharacterFrame, "TOPRIGHT", 2, 0)
+    p:SetPoint("BOTTOMLEFT", CharacterFrame, "BOTTOMRIGHT", 2, 0)
+    p:SetWidth(165)
+
+    if not p.buiAccentLine then
+        local sideTop = p:CreateTexture(nil, "ARTWORK")
+        sideTop:SetPoint("TOPLEFT", p, "TOPLEFT", 1, -1)
+        sideTop:SetPoint("TOPRIGHT", p, "TOPRIGHT", -1, -1)
+        sideTop:SetHeight(2)
+        sideTop:SetTexture(B.WHITE)
+        B:Accent(sideTop, "tex", 0.9)
+        p.buiAccentLine = sideTop
+    end
+
+    if AZSMoreStatsTitle then
+        AZSMoreStatsTitle:SetFont(B:GetFontPath(), 11, "OUTLINE")
+        B:Accent(AZSMoreStatsTitle, "text")
+        AZSMoreStatsTitle:ClearAllPoints()
+        AZSMoreStatsTitle:SetPoint("TOP", p, "TOP", 0, -8)
+    end
+
+    -- Style rows AZSMoreStat1..25
+    for i = 1, 25 do
+        local row = _G["AZSMoreStat" .. i]
+        if row then
+            row:SetWidth(150)
+            local lbl = _G["AZSMoreStat" .. i .. "Label"]
+            local val = _G["AZSMoreStat" .. i .. "StatText"]
+            if lbl then
+                lbl:SetFont(B:GetFontPath(), 9, "")
+                lbl:SetTextColor(0.75, 0.75, 0.75)
             end
-            if string.find(string.lower(cName), "stats") or isSidePanel then
-                c.buiSkinned = true
-                CleanFrameTextures(c)
-                B:Backdrop(c, 0.96)
-                B:Border(c, 0, 0, 0, 1)
-
-                -- Align Run Stats panel flush with CharacterFrame
-                c:ClearAllPoints()
-                c:SetPoint("TOPLEFT", CharacterFrame, "TOPRIGHT", 4, 0)
-                c:SetPoint("BOTTOMLEFT", CharacterFrame, "BOTTOMRIGHT", 4, 0)
-                c:SetWidth(155)
-
-                local sideTop = c:CreateTexture(nil, "ARTWORK")
-                sideTop.buiKeep = true
-                sideTop:SetPoint("TOPLEFT", c, "TOPLEFT", 1, -1)
-                sideTop:SetPoint("TOPRIGHT", c, "TOPRIGHT", -1, -1)
-                sideTop:SetHeight(2)
-                sideTop:SetTexture(B.WHITE)
-                B:Accent(sideTop, "tex", 0.9)
+            if val then
+                val:SetFont(B:GetFontPath(), 9, "OUTLINE")
+                val:SetTextColor(1.0, 0.84, 0.20)
             end
+        end
+    end
+end
 
-            -- Style any fontstrings inside
-            if c.GetRegions then
-                local regs = { c:GetRegions() }
-                local nRegs = table.getn(regs)
-                for j = 1, nRegs do
-                    local r = regs[j]
-                    if r and r.GetObjectType and r:GetObjectType() == "FontString" then
-                        local txt = r:GetText() or ""
-                        if txt == "Run Stats" then
-                            r:SetFont(B:GetFontPath(), 12, "OUTLINE")
-                            B:Accent(r, "text")
-                        elseif string.find(txt, ":") then
-                            r:SetFont(B:GetFontPath(), 9, "")
-                        else
-                            r:SetFont(B:GetFontPath(), 9, "OUTLINE")
-                        end
-                    end
+local function SkinTabs()
+    for i = 1, 5 do
+        local tab = _G["CharacterFrameTab" .. i]
+        if tab then
+            local tLeft = _G["CharacterFrameTab" .. i .. "Left"]
+            local tMid = _G["CharacterFrameTab" .. i .. "Middle"]
+            local tRight = _G["CharacterFrameTab" .. i .. "Right"]
+            if tLeft then tLeft:Hide() end
+            if tMid then tMid:Hide() end
+            if tRight then tRight:Hide() end
+            B:Backdrop(tab, 0.95)
+            B:Border(tab, 0.20, 0.20, 0.20, 1)
+            tab:SetHeight(22)
+            tab:SetWidth(74)
+            tab:ClearAllPoints()
+            if i == 1 then
+                tab:SetPoint("TOPLEFT", CharacterFrame, "BOTTOMLEFT", 14, -1)
+            else
+                local prevTab = _G["CharacterFrameTab" .. (i - 1)]
+                if prevTab then
+                    tab:SetPoint("LEFT", prevTab, "RIGHT", 4, 0)
                 end
+            end
+            local tabFs = tab:GetFontString()
+            if tabFs then
+                tabFs:SetFont(B:GetFontPath(), 10, "OUTLINE")
+            end
+            if not tab.buiHooked then
+                tab.buiHooked = true
+                local origClick = tab:GetScript("OnClick")
+                tab:SetScript("OnClick", function()
+                    if origClick then origClick() end
+                    SkinCharacterFrame()
+                    SkinTabs()
+                end)
+            end
+        end
+    end
+
+    local selTab = 1
+    if PanelTemplates_GetSelectedTab then
+        selTab = PanelTemplates_GetSelectedTab(CharacterFrame) or 1
+    end
+    local ar, ag, ab = B:GetAccent()
+    for i = 1, 5 do
+        local tab = _G["CharacterFrameTab" .. i]
+        if tab then
+            if i == selTab then
+                B:Border(tab, ar, ag, ab, 1)
+            else
+                B:Border(tab, 0.20, 0.20, 0.20, 1)
             end
         end
     end
@@ -220,49 +268,11 @@ local function SkinCharacterFrame()
         end
     end
 
-    -- 8. Tabs at the bottom (cleanly placed underneath the frame with 0 overlap)
-    for i = 1, 5 do
-        local tab = _G["CharacterFrameTab" .. i]
-        if tab then
-            local tLeft = _G["CharacterFrameTab" .. i .. "Left"]
-            local tMid = _G["CharacterFrameTab" .. i .. "Middle"]
-            local tRight = _G["CharacterFrameTab" .. i .. "Right"]
-            if tLeft then tLeft:Hide() end
-            if tMid then tMid:Hide() end
-            if tRight then tRight:Hide() end
-            B:Backdrop(tab, 0.95)
-            B:Border(tab, 0.20, 0.20, 0.20, 1)
-            tab:SetHeight(22)
-            tab:SetWidth(74)
-            tab:ClearAllPoints()
-            if i == 1 then
-                tab:SetPoint("TOPLEFT", CharacterFrame, "BOTTOMLEFT", 12, -2)
-            else
-                local prevTab = _G["CharacterFrameTab" .. (i - 1)]
-                if prevTab then
-                    tab:SetPoint("LEFT", prevTab, "RIGHT", 4, 0)
-                end
-            end
-            local tabFs = tab:GetFontString()
-            if tabFs then
-                tabFs:SetFont(B:GetFontPath(), 10, "OUTLINE")
-            end
-            if not tab.buiHooked then
-                tab.buiHooked = true
-                local origClick = tab:GetScript("OnClick")
-                tab:SetScript("OnClick", function()
-                    if origClick then origClick() end
-                    SkinCharacterFrame()
-                end)
-            end
-        end
-    end
+    -- 8. Tabs at the bottom
+    SkinTabs()
 
-    -- 9. Style attached Run Stats & sub panels
-    StyleSubWidgets(CharacterFrame)
-    if PaperDollFrame then
-        StyleSubWidgets(PaperDollFrame)
-    end
+    -- 9. Style attached Run Stats panel
+    SkinRunStatsPanel()
 end
 
 local function UpdateEquipment()
@@ -274,22 +284,8 @@ local function UpdateEquipment()
         end
     end
 
-    -- Update Tab Borders for active tab
-    local selTab = 1
-    if PanelTemplates_GetSelectedTab then
-        selTab = PanelTemplates_GetSelectedTab(CharacterFrame) or 1
-    end
-    local ar, ag, ab = B:GetAccent()
-    for i = 1, 5 do
-        local tab = _G["CharacterFrameTab" .. i]
-        if tab then
-            if i == selTab then
-                B:Border(tab, ar, ag, ab, 1)
-            else
-                B:Border(tab, 0.20, 0.20, 0.20, 1)
-            end
-        end
-    end
+    SkinTabs()
+    SkinRunStatsPanel()
 end
 
 function mod:Create()
@@ -309,7 +305,6 @@ function mod:Create()
     if CharacterFrame then
         local origOnShow = CharacterFrame:GetScript("OnShow")
         CharacterFrame:SetScript("OnShow", function()
-            -- Hide Multipliers panel to prevent clipping through the Character frame
             local sf = BUI_StatsFrame or EUI_StatsFrame
             if sf then sf:Hide() end
 
@@ -317,29 +312,14 @@ function mod:Create()
             if B:IsEnabled("character") then
                 SkinCharacterFrame()
                 UpdateEquipment()
-                StyleSubWidgets(CharacterFrame)
-                if PaperDollFrame then StyleSubWidgets(PaperDollFrame) end
-                for i = 1, 5 do
-                    local tab = _G["CharacterFrameTab" .. i]
-                    if tab then
-                        tab:ClearAllPoints()
-                        if i == 1 then
-                            tab:SetPoint("TOPLEFT", CharacterFrame, "BOTTOMLEFT", 12, -2)
-                        else
-                            local prevTab = _G["CharacterFrameTab" .. (i - 1)]
-                            if prevTab then
-                                tab:SetPoint("LEFT", prevTab, "RIGHT", 4, 0)
-                            end
-                        end
-                    end
-                end
+                SkinTabs()
+                SkinRunStatsPanel()
             end
         end)
 
         local origOnHide = CharacterFrame:GetScript("OnHide")
         CharacterFrame:SetScript("OnHide", function()
             if origOnHide then origOnHide() end
-            -- Restore Multipliers panel if module is enabled
             local sf = BUI_StatsFrame or EUI_StatsFrame
             if sf and B:IsEnabled("stats") then
                 sf:Show()
@@ -349,7 +329,9 @@ function mod:Create()
 end
 
 function mod:Update(state)
-    -- Character frame updates on inventory events / OnShow
+    if CharacterFrame and CharacterFrame:IsShown() then
+        SkinRunStatsPanel()
+    end
 end
 
 B:RegisterModule("character", mod)
