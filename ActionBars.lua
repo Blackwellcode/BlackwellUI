@@ -24,7 +24,7 @@ function mod:HideBlizzardArt()
         MainMenuBar:ClearAllPoints()
         MainMenuBar:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 1000, 1000)
         MainMenuBar:Hide()
-        MainMenuBar.Show = function() end
+        MainMenuBar:SetScript("OnShow", function() this:Hide() end)
     end
 
     -- Reparent and hide BonusActionBarFrame (stances/stealth bar)
@@ -33,7 +33,7 @@ function mod:HideBlizzardArt()
         BonusActionBarFrame:ClearAllPoints()
         BonusActionBarFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 1000, 1000)
         BonusActionBarFrame:Hide()
-        BonusActionBarFrame.Show = function() end
+        BonusActionBarFrame:SetScript("OnShow", function() this:Hide() end)
     end
 
     -- Reparent and hide bags & micro menu individually if detached
@@ -70,7 +70,7 @@ function mod:HideBlizzardArt()
             f:ClearAllPoints()
             f:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 1000, 1000)
             f:Hide()
-            f.Show = function() end
+            f:SetScript("OnShow", function() this:Hide() end)
         end
     end
 
@@ -81,7 +81,7 @@ function mod:HideBlizzardArt()
             ab:ClearAllPoints()
             ab:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 1000, 1000)
             ab:Hide()
-            ab.Show = function() end
+            ab:SetScript("OnShow", function() this:Hide() end)
         end
         local bab = getglobal("BonusActionButton" .. i)
         if bab then
@@ -89,7 +89,7 @@ function mod:HideBlizzardArt()
             bab:ClearAllPoints()
             bab:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 1000, 1000)
             bab:Hide()
-            bab.Show = function() end
+            bab:SetScript("OnShow", function() this:Hide() end)
         end
     end
 end

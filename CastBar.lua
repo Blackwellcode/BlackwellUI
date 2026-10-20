@@ -98,11 +98,12 @@ function mod:Create()
 
     local function FindSpellIcon(spellName)
         if not spellName or not GetSpellName then return nil end
+        local book = BOOKTYPE_SPELL or "spell"
         for s = 1, 150 do
-            local name = GetSpellName(s, BOOKTYPE_SPELL)
+            local name = GetSpellName(s, book)
             if not name then break end
             if name == spellName then
-                return GetSpellTexture(s, BOOKTYPE_SPELL)
+                return GetSpellTexture(s, book)
             end
         end
         return B:GetAbilityIcon(spellName)

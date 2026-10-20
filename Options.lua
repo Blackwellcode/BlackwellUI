@@ -293,6 +293,7 @@ local function BuildOptionsFrame()
 
     -- Native ColorPickerFrame integration
     swatchBtn:SetScript("OnClick", function()
+        if not ColorPickerFrame then return end
         local cur = B.db.customAccent or { r = 0, g = 0.9, b = 1 }
         ColorPickerFrame.func = function()
             local r, g, b = ColorPickerFrame:GetColorRGB()
@@ -304,7 +305,9 @@ local function BuildOptionsFrame()
         ColorPickerFrame.cancelFunc = function()
             -- do nothing on cancel
         end
-        ColorPickerFrame:SetColorRGB(cur.r, cur.g, cur.b)
+        if ColorPickerFrame.SetColorRGB then
+            ColorPickerFrame:SetColorRGB(cur.r, cur.g, cur.b)
+        end
         ColorPickerFrame:Show()
     end)
 

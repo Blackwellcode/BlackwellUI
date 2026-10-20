@@ -10,7 +10,8 @@ mod.label = "Nameplates"
 mod.alwaysActive = true
 
 local function SkinPlate(plate)
-    if plate.buiSkinned then return end
+    if not plate or plate.buiSkinned then return end
+    if type(plate.GetRegions) ~= "function" or type(plate.GetChildren) ~= "function" then return end
 
     local regions = { plate:GetRegions() }
     local nRegions = table.getn(regions)
@@ -26,11 +27,11 @@ local function SkinPlate(plate)
                     border = r
                 elseif tex == "Interface\\Tooltips\\Nameplate-Glow" then
                     glow = r
-                elseif tex and (string.find(tex, "Elite") or string.find(tex, "Dragon")) then
+                elseif tex and (string.find(tex, "Elite", 1, true) or string.find(tex, "Dragon", 1, true)) then
                     eliteIcon = r
-                elseif tex and string.find(tex, "Boss") then
+                elseif tex and string.find(tex, "Boss", 1, true) then
                     bossIcon = r
-                elseif tex and (string.find(tex, "TargetingFrame") or string.find(tex, "RaidIcon")) then
+                elseif tex and (string.find(tex, "TargetingFrame", 1, true) or string.find(tex, "RaidIcon", 1, true)) then
                     raidIcon = r
                 end
             elseif oType == "FontString" then
@@ -164,12 +165,12 @@ local function UpdatePlate(plate)
         end
     end
 
-    -- Target indicator border
+    -- Target indicator border (safe re-coloring without creating new textures)
     if UnitExists("target") and name and name:GetText() == UnitName("target") then
         local ar, ag, ab = B:GetAccent()
-        B:Border(healthBar, ar, ag, ab, 1)
+        B:SetBorderColor(healthBar, ar, ag, ab, 1)
     else
-        B:Border(healthBar, 0, 0, 0, 1)
+        B:SetBorderColor(healthBar, 0, 0, 0, 1)
     end
 
     -- Elite indicator
@@ -194,7 +195,7 @@ function mod:Create()
         local n = table.getn(children)
         for i = 1, n do
             local c = children[i]
-            if c then
+            if c and c.IsShown and c:IsShown() then
                 if not c.buiSkinned then
                     SkinPlate(c)
                 end

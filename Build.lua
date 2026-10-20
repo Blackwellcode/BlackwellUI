@@ -353,10 +353,11 @@ local function GetAbilityIcon(nameOrId)
         return ABILITY_ICONS[stripped]
     end
 
-    -- 4. Prefix search in dictionary
+    -- 4. Prefix search in dictionary (safe string.sub without pattern metacharacter hazards)
     if string.len(stripped) >= 4 then
+        local lenS = string.len(stripped)
         for k, v in pairs(ABILITY_ICONS) do
-            if string.find(k, "^" .. stripped) then
+            if string.len(k) >= lenS and string.sub(k, 1, lenS) == stripped then
                 return v
             end
         end
@@ -632,11 +633,12 @@ local spellBookIds = {}
 local function ScanSpellbook()
     spellIcons = {}
     spellBookIds = {}
+    local book = BOOKTYPE_SPELL or "spell"
     local i = 1
     while true do
-        local name, rank = GetSpellName(i, BOOKTYPE_SPELL)
+        local name, rank = GetSpellName(i, book)
         if not name then break end
-        local tex = GetSpellTexture(i, BOOKTYPE_SPELL)
+        local tex = GetSpellTexture(i, book)
         if tex and tex ~= "" then
             spellIcons[name] = tex
             local norm = NormalizeName(name)
@@ -651,6 +653,7 @@ end
 
 local spellbookWatcher = CreateFrame("Frame")
 spellbookWatcher:RegisterEvent("SPELLS_CHANGED")
+spellbookWatcher:RegisterEvent("PLAYER_ENTERING_WORLD")
 spellbookWatcher:SetScript("OnEvent", function()
     ScanSpellbook()
 end)
@@ -713,7 +716,7 @@ function mod:Create()
                 local norm = NormalizeName(sn)
                 local sId = spellBookIds[sn] or spellBookIds[norm] or spellBookIds[string.lower(sn)]
                 if sId and type(GameTooltip.SetSpell) == "function" then
-                    GameTooltip:SetSpell(sId, BOOKTYPE_SPELL)
+                    GameTooltip:SetSpell(sId, BOOKTYPE_SPELL or "spell")
                 else
                     GameTooltip:ClearLines()
                     local info = ABILITY_DESCRIPTIONS[norm] or ABILITY_DESCRIPTIONS[string.lower(sn)]
@@ -832,8 +835,8 @@ function mod:Update(state)
 
     for i = 1, MAX_TILES do
         local tile = f.tiles[i]
-        if i <= nSpells then
-            local sp = spells[i]
+        local sp = (i <= nSpells) and spells[i]
+        if sp and type(sp) == "table" then
             local spName = sp.spell or ""
             local spKey = sp.key or ""
             tile.spellName = (spName ~= "" and spName) or tostring(spKey)
@@ -916,8 +919,8 @@ function mod:Update(state)
 
     for i = 1, MAX_BUFFS do
         local r = f.buffBars[i]
-        if i <= maxRows then
-            local b = buffs[i]
+        local b = (i <= maxRows) and buffs[i]
+        if b and type(b) == "table" then
             local rawSpell = b.spell or "Buff"
             local left = (tonumber(b.left) or 0) - buffsAge
             if left < 0 then left = 0 end
