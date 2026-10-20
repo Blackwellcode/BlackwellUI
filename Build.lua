@@ -26,6 +26,632 @@ local BUFF_HEIGHT = 16
 local spellIcons = {}
 local buffMax = {}
 
+local function NormalizeName(str)
+    if not str or str == "" then return "" end
+    local s = string.lower(str)
+    s = string.gsub(s, "^%d+%.%s*", "")
+    s = string.gsub(s, "%s*%(.-%)", "")
+    s = string.gsub(s, "%s+", "_")
+    s = string.gsub(s, "%-+", "_")
+    s = string.gsub(s, ":+", "")
+    s = string.gsub(s, "'+", "")
+    return s
+end
+
+-------------------------------------------------------------------------------
+--  Magic Schools & Spell Colors (Cyberpunk / Authentic Azeroth Survivors)
+-------------------------------------------------------------------------------
+local SCHOOL_COLORS = {
+    Holy     = { 1.00, 0.78, 0.15 },
+    Fire     = { 1.00, 0.50, 0.10 },
+    Frost    = { 0.30, 0.72, 1.00 },
+    Nature   = { 0.30, 0.88, 0.25 },
+    Shadow   = { 0.66, 0.38, 1.00 },
+    Arcane   = { 1.00, 0.40, 0.85 },
+    Physical = { 0.95, 0.27, 0.24 },
+}
+
+local SCHOOL_OF = {
+    ["Consecration"] = "Holy", ["Exorcism"] = "Holy", ["Hammer of Wrath"] = "Holy", ["Holy Shock"] = "Holy",
+    ["Holy Wrath"] = "Holy", ["Judgement"] = "Holy", ["Hammer of Justice"] = "Holy", ["Holy Light"] = "Holy",
+    ["Divine Shield"] = "Holy", ["Holy Shield"] = "Holy", ["Redemption"] = "Holy", ["Smite"] = "Holy",
+    ["Holy Nova"] = "Holy", ["Power Word: Shield"] = "Holy", ["Renew"] = "Holy", ["Holy Fire"] = "Holy",
+    ["Shadow Word: Pain"] = "Shadow", ["Mind Blast"] = "Shadow", ["Mind Flay"] = "Shadow", ["Psychic Scream"] = "Shadow",
+    ["Shadow Bolt"] = "Shadow", ["Corruption"] = "Shadow", ["Curse of Agony"] = "Shadow", ["Death Coil"] = "Shadow",
+    ["Drain Life"] = "Shadow", ["Fear"] = "Shadow", ["Shadowmeld"] = "Shadow", ["Shadowburn"] = "Shadow",
+    ["Flame Shock"] = "Fire", ["Magma Totem"] = "Fire", ["Searing Totem"] = "Fire", ["Fire Nova Totem"] = "Fire",
+    ["Fireball"] = "Fire", ["Flamestrike"] = "Fire", ["Fire Blast"] = "Fire", ["Blast Wave"] = "Fire",
+    ["Pyroblast"] = "Fire", ["Immolate"] = "Fire", ["Rain of Fire"] = "Fire", ["Hellfire"] = "Fire",
+    ["Soul Fire"] = "Fire", ["Explosive Trap"] = "Fire", ["Immolation Trap"] = "Fire", ["Conflagrate"] = "Fire",
+    ["Frost Shock"] = "Frost", ["Frostbolt"] = "Frost", ["Frost Nova"] = "Frost", ["Blizzard"] = "Frost",
+    ["Cone of Cold"] = "Frost", ["Ice Barrier"] = "Frost", ["Frost Trap"] = "Frost", ["Freezing Trap"] = "Frost",
+    ["Arcane Missiles"] = "Arcane", ["Arcane Explosion"] = "Arcane", ["Polymorph"] = "Arcane", ["Arcane Shot"] = "Arcane",
+    ["Moonfire"] = "Arcane", ["Starfire"] = "Arcane", ["Hunter's Mark"] = "Arcane", ["Volley"] = "Arcane",
+    ["Lightning Bolt"] = "Nature", ["Chain Lightning"] = "Nature", ["Earth Shock"] = "Nature", ["Lightning Shield"] = "Nature",
+    ["Healing Wave"] = "Nature", ["Wrath"] = "Nature", ["Hurricane"] = "Nature", ["Entangling Roots"] = "Nature",
+    ["Rejuvenation"] = "Nature", ["Regrowth"] = "Nature", ["Thorns"] = "Nature", ["Faerie Fire"] = "Nature",
+    ["Serpent Sting"] = "Nature", ["Thunder Clap"] = "Nature",
+    ["Cleave"] = "Physical", ["Whirlwind"] = "Physical", ["Mortal Strike"] = "Physical", ["Execute"] = "Physical",
+    ["Rend"] = "Physical", ["Charge"] = "Physical", ["Intercept"] = "Physical", ["Heroic Leap"] = "Physical",
+    ["Bladestorm"] = "Physical", ["Overpower"] = "Physical", ["Slam"] = "Physical", ["Sinister Strike"] = "Physical",
+    ["Eviscerate"] = "Physical", ["Backstab"] = "Physical", ["Ambush"] = "Physical", ["Aimed Shot"] = "Physical",
+    ["Multi-Shot"] = "Physical", ["Auto Shot"] = "Physical", ["Auto Attack"] = "Physical", ["Shoot"] = "Physical",
+}
+
+-------------------------------------------------------------------------------
+--  Azeroth Survivors & Vanilla Spell ID to Canonical Name Master Lookup
+-------------------------------------------------------------------------------
+local SPELL_ID_TO_NAME = {
+    -- Warrior
+    ["845"] = "Cleave",
+    ["1680"] = "Whirlwind",
+    ["6343"] = "Thunder Clap",
+    ["8198"] = "Thunder Clap",
+    ["8204"] = "Thunder Clap",
+    ["8205"] = "Thunder Clap",
+    ["11580"] = "Thunder Clap",
+    ["11581"] = "Thunder Clap",
+    ["12294"] = "Mortal Strike",
+    ["21551"] = "Mortal Strike",
+    ["21552"] = "Mortal Strike",
+    ["21553"] = "Mortal Strike",
+    ["5308"] = "Execute",
+    ["20658"] = "Execute",
+    ["20660"] = "Execute",
+    ["20661"] = "Execute",
+    ["20662"] = "Execute",
+    ["772"] = "Rend",
+    ["6546"] = "Rend",
+    ["6547"] = "Rend",
+    ["6548"] = "Rend",
+    ["11572"] = "Rend",
+    ["11573"] = "Rend",
+    ["11574"] = "Rend",
+    ["100"] = "Charge",
+    ["6178"] = "Charge",
+    ["11578"] = "Charge",
+    ["20252"] = "Intercept",
+    ["6544"] = "Heroic Leap",
+    ["46924"] = "Bladestorm",
+    ["1719"] = "Recklessness",
+    ["12292"] = "Death Wish",
+    ["12328"] = "Sweeping Strikes",
+    ["2687"] = "Bloodrage",
+    ["6673"] = "Battle Shout",
+    ["5242"] = "Battle Shout",
+    ["6192"] = "Battle Shout",
+    ["11549"] = "Battle Shout",
+    ["11550"] = "Battle Shout",
+    ["11551"] = "Battle Shout",
+    ["25289"] = "Battle Shout",
+    ["1160"] = "Demoralizing Shout",
+    ["6190"] = "Demoralizing Shout",
+    ["11554"] = "Demoralizing Shout",
+    ["11555"] = "Demoralizing Shout",
+    ["11556"] = "Demoralizing Shout",
+    ["871"] = "Shield Wall",
+    ["12975"] = "Last Stand",
+    ["12880"] = "Enrage",
+    ["12966"] = "Flurry",
+    ["12967"] = "Flurry",
+    ["12968"] = "Flurry",
+    ["12969"] = "Flurry",
+    ["12970"] = "Flurry",
+    ["7384"] = "Overpower",
+    ["7887"] = "Overpower",
+    ["11584"] = "Overpower",
+    ["11585"] = "Overpower",
+    ["1464"] = "Slam",
+    ["8820"] = "Slam",
+    ["11604"] = "Slam",
+    ["11605"] = "Slam",
+    ["1715"] = "Hamstring",
+    ["7372"] = "Hamstring",
+    ["7373"] = "Hamstring",
+    ["694"] = "Mocking Blow",
+    ["355"] = "Taunt",
+    ["676"] = "Disarm",
+    ["6552"] = "Pummel",
+    ["72"] = "Shield Bash",
+    ["18499"] = "Berserker Rage",
+    ["23881"] = "Bloodthirst",
+    ["23892"] = "Bloodthirst",
+    ["23893"] = "Bloodthirst",
+    ["23894"] = "Bloodthirst",
+    ["23922"] = "Shield Slam",
+    ["12721"] = "Deep Wounds",
+
+    -- Paladin
+    ["26573"] = "Consecration",
+    ["20116"] = "Consecration",
+    ["20922"] = "Consecration",
+    ["20923"] = "Consecration",
+    ["20924"] = "Consecration",
+    ["24239"] = "Consecration",
+    ["879"] = "Exorcism",
+    ["5614"] = "Exorcism",
+    ["5615"] = "Exorcism",
+    ["10312"] = "Exorcism",
+    ["10313"] = "Exorcism",
+    ["10314"] = "Exorcism",
+    ["24275"] = "Hammer of Wrath",
+    ["24274"] = "Hammer of Wrath",
+    ["20473"] = "Holy Shock",
+    ["20929"] = "Holy Shock",
+    ["20930"] = "Holy Shock",
+    ["2812"] = "Holy Wrath",
+    ["10318"] = "Holy Wrath",
+    ["20271"] = "Judgement",
+    ["853"] = "Hammer of Justice",
+    ["5588"] = "Hammer of Justice",
+    ["5589"] = "Hammer of Justice",
+    ["10308"] = "Hammer of Justice",
+    ["635"] = "Holy Light",
+    ["639"] = "Holy Light",
+    ["647"] = "Holy Light",
+    ["1026"] = "Holy Light",
+    ["1042"] = "Holy Light",
+    ["3472"] = "Holy Light",
+    ["10328"] = "Holy Light",
+    ["10329"] = "Holy Light",
+    ["25292"] = "Holy Light",
+    ["19750"] = "Flash of Light",
+    ["19939"] = "Flash of Light",
+    ["19940"] = "Flash of Light",
+    ["19941"] = "Flash of Light",
+    ["19942"] = "Flash of Light",
+    ["19943"] = "Flash of Light",
+    ["642"] = "Divine Shield",
+    ["1020"] = "Divine Shield",
+    ["20925"] = "Holy Shield",
+    ["20927"] = "Holy Shield",
+    ["20928"] = "Holy Shield",
+    ["1044"] = "Blessing of Freedom",
+    ["1022"] = "Blessing of Protection",
+
+    -- Hunter
+    ["75"] = "Auto Shot",
+    ["3044"] = "Arcane Shot",
+    ["14281"] = "Arcane Shot",
+    ["14282"] = "Arcane Shot",
+    ["14283"] = "Arcane Shot",
+    ["14284"] = "Arcane Shot",
+    ["14285"] = "Arcane Shot",
+    ["14286"] = "Arcane Shot",
+    ["14287"] = "Arcane Shot",
+    ["2643"] = "Multi-Shot",
+    ["14288"] = "Multi-Shot",
+    ["14289"] = "Multi-Shot",
+    ["14290"] = "Multi-Shot",
+    ["25294"] = "Multi-Shot",
+    ["1978"] = "Serpent Sting",
+    ["13549"] = "Serpent Sting",
+    ["13550"] = "Serpent Sting",
+    ["13551"] = "Serpent Sting",
+    ["13552"] = "Serpent Sting",
+    ["13553"] = "Serpent Sting",
+    ["13554"] = "Serpent Sting",
+    ["13555"] = "Serpent Sting",
+    ["25295"] = "Serpent Sting",
+    ["1510"] = "Volley",
+    ["14294"] = "Volley",
+    ["14295"] = "Volley",
+    ["13813"] = "Explosive Trap",
+    ["14316"] = "Explosive Trap",
+    ["14317"] = "Explosive Trap",
+    ["5116"] = "Concussive Shot",
+    ["19434"] = "Aimed Shot",
+    ["20900"] = "Aimed Shot",
+    ["20901"] = "Aimed Shot",
+    ["20902"] = "Aimed Shot",
+    ["20903"] = "Aimed Shot",
+    ["20904"] = "Aimed Shot",
+    ["1130"] = "Hunter's Mark",
+    ["14323"] = "Distracting Shot",
+    ["13809"] = "Frost Trap",
+    ["14311"] = "Freezing Trap",
+    ["13795"] = "Immolation Trap",
+    ["19263"] = "Deterrence",
+    ["19574"] = "Bestial Wrath",
+
+    -- Rogue
+    ["1752"] = "Sinister Strike",
+    ["1757"] = "Sinister Strike",
+    ["1758"] = "Sinister Strike",
+    ["1759"] = "Sinister Strike",
+    ["1760"] = "Sinister Strike",
+    ["8621"] = "Sinister Strike",
+    ["11293"] = "Sinister Strike",
+    ["11294"] = "Sinister Strike",
+    ["2098"] = "Eviscerate",
+    ["6715"] = "Eviscerate",
+    ["6716"] = "Eviscerate",
+    ["6717"] = "Eviscerate",
+    ["6718"] = "Eviscerate",
+    ["8623"] = "Eviscerate",
+    ["8624"] = "Eviscerate",
+    ["11299"] = "Eviscerate",
+    ["11300"] = "Eviscerate",
+    ["13877"] = "Blade Flurry",
+    ["1943"] = "Rupture",
+    ["2077"] = "Rupture",
+    ["2078"] = "Rupture",
+    ["11267"] = "Rupture",
+    ["11268"] = "Rupture",
+    ["11269"] = "Rupture",
+    ["1776"] = "Gouge",
+    ["1777"] = "Gouge",
+    ["8629"] = "Gouge",
+    ["11285"] = "Gouge",
+    ["11286"] = "Gouge",
+    ["13750"] = "Adrenaline Rush",
+    ["53"] = "Backstab",
+    ["2589"] = "Backstab",
+    ["2590"] = "Backstab",
+    ["2591"] = "Backstab",
+    ["8721"] = "Backstab",
+    ["11279"] = "Backstab",
+    ["11280"] = "Backstab",
+    ["11281"] = "Backstab",
+    ["5171"] = "Slice and Dice",
+    ["6774"] = "Slice and Dice",
+    ["8676"] = "Ambush",
+    ["8724"] = "Ambush",
+    ["8725"] = "Ambush",
+    ["11265"] = "Ambush",
+    ["11266"] = "Ambush",
+    ["14177"] = "Cold Blood",
+    ["11305"] = "Sprint",
+    ["1856"] = "Vanish",
+
+    -- Priest
+    ["585"] = "Smite",
+    ["591"] = "Smite",
+    ["598"] = "Smite",
+    ["984"] = "Smite",
+    ["1004"] = "Smite",
+    ["6060"] = "Smite",
+    ["10933"] = "Smite",
+    ["10934"] = "Smite",
+    ["589"] = "Shadow Word: Pain",
+    ["594"] = "Shadow Word: Pain",
+    ["970"] = "Shadow Word: Pain",
+    ["992"] = "Shadow Word: Pain",
+    ["2767"] = "Shadow Word: Pain",
+    ["10892"] = "Shadow Word: Pain",
+    ["10893"] = "Shadow Word: Pain",
+    ["10894"] = "Shadow Word: Pain",
+    ["8092"] = "Mind Blast",
+    ["8102"] = "Mind Blast",
+    ["8103"] = "Mind Blast",
+    ["8104"] = "Mind Blast",
+    ["8105"] = "Mind Blast",
+    ["8106"] = "Mind Blast",
+    ["10945"] = "Mind Blast",
+    ["10946"] = "Mind Blast",
+    ["10947"] = "Mind Blast",
+    ["15237"] = "Holy Nova",
+    ["15430"] = "Holy Nova",
+    ["15431"] = "Holy Nova",
+    ["27799"] = "Holy Nova",
+    ["27800"] = "Holy Nova",
+    ["27801"] = "Holy Nova",
+    ["17"] = "Power Word: Shield",
+    ["592"] = "Power Word: Shield",
+    ["600"] = "Power Word: Shield",
+    ["3747"] = "Power Word: Shield",
+    ["6065"] = "Power Word: Shield",
+    ["6066"] = "Power Word: Shield",
+    ["10898"] = "Power Word: Shield",
+    ["10899"] = "Power Word: Shield",
+    ["10900"] = "Power Word: Shield",
+    ["10901"] = "Power Word: Shield",
+    ["139"] = "Renew",
+    ["6074"] = "Renew",
+    ["6075"] = "Renew",
+    ["6076"] = "Renew",
+    ["6077"] = "Renew",
+    ["6078"] = "Renew",
+    ["10927"] = "Renew",
+    ["10928"] = "Renew",
+    ["10929"] = "Renew",
+    ["25299"] = "Renew",
+    ["15407"] = "Mind Flay",
+    ["17311"] = "Mind Flay",
+    ["17312"] = "Mind Flay",
+    ["17313"] = "Mind Flay",
+    ["17314"] = "Mind Flay",
+    ["18807"] = "Mind Flay",
+    ["8122"] = "Psychic Scream",
+    ["14914"] = "Holy Fire",
+
+    -- Shaman
+    ["403"] = "Lightning Bolt",
+    ["529"] = "Lightning Bolt",
+    ["548"] = "Lightning Bolt",
+    ["915"] = "Lightning Bolt",
+    ["943"] = "Lightning Bolt",
+    ["6041"] = "Lightning Bolt",
+    ["10391"] = "Lightning Bolt",
+    ["10392"] = "Lightning Bolt",
+    ["15207"] = "Lightning Bolt",
+    ["15208"] = "Lightning Bolt",
+    ["421"] = "Chain Lightning",
+    ["930"] = "Chain Lightning",
+    ["2860"] = "Chain Lightning",
+    ["10605"] = "Chain Lightning",
+    ["8042"] = "Earth Shock",
+    ["8044"] = "Earth Shock",
+    ["8045"] = "Earth Shock",
+    ["8046"] = "Earth Shock",
+    ["10412"] = "Earth Shock",
+    ["10413"] = "Earth Shock",
+    ["10414"] = "Earth Shock",
+    ["8024"] = "Flame Shock",
+    ["8027"] = "Flame Shock",
+    ["8030"] = "Flame Shock",
+    ["10447"] = "Flame Shock",
+    ["10448"] = "Flame Shock",
+    ["29228"] = "Flame Shock",
+    ["8056"] = "Frost Shock",
+    ["8058"] = "Frost Shock",
+    ["10472"] = "Frost Shock",
+    ["10473"] = "Frost Shock",
+    ["324"] = "Lightning Shield",
+    ["325"] = "Lightning Shield",
+    ["905"] = "Lightning Shield",
+    ["945"] = "Lightning Shield",
+    ["8134"] = "Lightning Shield",
+    ["10431"] = "Lightning Shield",
+    ["10432"] = "Lightning Shield",
+    ["8004"] = "Healing Wave",
+    ["8008"] = "Healing Wave",
+    ["8010"] = "Healing Wave",
+    ["10395"] = "Healing Wave",
+    ["10396"] = "Healing Wave",
+    ["1064"] = "Chain Heal",
+    ["10622"] = "Chain Heal",
+    ["10623"] = "Chain Heal",
+    ["3599"] = "Searing Totem",
+    ["8190"] = "Magma Totem",
+    ["1535"] = "Fire Nova Totem",
+
+    -- Mage
+    ["133"] = "Fireball",
+    ["143"] = "Fireball",
+    ["145"] = "Fireball",
+    ["3140"] = "Fireball",
+    ["8400"] = "Fireball",
+    ["8401"] = "Fireball",
+    ["8402"] = "Fireball",
+    ["10148"] = "Fireball",
+    ["10149"] = "Fireball",
+    ["10150"] = "Fireball",
+    ["10151"] = "Fireball",
+    ["116"] = "Frostbolt",
+    ["205"] = "Frostbolt",
+    ["837"] = "Frostbolt",
+    ["7322"] = "Frostbolt",
+    ["8406"] = "Frostbolt",
+    ["8407"] = "Frostbolt",
+    ["8408"] = "Frostbolt",
+    ["10179"] = "Frostbolt",
+    ["10180"] = "Frostbolt",
+    ["10181"] = "Frostbolt",
+    ["5143"] = "Arcane Missiles",
+    ["5144"] = "Arcane Missiles",
+    ["5145"] = "Arcane Missiles",
+    ["8416"] = "Arcane Missiles",
+    ["8417"] = "Arcane Missiles",
+    ["10211"] = "Arcane Missiles",
+    ["10212"] = "Arcane Missiles",
+    ["122"] = "Frost Nova",
+    ["865"] = "Frost Nova",
+    ["6131"] = "Frost Nova",
+    ["10230"] = "Frost Nova",
+    ["1449"] = "Arcane Explosion",
+    ["8437"] = "Arcane Explosion",
+    ["8438"] = "Arcane Explosion",
+    ["8439"] = "Arcane Explosion",
+    ["10201"] = "Arcane Explosion",
+    ["10202"] = "Arcane Explosion",
+    ["10"] = "Blizzard",
+    ["6141"] = "Blizzard",
+    ["8427"] = "Blizzard",
+    ["10185"] = "Blizzard",
+    ["10186"] = "Blizzard",
+    ["10187"] = "Blizzard",
+    ["2120"] = "Flamestrike",
+    ["2121"] = "Flamestrike",
+    ["8422"] = "Flamestrike",
+    ["8423"] = "Flamestrike",
+    ["10215"] = "Flamestrike",
+    ["10216"] = "Flamestrike",
+    ["11366"] = "Pyroblast",
+    ["12505"] = "Pyroblast",
+    ["12522"] = "Pyroblast",
+    ["12523"] = "Pyroblast",
+    ["12524"] = "Pyroblast",
+    ["12525"] = "Pyroblast",
+    ["12526"] = "Pyroblast",
+    ["18809"] = "Pyroblast",
+    ["2136"] = "Fire Blast",
+    ["2137"] = "Fire Blast",
+    ["2138"] = "Fire Blast",
+    ["8412"] = "Fire Blast",
+    ["8413"] = "Fire Blast",
+    ["10197"] = "Fire Blast",
+    ["10199"] = "Fire Blast",
+    ["120"] = "Cone of Cold",
+    ["8492"] = "Cone of Cold",
+    ["10159"] = "Cone of Cold",
+    ["10160"] = "Cone of Cold",
+    ["10161"] = "Cone of Cold",
+    ["11426"] = "Ice Barrier",
+    ["13031"] = "Ice Barrier",
+    ["13032"] = "Ice Barrier",
+    ["13033"] = "Ice Barrier",
+    ["118"] = "Polymorph",
+
+    -- Warlock
+    ["686"] = "Shadow Bolt",
+    ["695"] = "Shadow Bolt",
+    ["705"] = "Shadow Bolt",
+    ["1088"] = "Shadow Bolt",
+    ["1106"] = "Shadow Bolt",
+    ["7641"] = "Shadow Bolt",
+    ["11659"] = "Shadow Bolt",
+    ["11660"] = "Shadow Bolt",
+    ["11661"] = "Shadow Bolt",
+    ["25307"] = "Shadow Bolt",
+    ["172"] = "Corruption",
+    ["6222"] = "Corruption",
+    ["6223"] = "Corruption",
+    ["7648"] = "Corruption",
+    ["11671"] = "Corruption",
+    ["11672"] = "Corruption",
+    ["25311"] = "Corruption",
+    ["348"] = "Immolate",
+    ["707"] = "Immolate",
+    ["1094"] = "Immolate",
+    ["2941"] = "Immolate",
+    ["11665"] = "Immolate",
+    ["11667"] = "Immolate",
+    ["11668"] = "Immolate",
+    ["25309"] = "Immolate",
+    ["980"] = "Curse of Agony",
+    ["1014"] = "Curse of Agony",
+    ["6217"] = "Curse of Agony",
+    ["11711"] = "Curse of Agony",
+    ["11712"] = "Curse of Agony",
+    ["11713"] = "Curse of Agony",
+    ["5740"] = "Rain of Fire",
+    ["6219"] = "Rain of Fire",
+    ["11677"] = "Rain of Fire",
+    ["11678"] = "Rain of Fire",
+    ["1949"] = "Hellfire",
+    ["11683"] = "Hellfire",
+    ["11684"] = "Hellfire",
+    ["6789"] = "Death Coil",
+    ["17925"] = "Death Coil",
+    ["17926"] = "Death Coil",
+    ["689"] = "Drain Life",
+    ["699"] = "Drain Life",
+    ["709"] = "Drain Life",
+    ["7651"] = "Drain Life",
+    ["11699"] = "Drain Life",
+    ["11700"] = "Drain Life",
+    ["5782"] = "Fear",
+    ["6215"] = "Fear",
+    ["17877"] = "Shadowburn",
+    ["17962"] = "Conflagrate",
+    ["6353"] = "Soul Fire",
+
+    -- Druid
+    ["8921"] = "Moonfire",
+    ["8924"] = "Moonfire",
+    ["8925"] = "Moonfire",
+    ["8926"] = "Moonfire",
+    ["8927"] = "Moonfire",
+    ["8928"] = "Moonfire",
+    ["8929"] = "Moonfire",
+    ["9833"] = "Moonfire",
+    ["9834"] = "Moonfire",
+    ["9835"] = "Moonfire",
+    ["2912"] = "Starfire",
+    ["8949"] = "Starfire",
+    ["8950"] = "Starfire",
+    ["8951"] = "Starfire",
+    ["9875"] = "Starfire",
+    ["9876"] = "Starfire",
+    ["25298"] = "Starfire",
+    ["5176"] = "Wrath",
+    ["5177"] = "Wrath",
+    ["5178"] = "Wrath",
+    ["5179"] = "Wrath",
+    ["5180"] = "Wrath",
+    ["6780"] = "Wrath",
+    ["8905"] = "Wrath",
+    ["9912"] = "Wrath",
+    ["774"] = "Rejuvenation",
+    ["1058"] = "Rejuvenation",
+    ["1430"] = "Rejuvenation",
+    ["2090"] = "Rejuvenation",
+    ["2091"] = "Rejuvenation",
+    ["3627"] = "Rejuvenation",
+    ["8910"] = "Rejuvenation",
+    ["9839"] = "Rejuvenation",
+    ["9840"] = "Rejuvenation",
+    ["9841"] = "Rejuvenation",
+    ["25299"] = "Rejuvenation",
+    ["8936"] = "Regrowth",
+    ["8938"] = "Regrowth",
+    ["8939"] = "Regrowth",
+    ["8940"] = "Regrowth",
+    ["8941"] = "Regrowth",
+    ["9750"] = "Regrowth",
+    ["9856"] = "Regrowth",
+    ["9857"] = "Regrowth",
+    ["9858"] = "Regrowth",
+    ["5185"] = "Healing Touch",
+    ["467"] = "Thorns",
+    ["339"] = "Entangling Roots",
+    ["6807"] = "Maul",
+    ["5221"] = "Shred",
+    ["1079"] = "Rip",
+    ["779"] = "Swipe",
+
+    -- Racials
+    ["20572"] = "Blood Fury",
+    ["20594"] = "Stoneform",
+    ["20549"] = "War Stomp",
+    ["20577"] = "Cannibalize",
+    ["20580"] = "Shadowmeld",
+    ["20554"] = "Berserking",
+    ["26297"] = "Berserking",
+    ["28730"] = "Arcane Torrent",
+    ["20552"] = "Escape Artist",
+    ["20575"] = "Will of the Forsaken",
+    ["20550"] = "Perception",
+}
+
+local KEY_NAMES = {
+    ["sw_pain"] = "Shadow Word: Pain",
+    ["pw_shield"] = "Power Word: Shield",
+    ["demo_shout"] = "Demoralizing Shout",
+    ["hunters_mark"] = "Hunter's Mark",
+}
+
+local function ResolveSpellKeyToName(key, spell)
+    if spell and spell ~= "" and not tonumber(spell) then
+        return spell
+    end
+    local kStr = tostring(key or "")
+    if SPELL_ID_TO_NAME[kStr] then
+        return SPELL_ID_TO_NAME[kStr]
+    end
+    if KEY_NAMES[kStr] then
+        return KEY_NAMES[kStr]
+    end
+    if string.find(kStr, "_") then
+        local name = string.gsub(kStr, "_", " ")
+        local first = true
+        return (string.gsub(name, "(%a)([%w']*)", function(initial, rest)
+            local word = initial .. rest
+            if not first and (word == "of" or word == "the" or word == "and") then
+                return string.lower(word)
+            end
+            first = false
+            return string.upper(initial) .. rest
+        end))
+    end
+    if spell and spell ~= "" then
+        return spell
+    end
+    return kStr
+end
+
+
 -------------------------------------------------------------------------------
 --  Azeroth Survivors Master Ability Icons Dictionary
 -------------------------------------------------------------------------------
@@ -202,18 +828,6 @@ local ABILITY_ICONS = {
     ["perception"] = "Interface\\Icons\\Spell_Nature_Sleep",
 }
 
-local function NormalizeName(str)
-    if not str or str == "" then return "" end
-    local s = string.lower(str)
-    s = string.gsub(s, "^%d+%.%s*", "")
-    s = string.gsub(s, "%s*%(.-%)", "")
-    s = string.gsub(s, "%s+", "_")
-    s = string.gsub(s, "%-+", "_")
-    s = string.gsub(s, ":+", "")
-    s = string.gsub(s, "'+", "")
-    return s
-end
-
 local ABILITY_DESCRIPTIONS = {
     ["cleave"] = { name = "Cleave", cost = "20 Rage", range = "Melee Range", cast = "Instant", desc = "A sweeping attack that strikes the target and an additional nearby ally, dealing weapon damage plus bonus damage." },
     ["whirlwind"] = { name = "Whirlwind", cost = "25 Rage", range = "8 yd radius", cast = "Instant", desc = "In a whirlwind of steel, attacks up to 4 nearby enemies, dealing weapon damage." },
@@ -297,6 +911,14 @@ local function GetAbilityIcon(nameOrId)
     end
 
     local norm = NormalizeName(nameOrId)
+
+    -- Resolve spell ID or key alias to canonical name if needed
+    local idResolved = SPELL_ID_TO_NAME[nameOrId] or SPELL_ID_TO_NAME[norm] or KEY_NAMES[nameOrId]
+    if idResolved then
+        local idNorm = NormalizeName(idResolved)
+        if ABILITY_ICONS[idNorm] then return ABILITY_ICONS[idNorm] end
+        if ABILITY_ICONS[idResolved] then return ABILITY_ICONS[idResolved] end
+    end
 
     -- Dynamic weapon icon for Melee / Weapon swings
     if norm == "melee" or norm == "attack" or norm == "auto_attack" or norm == "autoattack" or norm == "swing" or norm == "physical" or norm == "hero_melee" then
@@ -787,6 +1409,449 @@ local function GetActiveDotCount(normSpell)
     return 0
 end
 
+-------------------------------------------------------------------------------
+--  Action Bar Slot Scanner & Dynamic Ability Tooltip Engine (Cyberpunk Style)
+-------------------------------------------------------------------------------
+local actionScan = CreateFrame("GameTooltip", "BUI_BuildScanTooltip", UIParent, "GameTooltipTemplate")
+actionScan:SetOwner(WorldFrame, "ANCHOR_NONE")
+
+local function GetActionSlotInfo(slot)
+    if not (HasAction and HasAction(slot)) then
+        return nil, nil, nil
+    end
+    actionScan:SetOwner(WorldFrame, "ANCHOR_NONE")
+    actionScan:ClearLines()
+    actionScan:SetAction(slot)
+    local name = BUI_BuildScanTooltipTextLeft1 and BUI_BuildScanTooltipTextLeft1:GetText() or nil
+    local rank = BUI_BuildScanTooltipTextRight1 and BUI_BuildScanTooltipTextRight1:GetText() or nil
+    local tex = GetActionTexture and GetActionTexture(slot) or nil
+    actionScan:Hide()
+    return name, rank, tex
+end
+
+local function FindSpellActionSlot(index, spKey, spName, totalSpells)
+    -- In Azeroth Survivors:
+    -- Slotted spells occupy action slots 1 to 6.
+    -- The racial spell occupies action slot 12.
+    if totalSpells and index == totalSpells and totalSpells > 1 then
+        if HasAction and HasAction(12) then
+            return 12
+        end
+    end
+    if HasAction and HasAction(index) then
+        return index
+    end
+    -- Fallback: scan slots 1..12 to find matching name or texture
+    local normTarget = NormalizeName(spName or spKey or "")
+    if normTarget ~= "" and HasAction then
+        for s = 1, 12 do
+            if HasAction(s) then
+                local aName = GetActionSlotInfo(s)
+                if aName and NormalizeName(aName) == normTarget then
+                    return s
+                end
+            end
+        end
+    end
+    if index <= 6 then
+        return index
+    elseif totalSpells and index == totalSpells then
+        return 12
+    end
+    return index
+end
+
+-------------------------------------------------------------------------------
+--  Tooltip Line Counting & Cyberpunk Separators (WoW 1.12.1 Safe)
+-------------------------------------------------------------------------------
+local function GetTooltipNumLines(tip)
+    if not tip then return 0 end
+    if type(tip.NumLines) == "function" then
+        local ok, n = pcall(tip.NumLines, tip)
+        if ok and type(n) == "number" and n > 0 then return n end
+    end
+    local name = tip:GetName()
+    if not name then return 0 end
+    local count = 0
+    for i = 1, 30 do
+        local fs = getglobal(name .. "TextLeft" .. i)
+        if fs and fs:IsShown() and fs:GetText() and fs:GetText() ~= "" then
+            count = i
+        else
+            break
+        end
+    end
+    return count
+end
+
+if GameTooltip and not GameTooltip.NumLines then
+    GameTooltip.NumLines = function(self)
+        return GetTooltipNumLines(self)
+    end
+end
+
+local activeBuildTile = nil
+local writtenSignature = nil
+
+local function Signature()
+    local num = GetTooltipNumLines(GameTooltip)
+    if num < 1 then return "" end
+    local parts = {}
+    for l = 1, num do
+        local left = getglobal("GameTooltipTextLeft" .. l)
+        local right = getglobal("GameTooltipTextRight" .. l)
+        local lText = (left and left:GetText()) or ""
+        local rText = (right and right:IsShown() and right:GetText()) or ""
+        table.insert(parts, lText .. "~" .. rText)
+    end
+    return table.concat(parts, "^")
+end
+
+-- Thin 1px rule separators across GameTooltip
+local tooltipRules = {}
+local tooltipRulesUsed = 0
+
+local function HideRules()
+    for i = 1, table.getn(tooltipRules) do
+        tooltipRules[i]:Hide()
+    end
+    tooltipRulesUsed = 0
+end
+
+local function AddRule(lineIndex, color)
+    if not lineIndex or lineIndex <= 0 then return end
+    tooltipRulesUsed = tooltipRulesUsed + 1
+    local rule = tooltipRules[tooltipRulesUsed]
+    if not rule then
+        rule = GameTooltip:CreateTexture(nil, "ARTWORK")
+        rule:SetTexture("Interface\\ChatFrame\\ChatFrameBackground")
+        rule:SetHeight(1)
+        tooltipRules[tooltipRulesUsed] = rule
+    end
+    local text = getglobal("GameTooltipTextLeft" .. lineIndex)
+    if text then
+        rule:ClearAllPoints()
+        rule:SetPoint("LEFT", text, "LEFT", 0, 0)
+        rule:SetPoint("RIGHT", GameTooltip, "RIGHT", -10, 0)
+        rule:SetVertexColor(color[1], color[2], color[3], 0.55)
+        rule:Show()
+    end
+end
+
+local function Plain(text)
+    if not text then return "" end
+    local s = string.gsub(text, "|c%x%x%x%x%x%x%x%x", "")
+    s = string.gsub(s, "|r", "")
+    return s
+end
+
+local function Hex(c)
+    return string.format("|cff%02x%02x%02x", math.floor(c[1] * 255), math.floor(c[2] * 255), math.floor(c[3] * 255))
+end
+
+local function Capital(text)
+    if not text or text == "" then return "" end
+    return string.upper(string.sub(text, 1, 1)) .. string.sub(text, 2)
+end
+
+local function SplitCommaList(text)
+    local items = {}
+    if not text or text == "" then return items end
+    local pos = 1
+    local len = string.len(text)
+    while pos <= len do
+        local s, e = string.find(text, ",", pos, true)
+        local piece = string.sub(text, pos, (s or (len + 1)) - 1)
+        piece = string.gsub(piece, "^%s+", "")
+        piece = string.gsub(piece, "%s+$", "")
+        if piece ~= "" then
+            table.insert(items, piece)
+        end
+        if not s then break end
+        pos = e + 1
+    end
+    return items
+end
+
+local function SplitLines(text)
+    local lines = {}
+    if not text or text == "" then return lines end
+    local pos = 1
+    local len = string.len(text)
+    while pos <= len do
+        local s, e = string.find(text, "\n", pos, true)
+        local piece = string.sub(text, pos, (s or (len + 1)) - 1)
+        table.insert(lines, piece)
+        if not s then break end
+        pos = e + 1
+    end
+    return lines
+end
+
+local function HighlightText(text, school, schoolColor)
+    text = string.gsub(text, "(%d[%d%.]*)(%%?)( ?)(%a*)", function(num, pct, sp, word)
+        if pct ~= "" then
+            return "|cffffc214" .. num .. "%|r" .. sp .. word
+        elseif school and word == school then
+            return Hex(schoolColor) .. num .. sp .. word .. "|r"
+        elseif word == "sec" then
+            return "|cff8cccff" .. num .. sp .. word .. "|r"
+        elseif word == "yd" then
+            return "|cff99f2bf" .. num .. sp .. word .. "|r"
+        end
+        return "|cffffffff" .. num .. "|r" .. sp .. word
+    end)
+    if school then
+        text = string.gsub(text, school .. "|r damage", school .. " damage|r")
+    end
+    text = string.gsub(text, "|cffffffff([%d%.]+)|r damage", Hex(schoolColor) .. "%1 damage|r")
+    for _, lead in pairs({ "[Hh]eals you for ", "Absorbs the next ", "Absorbs up to ", "Shields you against ", "Restores " }) do
+        local s, e = string.find(text, lead)
+        if s then
+            text = string.gsub(text, lead .. "|cffffffff", lead .. "|cff4dff70")
+        end
+    end
+    return text
+end
+
+local function ReadTooltipData(tip)
+    local count = GetTooltipNumLines(tip)
+    if count < 2 then return nil end
+
+    local titleFs = getglobal("GameTooltipTextLeft1")
+    local rankFs = getglobal("GameTooltipTextRight1")
+    local rawTitle = titleFs and titleFs:GetText() or ""
+    local title = Plain(rawTitle)
+    if title == "" then return nil end
+
+    -- Guard against re-reading already-formatted tooltips:
+    if string.find(rawTitle, "|c", 1, true) then
+        return nil
+    end
+    local line2Fs = getglobal("GameTooltipTextLeft2")
+    local line2Text = line2Fs and line2Fs:GetText() or ""
+    if string.find(line2Text, "·", 1, true) or string.find(line2Text, "|c", 1, true) then
+        return nil
+    end
+
+    local rank = (rankFs and rankFs:IsShown()) and Plain(rankFs:GetText()) or nil
+
+    local ability = {
+        title = title,
+        rank = rank,
+        stats = {},
+        description = {},
+        sections = {},
+        other = {},
+        cast = nil,
+        cooldown = nil,
+        crit = nil,
+    }
+
+    local castLine = nil
+    for line = 2, count do
+        local lFs = getglobal("GameTooltipTextLeft" .. line)
+        local rFs = getglobal("GameTooltipTextRight" .. line)
+        local leftText = lFs and Plain(lFs:GetText()) or ""
+        local rightText = (rFs and rFs:IsShown()) and Plain(rFs:GetText()) or ""
+
+        if string.find(rightText, "cooldown", 1, true) or leftText == "Automatic" or leftText == "Passive" or string.find(leftText, "cast", 1, true) or string.find(leftText, "Instant", 1, true) or string.find(leftText, "Channeled", 1, true) or string.find(leftText, "Ranged", 1, true) then
+            castLine = line
+            ability.cast = (leftText ~= "") and leftText or "Instant"
+            ability.cooldown = (rightText ~= "") and rightText or nil
+            break
+        end
+    end
+
+    local descStart = 2
+    if castLine then
+        for line = 2, castLine - 1 do
+            local lFs = getglobal("GameTooltipTextLeft" .. line)
+            local text = lFs and Plain(lFs:GetText()) or ""
+            if text ~= "" then
+                table.insert(ability.stats, text)
+            end
+        end
+        descStart = castLine + 1
+    end
+
+    for line = descStart, count do
+        local lFs = getglobal("GameTooltipTextLeft" .. line)
+        local fullText = lFs and (lFs:GetText() or "") or ""
+        local split = SplitLines(fullText)
+        for p = 1, table.getn(split) do
+            local text = Plain(split[p])
+            if text ~= "" then
+                local sUp, eUp = string.find(text, "^Upgrades: ")
+                local sBon, eBon = string.find(text, "^Your bonuses: ")
+                local sTal, eTal = string.find(text, "^Talents: ")
+                local sCr, eCr, cPct, dPct = string.find(text, "^(%d+%%) chance to crit for (%d+%%) damage")
+
+                if sUp then
+                    local items = SplitCommaList(string.sub(text, eUp + 1))
+                    table.insert(ability.sections, { title = "Upgrades", color = { 1.00, 0.82, 0.30 }, items = items })
+                elseif sBon then
+                    local items = SplitCommaList(string.sub(text, eBon + 1))
+                    table.insert(ability.sections, { title = "Your bonuses", color = { 0.12, 1.00, 0.20 }, items = items })
+                elseif sTal then
+                    local items = SplitCommaList(string.sub(text, eTal + 1))
+                    table.insert(ability.sections, { title = "Talents", color = { 0.44, 0.84, 1.00 }, items = items })
+                elseif sCr then
+                    ability.crit = cPct .. " crit · " .. dPct .. " dmg"
+                else
+                    table.insert(ability.description, text)
+                end
+            end
+        end
+    end
+
+    return ability
+end
+
+local function FormatBlackwellAbilityTooltip(tip, cdRest, cdMax)
+    local ability = ReadTooltipData(tip)
+    if not ability then return false end
+
+    HideRules()
+    tip:ClearLines()
+
+    local name = ability.title
+    local school = SCHOOL_OF[name] or "Physical"
+    for index = 1, table.getn(ability.description) do
+        local d = ability.description[index]
+        local s, e, word = string.find(d, "(%a+) damage")
+        if word and SCHOOL_COLORS[word] then
+            school = word
+            break
+        end
+    end
+    local tint = SCHOOL_COLORS[school] or SCHOOL_COLORS["Physical"]
+    local what = school .. " damage"
+
+    -- Title & Rank
+    local rankStr = ability.rank or ""
+    if rankStr ~= "" then
+        tip:AddDoubleLine(name, rankStr, tint[1], tint[2], tint[3], 0.60, 0.60, 0.60)
+    else
+        tip:AddLine(name, tint[1], tint[2], tint[3])
+    end
+
+    -- Subtitle: School & Cast mode / Cooldown
+    local castMode = ability.cast or "Instant"
+    local cdText = ability.cooldown or ""
+    if cdText ~= "" then
+        cdText = string.gsub(cdText, "^([%d%.]+ sec)", "|cff8cccff%1|r")
+    end
+    tip:AddDoubleLine(Hex(tint) .. what .. "|r · " .. castMode, cdText, 0.65, 0.65, 0.65, 0.65, 0.65, 0.65)
+
+    -- Stats: Range / Radius / Crits
+    local statStr = table.concat(ability.stats, " · ")
+    if statStr ~= "" then
+        statStr = string.gsub(statStr, "([%d%.]+ yd)", "|cff99f2bf%1|r")
+    end
+    local critStr = ability.crit or ""
+    if critStr ~= "" then
+        critStr = string.gsub(critStr, "(%d+%%)", "|cffffc214%1|r")
+    end
+    if statStr ~= "" or critStr ~= "" then
+        tip:AddDoubleLine(statStr, critStr, 0.65, 0.65, 0.65, 1.00, 0.82, 0.10)
+    end
+
+    -- Rule / Divider before description
+    if table.getn(ability.description) > 0 then
+        tip:AddLine(" ")
+        AddRule(GetTooltipNumLines(tip), tint)
+        for index = 1, table.getn(ability.description) do
+            local highlighted = HighlightText(ability.description[index], school, tint)
+            tip:AddLine(highlighted, 0.78, 0.78, 0.78, 1)
+        end
+    end
+
+    -- Upgrades, Bonuses, Talents sections
+    for s = 1, table.getn(ability.sections) do
+        local sec = ability.sections[s]
+        local col = sec.color
+        tip:AddLine(" ")
+        AddRule(GetTooltipNumLines(tip), col)
+        tip:AddLine(sec.title, col[1], col[2], col[3])
+        for it = 1, table.getn(sec.items) do
+            local itemText = sec.items[it]
+            local sVal, eVal, val, lbl = string.find(itemText, "^([%+%-]?[%d%.]+%%?) (.+)$")
+            if val and lbl then
+                tip:AddDoubleLine("  " .. Capital(lbl), val, 0.65, 0.65, 0.65, col[1], col[2], col[3])
+            else
+                tip:AddLine("  " .. itemText, col[1], col[2], col[3], 1)
+            end
+        end
+    end
+
+    -- Remaining cooldown
+    if cdRest and cdRest > 0 then
+        tip:AddLine(" ")
+        AddRule(GetTooltipNumLines(tip), { 0.0, 0.90, 1.0 })
+        tip:AddLine(string.format("Cooldown remaining: %.1fs", cdRest), 0.0, 0.90, 1.0)
+    elseif cdMax and cdMax > 0 then
+        tip:AddLine(" ")
+        AddRule(GetTooltipNumLines(tip), { 0.60, 0.60, 0.60 })
+        tip:AddLine(string.format("Cooldown: %.1fs", cdMax), 0.60, 0.60, 0.60)
+    end
+
+    tip:Show()
+    writtenSignature = Signature()
+    return true
+end
+
+local function RenderFallbackTooltip(tip, nameOrId, rank, cdRest, cdMax)
+    HideRules()
+    tip:ClearLines()
+
+    local resolved = ResolveSpellKeyToName(nameOrId, nameOrId)
+    local norm = NormalizeName(resolved)
+    local info = ABILITY_DESCRIPTIONS[norm] or ABILITY_DESCRIPTIONS[nameOrId]
+    local school = SCHOOL_OF[resolved] or "Physical"
+    local tint = SCHOOL_COLORS[school] or SCHOOL_COLORS["Physical"]
+
+    local title = (info and info.name) or resolved or "Ability"
+    local rankStr = (rank and tonumber(rank) and tonumber(rank) > 0) and ("Rank " .. tostring(rank)) or nil
+
+    if rankStr then
+        tip:AddDoubleLine(title, rankStr, tint[1], tint[2], tint[3], 0.60, 0.60, 0.60)
+    else
+        tip:AddLine(title, tint[1], tint[2], tint[3])
+    end
+
+    if info then
+        local what = Hex(tint) .. school .. " damage|r"
+        local cast = info.cast or "Instant"
+        local cost = info.cost or ""
+        tip:AddDoubleLine(what .. " · " .. cast, cost, 0.65, 0.65, 0.65, 0.65, 0.65, 0.65)
+
+        if info.range and info.range ~= "" then
+            tip:AddLine(string.gsub(info.range, "([%d%.]+ yd)", "|cff99f2bf%1|r"), 0.65, 0.65, 0.65, 1)
+        end
+
+        if info.desc and info.desc ~= "" then
+            tip:AddLine(" ")
+            AddRule(GetTooltipNumLines(tip), tint)
+            local highlighted = HighlightText(info.desc, school, tint)
+            tip:AddLine(highlighted, 0.78, 0.78, 0.78, 1)
+        end
+    end
+
+    if cdRest and cdRest > 0 then
+        tip:AddLine(" ")
+        AddRule(GetTooltipNumLines(tip), { 0.0, 0.90, 1.0 })
+        tip:AddLine(string.format("Cooldown remaining: %.1fs", cdRest), 0.0, 0.90, 1.0)
+    elseif cdMax and cdMax > 0 then
+        tip:AddLine(" ")
+        AddRule(GetTooltipNumLines(tip), { 0.60, 0.60, 0.60 })
+        tip:AddLine(string.format("Cooldown: %.1fs", cdMax), 0.60, 0.60, 0.60)
+    end
+
+    tip:Show()
+    writtenSignature = Signature()
+end
+
 function mod:Create()
     local f = CreateFrame("Frame", "BUI_BuildFrame", UIParent)
     EUI_BuildFrame = f -- Compatibility alias
@@ -844,52 +1909,40 @@ function mod:Create()
         dotFs:Hide()
         tile.dotFs = dotFs
 
-        -- Tooltip handling (Full ability tooltip with descriptions)
+        tile.isBUIBuildTile = true
+
+        -- Tooltip handling (Full Cyberpunk ability tooltip with dynamic updates)
         tile:SetScript("OnEnter", function()
-            local sn = this.spellName
-            if sn and sn ~= "" then
-                GameTooltip:SetOwner(this, "ANCHOR_TOP")
-                local norm = NormalizeName(sn)
-                local sId = spellBookIds[sn] or spellBookIds[norm] or spellBookIds[string.lower(sn)]
-                if sId and type(GameTooltip.SetSpell) == "function" then
-                    GameTooltip:SetSpell(sId, BOOKTYPE_SPELL or "spell")
-                else
-                    GameTooltip:ClearLines()
-                    local info = ABILITY_DESCRIPTIONS[norm] or ABILITY_DESCRIPTIONS[string.lower(sn)]
-                    local title = (info and info.name) or sn
-                    local rankStr = (this.spellRank and tonumber(this.spellRank) and tonumber(this.spellRank) > 0) and ("Rank " .. tostring(this.spellRank)) or nil
-
-                    if rankStr and GameTooltip.AddDoubleLine then
-                        GameTooltip:AddDoubleLine(title, rankStr, 1, 1, 1, 0.6, 0.6, 0.6)
-                    else
-                        GameTooltip:AddLine(title, 1, 1, 1)
-                        if rankStr then GameTooltip:AddLine(rankStr, 0.6, 0.6, 0.6) end
-                    end
-
-                    if info then
-                        if info.cost and info.range and GameTooltip.AddDoubleLine then
-                            GameTooltip:AddDoubleLine(info.cost, info.range, 1, 1, 1, 1, 1, 1)
-                        elseif info.cost then
-                            GameTooltip:AddLine(info.cost, 1, 1, 1)
-                        end
-                        if info.cast then
-                            GameTooltip:AddLine(info.cast, 1, 1, 1)
-                        end
-                        if info.desc then
-                            GameTooltip:AddLine(info.desc, 1.0, 0.82, 0.0, 1)
-                        end
-                    end
-                end
-                if this.cdRest and this.cdRest > 0 then
-                    GameTooltip:AddLine(string.format("Cooldown remaining: %.1fs", this.cdRest), 0, 0.90, 1)
-                elseif this.cdMax and this.cdMax > 0 then
-                    GameTooltip:AddLine(string.format("Cooldown: %.1fs", this.cdMax), 0.7, 0.7, 0.7)
-                end
-                GameTooltip:Show()
+            activeBuildTile = this
+            GameTooltip:SetOwner(this, "ANCHOR_TOP")
+            local hasActionData = false
+            if this.actionSlot and HasAction and HasAction(this.actionSlot) and GameTooltip.SetAction then
+                GameTooltip:SetAction(this.actionSlot)
+                hasActionData = (GetTooltipNumLines(GameTooltip) >= 2)
             end
+
+            if not hasActionData and this.spellName and spellBookIds and GameTooltip.SetSpell then
+                local sId = spellBookIds[this.spellName] or spellBookIds[NormalizeName(this.spellName)]
+                if sId then
+                    GameTooltip:ClearLines()
+                    GameTooltip:SetSpell(sId, BOOKTYPE_SPELL or "spell")
+                    hasActionData = (GetTooltipNumLines(GameTooltip) >= 2)
+                end
+            end
+
+            if hasActionData then
+                FormatBlackwellAbilityTooltip(GameTooltip, this.cdRest, this.cdMax)
+            else
+                RenderFallbackTooltip(GameTooltip, this.spellName or this.spellKey, this.spellRank, this.cdRest, this.cdMax)
+            end
+            GameTooltip:Show()
+            writtenSignature = Signature()
         end)
 
         tile:SetScript("OnLeave", function()
+            activeBuildTile = nil
+            writtenSignature = nil
+            HideRules()
             GameTooltip:Hide()
         end)
 
@@ -897,6 +1950,50 @@ function mod:Create()
         tiles[i] = tile
     end
     f.tiles = tiles
+
+    -- Live Tooltip Watcher: only updates if external game engine rewrites tooltip
+    local tipWatcher = CreateFrame("Frame", nil, f)
+    tipWatcher:SetScript("OnUpdate", function()
+        if not GameTooltip:IsVisible() or not activeBuildTile then
+            if tooltipRulesUsed > 0 then
+                HideRules()
+            end
+            writtenSignature = nil
+            return
+        end
+        local sig = Signature()
+        if sig == writtenSignature or sig == "" then
+            return
+        end
+        local owner = activeBuildTile
+        if owner and owner.isBUIBuildTile then
+            local ok = FormatBlackwellAbilityTooltip(GameTooltip, owner.cdRest, owner.cdMax)
+            if ok then
+                writtenSignature = Signature()
+            end
+        end
+    end)
+
+    local origTipHide = GameTooltip.Hide
+    GameTooltip.Hide = function(self)
+        activeBuildTile = nil
+        writtenSignature = nil
+        HideRules()
+        if origTipHide then
+            return origTipHide(self)
+        end
+    end
+
+    if type(GameTooltip.GetScript) == "function" then
+        local origTipOnHide = GameTooltip:GetScript("OnHide")
+        GameTooltip:SetScript("OnHide", function()
+            activeBuildTile = nil
+            HideRules()
+            if origTipOnHide then
+                origTipOnHide()
+            end
+        end)
+    end
 
     ---------------------------------------------------------------------------
     --  Buff Bars (stacked above the spell tiles with icons & spell colors)
@@ -1014,10 +2111,13 @@ function mod:Update(state)
         local tile = f.tiles[i]
         local sp = (i <= nSpells) and spells[i]
         if sp and type(sp) == "table" then
-            local spName = sp.spell or ""
-            local spKey = sp.key or ""
-            tile.spellName = (spName ~= "" and spName) or tostring(spKey)
+            local rawName = sp.spell or ""
+            local rawKey = tostring(sp.key or "")
+            local resolvedName = ResolveSpellKeyToName(rawKey, rawName)
+            tile.spellName = resolvedName
+            tile.spellKey = rawKey
             tile.spellRank = sp.rank
+            tile.actionSlot = FindSpellActionSlot(i, rawKey, resolvedName, nSpells)
 
             tile:ClearAllPoints()
             local offsetX = startX + (i - 1) * (TILE_SIZE + TILE_GAP)
@@ -1032,13 +2132,15 @@ function mod:Update(state)
                 tile.rankFs:Hide()
             end
 
-            -- Resolve Icon Texture (Authentic WoW Icon)
-            local lookup = (spName ~= "" and spName) or tostring(spKey)
-            local iconTex = GetAbilityIcon(lookup)
-            if not iconTex and spKey ~= "" then
-                iconTex = GetAbilityIcon(spKey)
+            -- Resolve Icon Texture (Priority: Action Bar Slot Texture -> Dictionary -> Fallback)
+            local iconTex = nil
+            if tile.actionSlot and HasAction and HasAction(tile.actionSlot) and GetActionTexture then
+                iconTex = GetActionTexture(tile.actionSlot)
             end
-            if not iconTex then
+            if not iconTex or iconTex == "" then
+                iconTex = GetAbilityIcon(resolvedName) or GetAbilityIcon(rawKey)
+            end
+            if not iconTex or iconTex == "" then
                 iconTex = "Interface\\Icons\\INV_Misc_QuestionMark"
             end
 
@@ -1046,11 +2148,11 @@ function mod:Update(state)
             tile.icon:Show()
 
             -- DoT / Active Debuff Counter badge in top-right corner
-            local normName = NormalizeName(lookup)
+            local normName = NormalizeName(resolvedName)
             local dotCount = GetActiveDotCount(normName)
             if dotCount > 0 then
                 tile.dotFs:SetText(tostring(dotCount))
-                local dotCol = GetSpellColor(lookup)
+                local dotCol = GetSpellColor(resolvedName)
                 tile.dotFs:SetTextColor(dotCol.r, dotCol.g, dotCol.b)
                 tile.dotFs:Show()
             else

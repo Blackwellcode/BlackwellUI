@@ -1,10 +1,11 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Meter.lua
---  Authentic Cyberpunk Combat Analytics & Multi-Mode Meter:
---  - 4 Dynamic Modes: Damage Done, Boss Damage, Healing Done, Damage Taken
+--  Authentic Cyberpunk Combat Analytics & Dual Bottom-Right Meters:
+--  - AoE Damage Meter & Boss Damage Meter side-by-side in Bottom-Right corner
+--  - 4 Dynamic Modes on primary meter: AoE Damage, Boss Damage, Healing, Taken
 --  - Real-time Combat Log Crits Engine (Tracks Biggest Crits per ability)
---  - Sleek dark translucent window (0.05, 0.05, 0.05, 0.85) with 1px black border
---  - Header toggle button with cyber neon accent rule and Session Reset [R]
+--  - Sleek dark translucent window (0.04, 0.04, 0.04, 0.85) with 1px black border
+--  - Header toggle buttons with cyber neon accent rule and Session Reset [R]
 --  - 18px rows with statusbars, square ability icons, and detailed hover tooltips
 --  Lua 5.0 / WoW 1.12.1: no '#', no '%', no string methods.
 -------------------------------------------------------------------------------
@@ -16,7 +17,8 @@ mod.label = "Damage Meter"
 
 local MAX_METER_ROWS = 8
 local ROW_HEIGHT = 18
-local METER_WIDTH = 260
+local METER_WIDTH = 250
+local METER_GAP = 6
 
 B.meterOffsets = { done = {}, boss = {}, healing = {}, taken = {}, baseTime = 0, active = false }
 B.biggestCrits = {}
@@ -86,6 +88,7 @@ function B:ResetMeter(restoreAll)
     self.meterOffsets.baseTime = curT
 
     local rawDone = (s and s.meter) or (type(AZS_GetMeter) == "function" and AZS_GetMeter()) or (type(AZS_METER) == "table" and AZS_METER) or {}
+    if type(rawDone) ~= "table" then rawDone = {} end
     for i = 1, table.getn(rawDone) do
         local item = rawDone[i]
         if type(item) == "table" and item.name then
@@ -94,6 +97,7 @@ function B:ResetMeter(restoreAll)
     end
 
     local rawBoss = (s and s.bossMeter) or (type(AZS_GetBossMeter) == "function" and AZS_GetBossMeter()) or {}
+    if type(rawBoss) ~= "table" then rawBoss = {} end
     for i = 1, table.getn(rawBoss) do
         local item = rawBoss[i]
         if type(item) == "table" and item.name then
@@ -102,6 +106,7 @@ function B:ResetMeter(restoreAll)
     end
 
     local rawHeal = (s and s.healing) or (type(AZS_GetHealing) == "function" and AZS_GetHealing()) or {}
+    if type(rawHeal) ~= "table" then rawHeal = {} end
     for i = 1, table.getn(rawHeal) do
         local item = rawHeal[i]
         if type(item) == "table" and item.name then
@@ -110,6 +115,7 @@ function B:ResetMeter(restoreAll)
     end
 
     local rawTaken = (s and s.taken) or (type(AZS_TAKEN) == "table" and AZS_TAKEN) or {}
+    if type(rawTaken) ~= "table" then rawTaken = {} end
     for i = 1, table.getn(rawTaken) do
         local item = rawTaken[i]
         if type(item) == "table" and item.source then
@@ -118,15 +124,16 @@ function B:ResetMeter(restoreAll)
     end
 end
 
-function mod:Create()
-    local f = CreateFrame("Frame", "BUI_MeterFrame", UIParent)
-    EUI_MeterFrame = f -- Compatibility alias
+-------------------------------------------------------------------------------
+--  Meter Window Factory
+-------------------------------------------------------------------------------
+local function CreateMeterWindow(name, titleText, titleColor, accentColor)
+    local f = CreateFrame("Frame", name, UIParent)
     f:SetWidth(METER_WIDTH)
     f:SetHeight(20 + MAX_METER_ROWS * (ROW_HEIGHT + 2) + 6)
     B:Backdrop(f, 0.85)
-    self.frame = f
 
-    -- Header (Clickable button to cycle between Done, Boss, Healing, Taken)
+    -- Header (Clickable button to cycle modes)
     local hdrBtn = CreateFrame("Button", nil, f)
     hdrBtn:SetHeight(20)
     hdrBtn:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -1)
@@ -145,16 +152,25 @@ function mod:Create()
     rule:SetPoint("BOTTOMRIGHT", hdrBtn, "BOTTOMRIGHT", 0, 0)
     rule:SetHeight(1)
     rule:SetTexture(B.WHITE)
-    B:Accent(rule, "tex", 0.90)
+    if accentColor then
+        rule:SetVertexColor(accentColor[1], accentColor[2], accentColor[3], 0.90)
+    else
+        B:Accent(rule, "tex", 0.90)
+    end
     hdrBtn.rule = rule
 
     local titleFs = B:Font(hdrBtn, 10, "LEFT")
     titleFs:SetPoint("LEFT", hdrBtn, "LEFT", 8, 0)
-    titleFs:SetTextColor(0.95, 0.95, 0.95)
+    titleFs:SetText(titleText)
+    if titleColor then
+        titleFs:SetTextColor(titleColor[1], titleColor[2], titleColor[3])
+    else
+        titleFs:SetTextColor(0.95, 0.95, 0.95)
+    end
     hdrBtn.title = titleFs
 
     -- Reset / Refresh Button on the far right of header
-    local resetBtn = CreateFrame("Button", "BUI_MeterResetBtn", hdrBtn)
+    local resetBtn = CreateFrame("Button", name .. "ResetBtn", hdrBtn)
     resetBtn:SetWidth(14)
     resetBtn:SetHeight(14)
     resetBtn:SetPoint("RIGHT", hdrBtn, "RIGHT", -4, 0)
@@ -206,22 +222,12 @@ function mod:Create()
 
     local valFs = B:Font(hdrBtn, 10, "RIGHT")
     valFs:SetPoint("RIGHT", resetBtn, "LEFT", -6, 0)
-    B:Accent(valFs, "text")
+    if accentColor then
+        valFs:SetTextColor(accentColor[1], accentColor[2], accentColor[3])
+    else
+        B:Accent(valFs, "text")
+    end
     hdrBtn.value = valFs
-
-    hdrBtn:SetScript("OnClick", function()
-        local cur = B.db.meterMode or "done"
-        if cur == "done" then
-            B.db.meterMode = "boss"
-        elseif cur == "boss" then
-            B.db.meterMode = "healing"
-        elseif cur == "healing" then
-            B.db.meterMode = "taken"
-        else
-            B.db.meterMode = "done"
-        end
-        B:Tick()
-    end)
 
     f.header = hdrBtn
 
@@ -256,13 +262,13 @@ function mod:Create()
 
         local nameFs = B:Font(bar, 9, "LEFT")
         nameFs:SetPoint("LEFT", bar, "LEFT", 4, 0)
-        nameFs:SetWidth(125)
+        nameFs:SetWidth(120)
         nameFs:SetHeight(14)
         r.nameFs = nameFs
 
         local textRight = B:Font(bar, 9, "RIGHT")
         textRight:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
-        textRight:SetWidth(90)
+        textRight:SetWidth(85)
         textRight:SetHeight(14)
         r.textRight = textRight
 
@@ -300,26 +306,83 @@ function mod:Create()
     end
     f.rows = rows
 
-    B:RegisterMover(f, "meter", "Damage Meter", "TOPRIGHT", "TOPRIGHT", -12, -400)
+    return f
+end
+
+-------------------------------------------------------------------------------
+--  Module Lifecycle
+-------------------------------------------------------------------------------
+function mod:Create()
+    -- 1. AoE Damage Meter (Left Window in Bottom-Right Corner)
+    local fAoE = CreateMeterWindow("BUI_MeterFrame", "AOE DAMAGE", { 0.95, 0.95, 0.95 }, nil)
+    EUI_MeterFrame = fAoE -- Compatibility alias
+    self.frame = fAoE
+
+    -- 2. Boss Damage Meter (Right Window in Bottom-Right Corner)
+    local fBoss = CreateMeterWindow("BUI_BossMeterFrame", "BOSS DAMAGE", { 1.0, 0.25, 0.40 }, { 1.0, 0.25, 0.40 })
+    EUI_BossMeterFrame = fBoss -- Compatibility alias
+    self.bossFrame = fBoss
+
+    -- Header Click handlers
+    fAoE.header:SetScript("OnClick", function()
+        local cur = B.db.meterMode or "aoe"
+        if cur == "aoe" or cur == "done" then
+            B.db.meterMode = "healing"
+        elseif cur == "healing" then
+            B.db.meterMode = "taken"
+        else
+            B.db.meterMode = "aoe"
+        end
+        B:Tick()
+    end)
+
+    fBoss.header:SetScript("OnClick", function()
+        local cur = B.db.bossMeterMode or "boss"
+        if cur == "boss" then
+            B.db.bossMeterMode = "taken"
+        else
+            B.db.bossMeterMode = "boss"
+        end
+        B:Tick()
+    end)
+
+    -- Synchronize visibility between both frames
+    fAoE:SetScript("OnShow", function()
+        if fBoss and not fBoss:IsShown() and B:IsEnabled("meter") then
+            fBoss:Show()
+        end
+    end)
+    fAoE:SetScript("OnHide", function()
+        if fBoss and fBoss:IsShown() then
+            fBoss:Hide()
+        end
+    end)
+
+    -- Register both as independent Movers
+    -- Default placement: Boss in far bottom-right (-12, 24), AoE directly to its left (-268, 24)
+    local aoeX = -12 - METER_WIDTH - METER_GAP
+    B:RegisterMover(fAoE, "meter", "AoE Damage Meter", "BOTTOMRIGHT", "BOTTOMRIGHT", aoeX, 24)
+    B:RegisterMover(fBoss, "meter_boss", "Boss Damage Meter", "BOTTOMRIGHT", "BOTTOMRIGHT", -12, 24)
 end
 
 function mod:Update(state)
-    local f = self.frame
-    local mode = B.db.meterMode or "done"
-    local rows = f.rows
+    local fAoE = self.frame
+    local fBoss = self.bossFrame
+    if not (fAoE and fBoss) then return end
 
-    -- Dynamic anchor below EncounterFrame or TimerFrame if not custom moved
+    -- Position anchors if not moved by user
     if not (B.db and B.db.positions and B.db.positions["meter"]) then
-        f:ClearAllPoints()
-        local encF = BUI_EncounterFrame or EUI_EncounterFrame
-        local timerF = BUI_TimerFrame or EUI_TimerFrame
-        if encF and encF:IsShown() then
-            f:SetPoint("TOPRIGHT", encF, "BOTTOMRIGHT", 0, -6)
-        elseif timerF and (timerF:IsShown() or B:IsEnabled("timer")) then
-            f:SetPoint("TOPRIGHT", timerF, "BOTTOMRIGHT", 0, -6)
-        else
-            f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -12, -320)
-        end
+        fAoE:ClearAllPoints()
+        local aoeX = -12 - METER_WIDTH - METER_GAP
+        fAoE:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", aoeX, 24)
+    end
+    if not (B.db and B.db.positions and B.db.positions["meter_boss"]) then
+        fBoss:ClearAllPoints()
+        fBoss:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -12, 24)
+    end
+
+    if not fBoss:IsShown() then
+        fBoss:Show()
     end
 
     local curT = 0
@@ -327,6 +390,8 @@ function mod:Update(state)
         curT = tonumber(state.run.t) or 0
     elseif state and state.time then
         curT = tonumber(state.time) or 0
+    else
+        curT = GetTime()
     end
     local runSec = curT
     if B.meterOffsets and B.meterOffsets.active then
@@ -335,17 +400,21 @@ function mod:Update(state)
     if runSec < 1 then runSec = 1 end
 
     ---------------------------------------------------------------------------
-    --  Mode 1: DAMAGE TAKEN
+    --  1. BOSS DAMAGE WINDOW
     ---------------------------------------------------------------------------
-    if mode == "taken" then
+    local bossMode = B.db.bossMeterMode or "boss"
+    local bossRows = fBoss.rows
+
+    if bossMode == "taken" then
         if B.meterOffsets and B.meterOffsets.active then
-            f.header.title:SetText("DMG TAKEN (SESSION)")
+            fBoss.header.title:SetText("DMG TAKEN (SESSION)")
         else
-            f.header.title:SetText("DAMAGE TAKEN")
+            fBoss.header.title:SetText("DAMAGE TAKEN")
         end
-        f.header.title:SetTextColor(1.0, 0.65, 0.20) -- Cyber Amber
+        fBoss.header.title:SetTextColor(1.0, 0.65, 0.20)
 
         local rawTaken = state.taken or {}
+        if type(rawTaken) ~= "table" then rawTaken = {} end
         local count = table.getn(rawTaken)
         local takenList = {}
         local totalTaken = 0
@@ -369,11 +438,11 @@ function mod:Update(state)
 
         table.sort(takenList, function(a, b) return (tonumber(a.dmg) or 0) > (tonumber(b.dmg) or 0) end)
         local displayCount = table.getn(takenList)
-        f.header.value:SetText(B:Short(totalTaken))
+        fBoss.header.value:SetText(B:Short(totalTaken))
 
         local shown = 0
         for i = 1, MAX_METER_ROWS do
-            local r = rows[i]
+            local r = bossRows[i]
             if i <= displayCount then
                 local item = takenList[i]
                 local d = item.dmg
@@ -407,22 +476,20 @@ function mod:Update(state)
 
         local h = 24 + shown * (ROW_HEIGHT + 2) + 4
         if h < 32 then h = 32 end
-        f:SetHeight(h)
-
-    ---------------------------------------------------------------------------
-    --  Mode 2: BOSS DAMAGE
-    ---------------------------------------------------------------------------
-    elseif mode == "boss" then
+        fBoss:SetHeight(h)
+    else -- "boss" (Default for Boss Window)
         if B.meterOffsets and B.meterOffsets.active then
-            f.header.title:SetText("BOSS DMG (SESSION)")
+            fBoss.header.title:SetText("BOSS DMG (SESSION)")
         else
-            f.header.title:SetText("BOSS DAMAGE")
+            fBoss.header.title:SetText("BOSS DAMAGE")
         end
-        f.header.title:SetTextColor(1.0, 0.25, 0.40) -- Crimson
+        fBoss.header.title:SetTextColor(1.0, 0.25, 0.40) -- Crimson
 
         local rawBoss = (type(AZS_GetBossMeter) == "function" and AZS_GetBossMeter()) or state.bossMeter or {}
+        if type(rawBoss) ~= "table" then rawBoss = {} end
         local count = table.getn(rawBoss)
         local bossList = {}
+        local bossBySpell = {}
         local totalBossDmg = 0
         local maxVal = 0
 
@@ -434,6 +501,7 @@ function mod:Update(state)
                 local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.boss and B.meterOffsets.boss[sName]) or 0
                 local d = rawD - base
                 if d < 0 then d = 0 end
+                bossBySpell[sName] = d
                 if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
                     table.insert(bossList, { name = sName, dmg = d })
                     totalBossDmg = totalBossDmg + d
@@ -445,11 +513,11 @@ function mod:Update(state)
         table.sort(bossList, function(a, b) return (tonumber(a.dmg) or 0) > (tonumber(b.dmg) or 0) end)
         local displayCount = table.getn(bossList)
         local totalDps = math.floor(totalBossDmg / runSec)
-        f.header.value:SetText(string.format("%s (%s/s)", B:Short(totalBossDmg), B:Short(totalDps)))
+        fBoss.header.value:SetText(string.format("%s (%s/s)", B:Short(totalBossDmg), B:Short(totalDps)))
 
         local shown = 0
         for i = 1, MAX_METER_ROWS do
-            local r = rows[i]
+            local r = bossRows[i]
             if i <= displayCount then
                 local item = bossList[i]
                 local d = item.dmg
@@ -458,7 +526,11 @@ function mod:Update(state)
                 if pctMax > 1 then pctMax = 1 end
 
                 r.bar:SetValue(pctMax)
-                B:SetBarColor(r.bar, 0.85, 0.20, 0.35)
+                if i == 1 then
+                    B:SetBarColor(r.bar, 1.0, 0.25, 0.40)
+                else
+                    B:SetBarColor(r.bar, 0.80, 0.18, 0.32)
+                end
 
                 local spellName = item.name or "Unknown"
                 local iconTex = B:GetAbilityIcon(spellName)
@@ -488,20 +560,101 @@ function mod:Update(state)
 
         local h = 24 + shown * (ROW_HEIGHT + 2) + 4
         if h < 32 then h = 32 end
-        f:SetHeight(h)
+        fBoss:SetHeight(h)
+
+        -- Expose boss map for AoE calculations
+        self.bossBySpell = bossBySpell
+    end
 
     ---------------------------------------------------------------------------
-    --  Mode 3: HEALING DONE
+    --  2. AOE DAMAGE WINDOW (Primary)
     ---------------------------------------------------------------------------
-    elseif mode == "healing" then
+    local aoeMode = B.db.meterMode or "aoe"
+    local aoeRows = fAoE.rows
+
+    if aoeMode == "taken" then
         if B.meterOffsets and B.meterOffsets.active then
-            f.header.title:SetText("HEALING (SESSION)")
+            fAoE.header.title:SetText("DMG TAKEN (SESSION)")
         else
-            f.header.title:SetText("HEALING DONE")
+            fAoE.header.title:SetText("DAMAGE TAKEN")
         end
-        f.header.title:SetTextColor(0.20, 0.90, 0.40) -- Emerald
+        fAoE.header.title:SetTextColor(1.0, 0.65, 0.20) -- Cyber Amber
+
+        local rawTaken = state.taken or {}
+        if type(rawTaken) ~= "table" then rawTaken = {} end
+        local count = table.getn(rawTaken)
+        local takenList = {}
+        local totalTaken = 0
+        local maxVal = 0
+
+        for i = 1, count do
+            local item = rawTaken[i]
+            if type(item) == "table" then
+                local rawD = tonumber(item.dmg) or 0
+                local src = item.source or "Unknown"
+                local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.taken and B.meterOffsets.taken[src]) or 0
+                local d = rawD - base
+                if d < 0 then d = 0 end
+                if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
+                    table.insert(takenList, { source = src, dmg = d })
+                    totalTaken = totalTaken + d
+                    if d > maxVal then maxVal = d end
+                end
+            end
+        end
+
+        table.sort(takenList, function(a, b) return (tonumber(a.dmg) or 0) > (tonumber(b.dmg) or 0) end)
+        local displayCount = table.getn(takenList)
+        fAoE.header.value:SetText(B:Short(totalTaken))
+
+        local shown = 0
+        for i = 1, MAX_METER_ROWS do
+            local r = aoeRows[i]
+            if i <= displayCount then
+                local item = takenList[i]
+                local d = item.dmg
+                local pctMax = (maxVal > 0) and (d / maxVal) or 0
+                if pctMax > 1 then pctMax = 1 end
+
+                r.bar:SetValue(pctMax)
+                B:SetBarColor(r.bar, 0.75, 0.25, 0.25)
+
+                local sourceName = item.source or "Unknown"
+                local iconTex = B:GetAbilityIcon(sourceName)
+                r.icon:SetTexture(iconTex)
+                r.icon:Show()
+
+                r.spellName = sourceName
+                r.valStr = string.format("Total Damage Taken: %s", B:Short(d))
+
+                r.nameFs:SetText(string.format("%d. %s", i, sourceName))
+                r.nameFs:SetTextColor(0.95, 0.95, 0.95)
+
+                local share = (totalTaken > 0) and (d / totalTaken * 100) or 0
+                local shareInt = math.floor(share + 0.5)
+                r.textRight:SetText(string.format("%s (%d%%)", B:Short(d), shareInt))
+
+                r:Show()
+                shown = shown + 1
+            else
+                r:Hide()
+            end
+        end
+
+        local h = 24 + shown * (ROW_HEIGHT + 2) + 4
+        if h < 32 then h = 32 end
+        fAoE:SetHeight(h)
+
+    elseif aoeMode == "healing" then
+        if B.meterOffsets and B.meterOffsets.active then
+            fAoE.header.title:SetText("HEALING (SESSION)")
+        else
+            fAoE.header.title:SetText("HEALING DONE")
+        end
+        fAoE.header.title:SetTextColor(0.20, 0.90, 0.40) -- Emerald
 
         local rawHeal = (type(AZS_GetHealing) == "function" and AZS_GetHealing()) or state.healing or {}
+        if type(rawHeal) ~= "table" then rawHeal = {} end
         local count = table.getn(rawHeal)
         local healList = {}
         local totalHeal = 0
@@ -526,11 +679,11 @@ function mod:Update(state)
         table.sort(healList, function(a, b) return (tonumber(a.dmg) or 0) > (tonumber(b.dmg) or 0) end)
         local displayCount = table.getn(healList)
         local totalHps = math.floor(totalHeal / runSec)
-        f.header.value:SetText(string.format("%s (%s/s)", B:Short(totalHeal), B:Short(totalHps)))
+        fAoE.header.value:SetText(string.format("%s (%s/s)", B:Short(totalHeal), B:Short(totalHps)))
 
         local shown = 0
         for i = 1, MAX_METER_ROWS do
-            local r = rows[i]
+            local r = aoeRows[i]
             if i <= displayCount then
                 local item = healList[i]
                 local hVal = item.dmg
@@ -569,24 +722,23 @@ function mod:Update(state)
 
         local h = 24 + shown * (ROW_HEIGHT + 2) + 4
         if h < 32 then h = 32 end
-        f:SetHeight(h)
+        fAoE:SetHeight(h)
 
-    ---------------------------------------------------------------------------
-    --  Mode 4: DAMAGE DONE (Default)
-    ---------------------------------------------------------------------------
-    else
+    else -- "aoe" or "done" (Default: AOE DAMAGE = Total Damage minus Boss Damage)
         if B.meterOffsets and B.meterOffsets.active then
-            f.header.title:SetText("DMG DONE (SESSION)")
+            fAoE.header.title:SetText("AOE DMG (SESSION)")
         else
-            f.header.title:SetText("DAMAGE DONE")
+            fAoE.header.title:SetText("AOE DAMAGE")
         end
-        f.header.title:SetTextColor(0.95, 0.95, 0.95)
+        fAoE.header.title:SetTextColor(0.95, 0.95, 0.95)
 
         local rawMeter = (type(AZS_GetMeter) == "function" and AZS_GetMeter()) or state.meter or {}
+        if type(rawMeter) ~= "table" then rawMeter = {} end
         local count = table.getn(rawMeter)
-        local meterList = {}
-        local totalDmg = 0
+        local aoeList = {}
+        local totalAoEDmg = 0
         local maxVal = 0
+        local bossMap = self.bossBySpell or {}
 
         for i = 1, count do
             local item = rawMeter[i]
@@ -594,29 +746,34 @@ function mod:Update(state)
                 local rawD = tonumber(item.dmg) or 0
                 local sName = item.name or "Unknown"
                 local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.done and B.meterOffsets.done[sName]) or 0
-                local d = rawD - base
-                if d < 0 then d = 0 end
-                if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
-                    table.insert(meterList, { name = sName, dmg = d })
-                    totalDmg = totalDmg + d
-                    if d > maxVal then maxVal = d end
+                local totalD = rawD - base
+                if totalD < 0 then totalD = 0 end
+
+                local bossD = bossMap[sName] or 0
+                local aoeD = totalD - bossD
+                if aoeD < 0 then aoeD = 0 end
+
+                if aoeD > 0 or not (B.meterOffsets and B.meterOffsets.active) then
+                    table.insert(aoeList, { name = sName, dmg = aoeD })
+                    totalAoEDmg = totalAoEDmg + aoeD
+                    if aoeD > maxVal then maxVal = aoeD end
                 end
             end
         end
 
-        table.sort(meterList, function(a, b) return (tonumber(a.dmg) or 0) > (tonumber(b.dmg) or 0) end)
-        local displayCount = table.getn(meterList)
-        local totalDps = math.floor(totalDmg / runSec)
-        f.header.value:SetText(string.format("%s (%s/s)", B:Short(totalDmg), B:Short(totalDps)))
+        table.sort(aoeList, function(a, b) return (tonumber(a.dmg) or 0) > (tonumber(b.dmg) or 0) end)
+        local displayCount = table.getn(aoeList)
+        local totalDps = math.floor(totalAoEDmg / runSec)
+        fAoE.header.value:SetText(string.format("%s (%s/s)", B:Short(totalAoEDmg), B:Short(totalDps)))
 
         local shown = 0
         local ar, ag, ab = B:GetAccent()
         local cr, cg, cb = B:GetClassColor()
 
         for i = 1, MAX_METER_ROWS do
-            local r = rows[i]
+            local r = aoeRows[i]
             if i <= displayCount then
-                local item = meterList[i]
+                local item = aoeList[i]
                 local d = item.dmg
                 local dps = math.floor(d / runSec)
                 local pctMax = (maxVal > 0) and (d / maxVal) or 0
@@ -637,7 +794,7 @@ function mod:Update(state)
                 r.icon:Show()
 
                 r.spellName = spellName
-                r.valStr = string.format("Damage: %s (%s/s)", B:Short(d), B:Short(dps))
+                r.valStr = string.format("AoE Damage: %s (%s/s)", B:Short(d), B:Short(dps))
 
                 r.nameFs:SetText(string.format("%d. %s", i, spellName))
                 r.nameFs:SetTextColor(0.95, 0.95, 0.95)
@@ -645,7 +802,7 @@ function mod:Update(state)
                 if dps > 0 then
                     r.textRight:SetText(string.format("%s (%s)", B:Short(d), B:Short(dps)))
                 else
-                    local share = (totalDmg > 0) and (d / totalDmg * 100) or 0
+                    local share = (totalAoEDmg > 0) and (d / totalAoEDmg * 100) or 0
                     local shareInt = math.floor(share + 0.5)
                     r.textRight:SetText(string.format("%s (%d%%)", B:Short(d), shareInt))
                 end
@@ -659,7 +816,7 @@ function mod:Update(state)
 
         local h = 24 + shown * (ROW_HEIGHT + 2) + 4
         if h < 32 then h = 32 end
-        f:SetHeight(h)
+        fAoE:SetHeight(h)
     end
 end
 
