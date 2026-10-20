@@ -17,8 +17,8 @@ local mod = {}
 mod.label = "Build & Cooldowns"
 
 local MAX_TILES = 8
-local TILE_SIZE = 36
-local TILE_GAP = 4
+local TILE_SIZE = 32
+local TILE_GAP = 2
 local MAX_BUFFS = 5
 local BUFF_WIDTH = 220
 local BUFF_HEIGHT = 16
@@ -1856,7 +1856,7 @@ function mod:Create()
     local f = CreateFrame("Frame", "BUI_BuildFrame", UIParent)
     EUI_BuildFrame = f -- Compatibility alias
     f:SetWidth(TILE_SIZE * 5 + TILE_GAP * 4)
-    f:SetHeight(TILE_SIZE + 10)
+    f:SetHeight(TILE_SIZE)
     self.frame = f
 
     ScanSpellbook()
@@ -1888,22 +1888,22 @@ function mod:Create()
         cdOverlay:Hide()
         tile.cdOverlay = cdOverlay
 
-        -- Cooldown countdown text (Expressway Bold, centered, size 13, outline)
-        local cdFs = B:Font(tile, 13, "CENTER")
+        -- Cooldown countdown text (Expressway Bold, centered, size 11, outline)
+        local cdFs = B:Font(tile, 11, "CENTER")
         cdFs:SetPoint("CENTER", tile, "CENTER", 0, 0)
         cdFs:SetTextColor(1, 1, 1)
         cdFs:Hide()
         tile.cdFs = cdFs
 
         -- Rank badge (bottom-right, gold accent)
-        local rankFs = B:Font(tile, 10, "RIGHT")
+        local rankFs = B:Font(tile, 9, "RIGHT")
         rankFs:SetPoint("BOTTOMRIGHT", tile, "BOTTOMRIGHT", -2, 1)
         rankFs:SetTextColor(1.0, 0.82, 0.10)
         rankFs:Hide()
         tile.rankFs = rankFs
 
         -- DoT / Active Debuff Counter badge (top-right corner, bold)
-        local dotFs = B:Font(tile, 10, "RIGHT")
+        local dotFs = B:Font(tile, 9, "RIGHT")
         dotFs:SetPoint("TOPRIGHT", tile, "TOPRIGHT", -2, -1)
         dotFs:SetTextColor(1.0, 0.40, 0.20)
         dotFs:Hide()
@@ -2001,7 +2001,7 @@ function mod:Create()
     local buffContainer = CreateFrame("Frame", nil, f)
     buffContainer:SetWidth(BUFF_WIDTH)
     buffContainer:SetHeight(MAX_BUFFS * (BUFF_HEIGHT + 2))
-    buffContainer:SetPoint("BOTTOM", f, "TOP", 0, 6)
+    buffContainer:SetPoint("BOTTOM", f, "TOP", 0, 4)
     f.buffContainer = buffContainer
 
     local buffBars = {}
@@ -2104,6 +2104,7 @@ function mod:Update(state)
     local totalW = nSpells * TILE_SIZE + (nSpells > 1 and (nSpells - 1) * TILE_GAP or 0)
     if totalW < 100 then totalW = 100 end
     f:SetWidth(totalW)
+    f:SetHeight(TILE_SIZE)
 
     local startX = -totalW / 2 + TILE_SIZE / 2
 

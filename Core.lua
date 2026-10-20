@@ -15,7 +15,7 @@ BlackwallUI = BlackwellUI -- Backwards compatibility alias
 EllesmereUI = BlackwellUI -- Backwards compatibility alias
 local E = BlackwellUI
 
-B.version = "2.3.1-azs"
+B.version = "2.4.0-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -172,9 +172,9 @@ function B:InitDB()
     end
     BlackwellUIDB = MergeDefaults(DEFAULTS, BlackwellUIDB)
     self.db = BlackwellUIDB
-    if not self.db.layoutVersion or self.db.layoutVersion < 7 then
+    if not self.db.layoutVersion or self.db.layoutVersion < 8 then
         self.db.positions = {}
-        self.db.layoutVersion = 7
+        self.db.layoutVersion = 8
     end
     if not self.THEMES[self.db.theme] then self.db.theme = DEFAULTS.theme end
     if not self.BAR_TEXTURES[self.db.barTexture] then self.db.barTexture = DEFAULTS.barTexture end

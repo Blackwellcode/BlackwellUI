@@ -10,8 +10,8 @@ local mod = {}
 mod.label = "Cast Bar"
 mod.alwaysActive = true
 
-local BAR_WIDTH = 240
-local BAR_HEIGHT = 20
+local BAR_WIDTH = 210
+local BAR_HEIGHT = 16
 
 function mod:HideBlizzardCastBar()
     if CastingBarFrame then
@@ -30,7 +30,7 @@ function mod:Create()
     self:HideBlizzardCastBar()
 
     ---------------------------------------------------------------------------
-    --  CastBar Container (240 x 20)
+    --  CastBar Container (210 x 16) - Seamlessly docked above Hero Frame
     ---------------------------------------------------------------------------
     local castBar = CreateFrame("Frame", "BUI_PlayerCastBar", root)
     EUI_PlayerCastBar = castBar -- Compatibility alias
@@ -38,18 +38,12 @@ function mod:Create()
     castBar:SetHeight(BAR_HEIGHT)
     B:Backdrop(castBar, 0.85)
 
-    -- Status Bar
-    local bar = B:Bar(castBar, nil)
-    bar:SetPoint("TOPLEFT", castBar, "TOPLEFT", 2, -2)
-    bar:SetPoint("BOTTOMRIGHT", castBar, "BOTTOMRIGHT", -2, 2)
-    castBar.bar = bar
-
-    -- Spell Icon Frame (20 x 20)
+    -- Spell Icon Frame (16 x 16, docked at TOPLEFT)
     local iconFrame = CreateFrame("Frame", nil, castBar)
     iconFrame:SetWidth(BAR_HEIGHT)
     iconFrame:SetHeight(BAR_HEIGHT)
-    iconFrame:SetPoint("RIGHT", castBar, "LEFT", -4, 0)
-    B:Backdrop(iconFrame, 0.85)
+    iconFrame:SetPoint("TOPLEFT", castBar, "TOPLEFT", 0, 0)
+    B:Backdrop(iconFrame, 0.90)
 
     local iconTex = iconFrame:CreateTexture(nil, "ARTWORK")
     iconTex:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", 1, -1)
@@ -58,32 +52,38 @@ function mod:Create()
     castBar.iconFrame = iconFrame
     castBar.iconTex = iconTex
 
+    -- Status Bar (fills remaining width next to iconFrame)
+    local bar = B:Bar(castBar, nil)
+    bar:SetPoint("TOPLEFT", iconFrame, "TOPRIGHT", 2, 0)
+    bar:SetPoint("BOTTOMRIGHT", castBar, "BOTTOMRIGHT", 0, 0)
+    castBar.bar = bar
+
     -- Spell Name Text
     local nameFs = B:Font(bar, 9, "LEFT")
     nameFs:SetPoint("LEFT", bar, "LEFT", 4, 0)
-    nameFs:SetWidth(BAR_WIDTH - 65)
-    nameFs:SetHeight(14)
+    nameFs:SetWidth(BAR_WIDTH - BAR_HEIGHT - 55)
+    nameFs:SetHeight(12)
     nameFs:SetTextColor(1, 1, 1)
     castBar.nameFs = nameFs
 
     -- Time Text
     local timeFs = B:Font(bar, 9, "RIGHT")
     timeFs:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
-    timeFs:SetWidth(55)
-    timeFs:SetHeight(14)
+    timeFs:SetWidth(50)
+    timeFs:SetHeight(12)
     timeFs:SetTextColor(0.9, 0.9, 0.9)
     castBar.timeFs = timeFs
 
     -- Spark Texture
     local spark = bar:CreateTexture(nil, "OVERLAY")
     spark:SetTexture("Interface\\CastingBar\\UI-CastingBar-Spark")
-    spark:SetWidth(16)
-    spark:SetHeight(BAR_HEIGHT * 2)
+    spark:SetWidth(12)
+    spark:SetHeight(BAR_HEIGHT * 1.8)
     spark:SetBlendMode("ADD")
     castBar.spark = spark
 
     castBar:Hide()
-    B:RegisterMover(castBar, "castbar", "Player Cast Bar", "BOTTOM", "BOTTOM", 0, 80)
+    B:RegisterMover(castBar, "castbar", "Player Cast Bar", "BOTTOM", "BOTTOM", -245, 172)
     self.castBar = castBar
 
     ---------------------------------------------------------------------------
@@ -143,8 +143,14 @@ function mod:Create()
             if icon then
                 castBar.iconTex:SetTexture(icon)
                 castBar.iconFrame:Show()
+                castBar.bar:ClearAllPoints()
+                castBar.bar:SetPoint("TOPLEFT", castBar.iconFrame, "TOPRIGHT", 2, 0)
+                castBar.bar:SetPoint("BOTTOMRIGHT", castBar, "BOTTOMRIGHT", 0, 0)
             else
                 castBar.iconFrame:Hide()
+                castBar.bar:ClearAllPoints()
+                castBar.bar:SetPoint("TOPLEFT", castBar, "TOPLEFT", 0, 0)
+                castBar.bar:SetPoint("BOTTOMRIGHT", castBar, "BOTTOMRIGHT", 0, 0)
             end
 
             castBar:Show()
@@ -194,8 +200,14 @@ function mod:Create()
             if icon then
                 castBar.iconTex:SetTexture(icon)
                 castBar.iconFrame:Show()
+                castBar.bar:ClearAllPoints()
+                castBar.bar:SetPoint("TOPLEFT", castBar.iconFrame, "TOPRIGHT", 2, 0)
+                castBar.bar:SetPoint("BOTTOMRIGHT", castBar, "BOTTOMRIGHT", 0, 0)
             else
                 castBar.iconFrame:Hide()
+                castBar.bar:ClearAllPoints()
+                castBar.bar:SetPoint("TOPLEFT", castBar, "TOPLEFT", 0, 0)
+                castBar.bar:SetPoint("BOTTOMRIGHT", castBar, "BOTTOMRIGHT", 0, 0)
             end
 
             castBar:Show()
@@ -214,8 +226,8 @@ function mod:Create()
 
     castBar:SetScript("OnUpdate", function()
         local now = GetTime()
-        local barWidth = castBar:GetWidth() - 4
-        if barWidth <= 0 then barWidth = BAR_WIDTH end
+        local barWidth = castBar.bar:GetWidth()
+        if not barWidth or barWidth <= 0 then barWidth = BAR_WIDTH - BAR_HEIGHT - 2 end
 
         if casting then
             local cur = now - startTime
