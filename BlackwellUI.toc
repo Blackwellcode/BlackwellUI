@@ -2,7 +2,7 @@
 ## Title: |cff00e5ffBlackwell|rUI |cff9a9a9a(Azeroth Survivors)|r
 ## Notes: Cyberpunk-grade HUD & Analytics Engine for Azeroth Survivors (WoW 1.12.1).
 ## Author: Pierre & Ellesmere, Blackwell Edition for Azeroth Survivors
-## Version: 2.3.0-azs
+## Version: 2.3.1-azs
 ## SavedVariables: BlackwellUIDB
 
 Core.lua
