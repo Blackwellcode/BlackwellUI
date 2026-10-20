@@ -258,27 +258,27 @@ function mod:Create()
     hpBar:SetHeight(35)
     hero.hpBar = hpBar
 
-    -- Player Name (inside Health Bar, LEFT aligned, Expressway font)
-    local nameText = B:Font(hpBar, 12, "LEFT")
-    nameText:SetPoint("LEFT", hpBar, "LEFT", 8, 0)
+    -- Player Name (inside Health Bar, TOPLEFT aligned)
+    local nameText = B:Font(hpBar, 11, "LEFT")
+    nameText:SetPoint("TOPLEFT", hpBar, "TOPLEFT", 6, -3)
     nameText:SetWidth(110)
-    nameText:SetHeight(16)
+    nameText:SetHeight(14)
     nameText:SetTextColor(1, 1, 1)
     hero.nameText = nameText
 
     -- Health Text (inside Health Bar, RIGHT aligned, e.g. "270 | 100%")
     local hpText = B:Font(hpBar, 11, "RIGHT")
-    hpText:SetPoint("RIGHT", hpBar, "RIGHT", -8, 0)
+    hpText:SetPoint("RIGHT", hpBar, "RIGHT", -6, 0)
     hpText:SetWidth(90)
     hpText:SetHeight(16)
     hpText:SetTextColor(1, 1, 1)
     hero.hpText = hpText
 
-    -- Level badge (subtle on top-right border)
-    local lvlText = B:Font(hero, 9, "RIGHT")
-    lvlText:SetPoint("TOPRIGHT", hero, "TOPRIGHT", -4, 11)
-    lvlText:SetWidth(50)
-    lvlText:SetHeight(10)
+    -- Level badge (inside Health Bar, BOTTOMLEFT aligned)
+    local lvlText = B:Font(hpBar, 8, "LEFT")
+    lvlText:SetPoint("BOTTOMLEFT", hpBar, "BOTTOMLEFT", 6, 4)
+    lvlText:SetWidth(60)
+    lvlText:SetHeight(12)
     B:Accent(lvlText, "text")
     hero.lvlText = lvlText
 
@@ -327,28 +327,28 @@ function mod:Create()
     tgtHpBar:SetHeight(35)
     tgt.hpBar = tgtHpBar
 
-    -- Target Name (inside Health Bar, LEFT aligned)
-    local tgtNameText = B:Font(tgtHpBar, 12, "LEFT")
-    tgtNameText:SetPoint("LEFT", tgtHpBar, "LEFT", 8, 0)
-    tgtNameText:SetWidth(110)
-    tgtNameText:SetHeight(16)
+    -- Target Name (inside Health Bar, TOPLEFT aligned)
+    local tgtNameText = B:Font(tgtHpBar, 11, "LEFT")
+    tgtNameText:SetPoint("TOPLEFT", tgtHpBar, "TOPLEFT", 6, -3)
+    tgtNameText:SetWidth(115)
+    tgtNameText:SetHeight(14)
     tgtNameText:SetTextColor(1, 1, 1)
     tgt.nameText = tgtNameText
 
+    -- Target Badge (boss/elite/enraged status inside Health Bar, BOTTOMLEFT aligned)
+    local badgeText = B:Font(tgtHpBar, 8, "LEFT")
+    badgeText:SetPoint("BOTTOMLEFT", tgtHpBar, "BOTTOMLEFT", 6, 4)
+    badgeText:SetWidth(100)
+    badgeText:SetHeight(12)
+    tgt.badgeText = badgeText
+
     -- Target HP Text (inside Health Bar, RIGHT aligned, e.g. "118K | 52%")
     local tgtHpText = B:Font(tgtHpBar, 11, "RIGHT")
-    tgtHpText:SetPoint("RIGHT", tgtHpBar, "RIGHT", -8, 0)
+    tgtHpText:SetPoint("RIGHT", tgtHpBar, "RIGHT", -6, 0)
     tgtHpText:SetWidth(90)
     tgtHpText:SetHeight(16)
     tgtHpText:SetTextColor(1, 1, 1)
     tgt.hpText = tgtHpText
-
-    -- Target Badge (boss/elite/enraged status on top right)
-    local badgeText = B:Font(tgt, 9, "RIGHT")
-    badgeText:SetPoint("TOPRIGHT", tgt, "TOPRIGHT", -4, 11)
-    badgeText:SetWidth(80)
-    badgeText:SetHeight(10)
-    tgt.badgeText = badgeText
 
     -- Target Power Bar (208 x 6)
     local tgtPBar = B:Bar(tgt, nil, 0.0, 0.55, 1.0)
@@ -364,7 +364,7 @@ function mod:Create()
         local r = CreateFrame("Button", "BUI_TargetDebuffBar" .. i, tgt)
         r:SetWidth(DEBUFF_BAR_WIDTH)
         r:SetHeight(DEBUFF_BAR_HEIGHT)
-        r:SetPoint("BOTTOMLEFT", tgt, "TOPLEFT", 1, 6 + (i - 1) * (DEBUFF_BAR_HEIGHT + 2))
+        r:SetPoint("BOTTOMLEFT", tgt, "TOPLEFT", 1, 4 + (i - 1) * 18)
         r:EnableMouse(true)
 
         -- Square Icon tile on the left (16x16)
