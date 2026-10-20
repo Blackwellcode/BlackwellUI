@@ -1,71 +1,78 @@
-# BlackwellUI (BUI)
+# BlackwellUI (BUI) // CYBERPUNK HUD FOR AZEROTH SURVIVORS
 
-[![WoW Version](https://img.shields.io/badge/WoW-1.12.1%20Vanilla-blue.svg)](https://github.com/Seele2024/BlackwellUI)
-[![Game Mode](https://img.shields.io/badge/Mode-Azeroth%20Survivors-red.svg)](https://github.com/Seele2024/BlackwellUI)
-[![Release](https://img.shields.io/badge/Release-v2.0.0--azs-00e5ff.svg)](https://github.com/Seele2024/BlackwellUI/releases)
-[![Lua](https://img.shields.io/badge/Lua-5.0%20Strict-brightgreen.svg)](https://github.com/Seele2024/BlackwellUI)
+[![WoW Version](https://img.shields.io/badge/WoW-1.12.1%20Vanilla-blue.svg?style=flat-square)](https://github.com/Seele2024/BlackwellUI)
+[![Game Mode](https://img.shields.io/badge/Mode-Azeroth%20Survivors-red.svg?style=flat-square)](https://github.com/Seele2024/BlackwellUI)
+[![Release](https://img.shields.io/badge/Release-v2.1.0--azs-00e5ff.svg?style=flat-square)](https://github.com/Seele2024/BlackwellUI/releases)
+[![Lua](https://img.shields.io/badge/Engine-Lua%205.0%20Strict-brightgreen.svg?style=flat-square)](https://github.com/Seele2024/BlackwellUI)
+[![License](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](https://github.com/Seele2024/BlackwellUI/blob/main/LICENSE)
 
-**BlackwellUI (BUI)** is a stripped-down, high-performance tactical HUD engineered from scratch specifically for the **Azeroth Survivors** game mode on World of Warcraft (Vanilla 1.12.1).
-
-Designed with a high-contrast Cyberpunk aesthetic (1px borders, dark semi-translucent panels, Expressway typography), BlackwellUI eliminates stock clutter and equips you with real-time combat analytics to maximize survival and DPS.
-
----
-
-## 🩸 Core Features
-
-* **Purged Stock Clutter:** Unused action bars, bag frames, and micro menus are completely suppressed. Since abilities auto-cast in Survivors, your screen space is dedicated solely to combat intelligence.
-* **Centered Cooldown & Build Matrix:** 36×36 square spell tiles with radial cooldown swipes, active rank indicators, and clean typography centered right between your hero and target frames.
-* **Smart Aura Buff Tracker:** Real-time proc and aura tracking with crisp square spell icons, resolved spell names (no raw numeric IDs), and full-width color-coded statusbars matching spell schools.
-* **Dynamic Encounter Radar:** Boss, guardian, and elite tracking docked cleanly under the minimap showing live HP, maximum health, and remaining percentage without frame overlap.
-* **Combat Telemetry Suite:**
-  * **Damage Meter:** Integrated Done/Taken meter with ability icons, DPS rates, and share percentages.
-  * **Stat Multipliers:** Live left-side panel displaying active character multipliers (Damage, Area, CDR, Crit, etc.) parsed directly from `AZS_STATS`.
-  * **Economy DataBar:** Bottom telemetry strip displaying XP progress, Level, Kills, Gold, **Next Chest Cost**, Lives, Rerolls, FPS, and Network Latency.
-* **Minimalist Cyberpunk Styling:** 1px borders, customizable semi-transparent backdrops, modern fonts (*Expressway*, *Homespun*, *Fira Sans*), and smooth statusbars.
+> **BlackwellUI** ist ein kompromissloses, hochperformantes Cyberpunk-HUD, entwickelt von Grund auf exklusiv für den Roguelite-Modus **Azeroth Survivors** auf WoW Vanilla 1.12.1.
 
 ---
 
-## 🎛 Controls & Commands
+## ⚡ Was ist Azeroth Survivors & BlackwellUI?
 
-Access all settings in-game via the configuration window:
+**Azeroth Survivors** verwandelt World of Warcraft 1.12.1 in ein rasantes Reverse-Bullet-Hell / Vampire-Survivors Survival-Game. Fähigkeiten lösen vollautomatisch aus, Wellen von tausenden Mobs stürmen auf den Helden ein und sekundengenaue Build-Optimierung entscheidet über Leben und Tod.
 
-| Command | Action |
+Das Standard-Interface von WoW (Aktionsleisten, Taschen, Blizzard-Menüs) ist für diesen Modus völlig ungeeignet. **BlackwellUI** radiert den Blizzard-Ballast restlos aus und ersetzt ihn durch ein taktisches Cyberpunk-HUD mit 1px-Borders, dunklen Panels und Live-Telemetrie.
+
+---
+
+## 📸 In-Game Screenshots
+
+### 1. Tactical Combat HUD (Duskwood Run)
+![BlackwellUI Combat HUD](media/screenshots/hud-overview.png)
+*Zentraler Cooldown-Matrix-Stack, Aura-Buff-Tracker mit echten Spell-Icons, dynamischer Encounter-Radar und schlanker Schadensmesser.*
+
+<br/>
+
+### 2. Character Matrix & Run Stats Panel ('C'-Key)
+![Character Info & Run Stats](media/screenshots/character-runstats.png)
+*Vollständig überarbeitetes Charakterfenster: 3D-Modell, Item-Quality-Borders, keine überflüssigen Tabs und nahtlos rechts angedocktes Run-Stats-Panel.*
+
+<br/>
+
+### 3. Target Frame & Debuff Aura Bars mit Tick Damage
+![Target Debuff Aura Bars](media/screenshots/target-debuffs.png)
+*Reaktions-gefärbter TargetFrame mit 6 Debuff-Balken über dem Ziel, Tooltip-Namen, ablaufender Restdauer und zentriertem Ticking-Damage.*
+
+---
+
+## 🩸 Features auf einen Blick
+
+* **Zero-Clutter Policy:** Sämtliche Blizzard-Aktionsleisten, Taschen und Micro-Buttons sind permanent eliminiert. Maximale Sicht auf die Gegnerhorden.
+* **Cooldown-Manager & Tooltips:** 36×36px Ability-Kacheln mit Cooldown-Swipe, Rang-Badges und vollwertigem Blizzard-Tooltip bei Mouseover. Automatische dynamische Texturerkennung für Nah- und Fernkampfwaffen.
+* **Cyberpunk Nameplates:** 120×10px Statusbars, 1px-Konturen, Reaktionsfarben (Neon-Rot, Gold, Grün) und dynamischer Akzentborder für das aktive Ziel.
+* **Elites & Bosses Radar:** Erkennt Bosse, Wächter und Elites in Echtzeit, zeigt verbleibende HP/Prozente und unterstützt **Click-Targeting** via Linksklick direkt aus der Zeile.
+* **Live Damage Meter:** Wechsel zwischen DMG Done und Taken. Inklusive **[R]-Reset-Button** (Linksklick: Session auf 0 / Rechtsklick: Gesamtrun wiederherstellen) und DPS-Berechnung.
+* **Run Multipliers Panel:** Echtzeit-Auflistung aller aktiven Stat-Multiplikatoren (`AZS_STATS`) am linken Bildschirmrand. Blendet sich automatisch aus, wenn das Charakterfenster geöffnet wird.
+* **Telemetry DataBar:** Bottom-Bar mit XP-Fortschritt, Level, Kills, Gold, **Next Chest Cost**, Leben, Rerolls und FPS.
+
+---
+
+## 🎛 Quick Controls
+
+| Befehl | Aktion |
 |---|---|
-| `/bui` or `/blackwell` | Toggle the BlackwellUI Configuration Center |
-| `/bui unlock` or `/bui move` | Unlock all HUD frames for drag-and-drop repositioning |
-| `/bui lock` | Lock all HUD frames in place |
-| `/bui reset` | Reset all frames to default layout |
-| `/bui demo` | Toggle demo/preview mode |
-| `/bui hud` | Toggle replacement of stock Azeroth Survivors run HUD |
-
-### Configuration Center
-* **Themes:** Select from preset themes (*Blackwell Cyan*, *Crimson*, *Amber*, *Emerald*, *Violet*, *Monolith*, *Class Colors*) or click the **RGB Swatch** to pick any custom accent color using the native Blizzard color picker.
-* **Fine-Tuning:** Dedicated step controls for Frame Backdrop Opacity (30%–100%), HUD Font Scaling (`-2` to `+4`), and Chat Font Size (`8pt` to `20pt`).
+| `/bui` oder `/blackwell` | Öffnet das Steuerungszentrum (Themes, Farben, Font-Scale) |
+| `/bui unlock` / `/bui move` | Alle HUD-Elemente frei per Drag & Drop verschieben |
+| `/bui lock` | Alle Elemente verriegeln |
+| `/bui reset` | Standardkoordinaten wiederherstellen |
+| `/bui demo` | Demo-Vorschau mit simulierten Daten umschalten |
 
 ---
 
-## 📥 Installation
+## 🔗 Links & Ressourcen
 
-1. Download the latest repository code or Release ZIP.
-2. Ensure the extracted folder is named exactly **`BlackwellUI`** (do not leave it as `BlackwellUI-main`).
-3. Move the `BlackwellUI` folder into your game directory:
-   ```text
-   World of Warcraft/Interface/AddOns/BlackwellUI
-   ```
-4. Verify the folder contains `BlackwellUI.toc`, `Core.lua`, `media/`, etc.
-5. Log into World of Warcraft (Vanilla 1.12.1) and ensure **BlackwellUI** is enabled in the AddOn menu.
-6. Type `/bui` in-game to configure your setup!
+* **GitHub Repository:** [github.com/Seele2024/BlackwellUI](https://github.com/Seele2024/BlackwellUI)
+* **Releases & Downloads (`BlackwellUI.zip`):** [github.com/Seele2024/BlackwellUI/releases](https://github.com/Seele2024/BlackwellUI/releases)
+* **Azeroth Survivors Modus:** Standalone / Modded Vanilla 1.12.1 Client (*wenilla-rogue*)
+* **Issue Tracker:** [github.com/Seele2024/BlackwellUI/issues](https://github.com/Seele2024/BlackwellUI/issues)
 
 ---
 
-## 🛠 Engineering & Compatibility
+## 🛠 Engineering Standard
 
-* **Vanilla 1.12.1 / Lua 5.0 Strict:** 100% compliant with Lua 5.0 specifications (no `#` length operators, no `%` modulo, no string method calls, zero post-1.12 APIs).
-* **Safe CVars Management:** Safely toggles persistent stock HUD CVars with zero redundant `SetCVar` loops.
-* **Backwards Compatibility:** Includes automated SavedVariables migration and slash command aliases for smooth upgrades.
-
----
-
-## 📜 License
-
-Created by **Pierre** & **Ellesmere** for the Azeroth Survivors community. Released under the MIT License.
+* **100% Strict Lua 5.0:** Entwickelt nach dem WoW 1.12.1 Standard (kein `#`-Operator, kein Modulo-Operator `%`, keine String-Objektmethoden).
+* **Zero Texture Leaks:** Idempotente Texturverwaltung (`buiEdges`), keine endlosen Re-Skinning-Loops.
+* **Zero Hallucination:** Defensiv programmierte API-Wrapper für `AZS_*` Globals, Spellbook-Scanner und Unit-Events.
