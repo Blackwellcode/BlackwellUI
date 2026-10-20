@@ -1,10 +1,10 @@
 # BlackwellUI (BUI) // CYBERPUNK TACTICAL HUD FOR AZEROTH SURVIVORS
 
-[![WoW Version](https://img.shields.io/badge/WoW-1.12.1%20Vanilla-blue.svg?style=flat-square)](https://github.com/Seele2024/BlackwellUI)
-[![Game Mode](https://img.shields.io/badge/Mode-Azeroth%20Survivors-red.svg?style=flat-square)](https://github.com/Seele2024/BlackwellUI)
-[![Release](https://img.shields.io/badge/Release-v2.1.0--azs-00e5ff.svg?style=flat-square)](https://github.com/Seele2024/BlackwellUI/releases)
-[![Lua Engine](https://img.shields.io/badge/Engine-Strict%20Lua%205.0-brightgreen.svg?style=flat-square)](https://github.com/Seele2024/BlackwellUI)
-[![License](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](https://github.com/Seele2024/BlackwellUI/blob/main/LICENSE)
+[![WoW Version](https://img.shields.io/badge/WoW-1.12.1%20Vanilla-blue.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI)
+[![Game Mode](https://img.shields.io/badge/Mode-Azeroth%20Survivors-red.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI)
+[![Release](https://img.shields.io/badge/Release-v2.1.0--azs-00e5ff.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI/releases)
+[![Lua Engine](https://img.shields.io/badge/Engine-Strict%20Lua%205.0-brightgreen.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI)
+[![License](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI/blob/main/LICENSE)
 
 > **BlackwellUI** is a lightweight, high-performance tactical HUD overhaul engineered from scratch specifically for the **Azeroth Survivors** game mode on World of Warcraft (Vanilla 1.12.1).
 
@@ -66,10 +66,10 @@ Stock World of Warcraft UI (action bars, bag slots, micro menus, standard unitfr
 
 ## 🔗 Links & Resources
 
-* **GitHub Repository:** [github.com/Seele2024/BlackwellUI](https://github.com/Seele2024/BlackwellUI)
-* **Releases & Downloads (`BlackwellUI.zip`):** [github.com/Seele2024/BlackwellUI/releases](https://github.com/Seele2024/BlackwellUI/releases)
+* **GitHub Repository:** [github.com/Blackwellcode/BlackwellUI](https://github.com/Blackwellcode/BlackwellUI)
+* **Releases & Downloads (`BlackwellUI.zip`):** [github.com/Blackwellcode/BlackwellUI/releases](https://github.com/Blackwellcode/BlackwellUI/releases)
 * **Game Mode:** Azeroth Survivors (Custom Vanilla 1.12.1 Client)
-* **Issue Tracker & Feature Requests:** [github.com/Seele2024/BlackwellUI/issues](https://github.com/Seele2024/BlackwellUI/issues)
+* **Issue Tracker & Feature Requests:** [github.com/Blackwellcode/BlackwellUI/issues](https://github.com/Blackwellcode/BlackwellUI/issues)
 
 ---
 
