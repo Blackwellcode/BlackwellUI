@@ -112,7 +112,7 @@ local function GetSpellTickDamage(name)
 
     if not val then
         for k, v in pairs(lastTickDamage) do
-            if string.find(lowerName, k) or string.find(k, lowerName) then
+            if string.find(lowerName, k, 1, true) or string.find(k, lowerName, 1, true) then
                 val = v
                 break
             end
@@ -122,7 +122,7 @@ local function GetSpellTickDamage(name)
     if not val and type(AZS_METER) == "table" then
         for i = 1, table.getn(AZS_METER) do
             local item = AZS_METER[i]
-            if item.name and string.lower(item.name) == lowerName then
+            if type(item) == "table" and item.name and string.lower(item.name) == lowerName then
                 if item.dps and item.dps > 0 then
                     val = math.floor(tonumber(item.dps) + 0.5)
                 end
@@ -411,7 +411,9 @@ function mod:Create()
         r:SetScript("OnEnter", function()
             if UnitExists("target") and this.debuffIndex then
                 GameTooltip:SetOwner(this, "ANCHOR_TOP")
-                GameTooltip:SetUnitDebuff("target", this.debuffIndex)
+                if type(GameTooltip.SetUnitDebuff) == "function" then
+                    GameTooltip:SetUnitDebuff("target", this.debuffIndex)
+                end
                 if this.tickDmg and this.tickDmg > 0 then
                     GameTooltip:AddLine(string.format("Tick Damage: %d", this.tickDmg), 1.0, 0.85, 0.20)
                 end

@@ -71,18 +71,22 @@ function mod:Create()
         Minimap:SetWidth(MAP_SIZE)
         Minimap:SetHeight(MAP_SIZE)
 
-        -- Mask to 1.12 square
-        Minimap:SetMaskTexture(B.WHITE)
+        -- Mask to 1.12 square if supported
+        if type(Minimap.SetMaskTexture) == "function" then
+            Minimap:SetMaskTexture(B.WHITE)
+        end
 
         -- Mousewheel zoom
-        Minimap:EnableMouseWheel(true)
-        Minimap:SetScript("OnMouseWheel", function()
-            if arg1 > 0 then
-                Minimap_ZoomIn()
-            else
-                Minimap_ZoomOut()
-            end
-        end)
+        if type(Minimap.EnableMouseWheel) == "function" then
+            Minimap:EnableMouseWheel(true)
+            Minimap:SetScript("OnMouseWheel", function()
+                if arg1 and arg1 > 0 then
+                    if type(Minimap_ZoomIn) == "function" then Minimap_ZoomIn() end
+                else
+                    if type(Minimap_ZoomOut) == "function" then Minimap_ZoomOut() end
+                end
+            end)
+        end
     end
 
     ---------------------------------------------------------------------------

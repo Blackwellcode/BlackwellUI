@@ -424,10 +424,12 @@ function B:GetAbilityIcon(nameOrId)
     if MASTER_ABILITY_ICONS[nameOrId] then return MASTER_ABILITY_ICONS[nameOrId] end
     if MASTER_ABILITY_ICONS[norm] then return MASTER_ABILITY_ICONS[norm] end
 
-    -- Fallback prefix match
+    -- Fallback prefix match (safe string.sub without pattern metacharacter hazards)
     if string.len(norm) >= 4 then
+        local lenNorm = string.len(norm)
         for k, v in pairs(MASTER_ABILITY_ICONS) do
-            if string.find(k, "^" .. norm) or string.find(norm, "^" .. k) then
+            local lenK = string.len(k)
+            if (lenK >= lenNorm and string.sub(k, 1, lenNorm) == norm) or (lenNorm >= lenK and string.sub(norm, 1, lenK) == k) then
                 return v
             end
         end
@@ -485,7 +487,12 @@ end
 
 -- 1px edge just outside the frame, so the frame's own size stays exact.
 function B:Border(f, r, g, b, a)
-    local edges = {}
+    local edges = f.buiEdges or f.euiEdges
+    if edges then
+        self:SetBorderColor(f, r, g, b, a)
+        return
+    end
+    edges = {}
     local cr, cg, cb, ca = r or 0, g or 0, b or 0, a or 1
     local top = f:CreateTexture(nil, "BORDER")
     top:SetPoint("BOTTOMLEFT", f, "TOPLEFT", -1, 0)
@@ -521,8 +528,14 @@ function B:SetBorderColor(f, r, g, b, a)
 end
 
 function B:Backdrop(f, alpha)
-    local bg = f:CreateTexture(nil, "BACKGROUND")
+    local bg = f.buiBg or f.euiBg
     local a = (self.db and self.db.backdropAlpha) or alpha or 0.85
+    if bg then
+        self:Solid(bg, 0.055, 0.050, 0.045, a)
+        self:Border(f, 0, 0, 0, 1)
+        return bg
+    end
+    bg = f:CreateTexture(nil, "BACKGROUND")
     self:Solid(bg, 0.055, 0.050, 0.045, a)
     bg:SetAllPoints(f)
     f.buiBg = bg
@@ -870,7 +883,7 @@ local function Age(stamp, phase)
 end
 
 function B:HasApi()
-    return type(AZS_GetPhase) == "function" and type(AZS_RUN) == "table"
+    return (type(AZS_GetPhase) == "function" or type(AZS_PHASE) == "string" or (type(AZS_RUN) == "table" and AZS_RUN.phase ~= nil)) and type(AZS_RUN) == "table"
 end
 
 function B:GetState()
@@ -883,35 +896,45 @@ function B:GetState()
         s.active = false
         return s
     end
-    local phase = AZS_GetPhase()
+    local phase = nil
+    if type(AZS_GetPhase) == "function" then
+        phase = AZS_GetPhase()
+    elseif type(AZS_PHASE) == "string" then
+        phase = AZS_PHASE
+    elseif AZS_RUN and AZS_RUN.phase then
+        phase = AZS_RUN.phase
+    end
     s.phase = phase
     s.active = (phase ~= nil)
     if not s.active then return s end
 
-    s.time = AZS_GetRunTime() or 0
-    s.length = AZS_GetRunLength()
+    s.time = (type(AZS_GetRunTime) == "function" and AZS_GetRunTime()) or (AZS_RUN and tonumber(AZS_RUN.t)) or 0
+    s.length = (type(AZS_GetRunLength) == "function" and AZS_GetRunLength()) or (AZS_RUN and tonumber(AZS_RUN.dur)) or 900
     s.zone = AZS_ZONE or {}
     s.run = AZS_RUN or {}
-    s.bosses = AZS_GetBosses()
-    s.guardians = AZS_GetGuardians()
+    s.bosses = (type(AZS_GetBosses) == "function" and AZS_GetBosses()) or {}
+    s.guardians = (type(AZS_GetGuardians) == "function" and AZS_GetGuardians()) or {}
     local elites = {}
-    local units = AZS_UNITS or {}
+    local units = (type(AZS_UNITS) == "table" and AZS_UNITS) or {}
     for i = 1, table.getn(units) do
         local u = units[i]
-        if u.kind == "elite" then
+        if type(u) == "table" and u.kind == "elite" then
             table.insert(elites, { id = u.id, name = u.name, hp = u.hp, hpm = u.hpm })
         end
     end
     s.elites = elites
     s.units = units
     s.schedule = AZS_SCHEDULE or {}
-    s.upcoming = AZS_GetUpcomingBosses()
+    s.upcoming = (type(AZS_GetUpcomingBosses) == "function" and AZS_GetUpcomingBosses()) or {}
     s.spells = AZS_SPELLS or {}
     s.spellsAge = Age(AZS_SPELLS_UPDATED, phase)
     s.buffs = AZS_BUFFS or {}
     s.buffsAge = Age(AZS_BUFFS_UPDATED, phase)
-    local meter, total, dps = AZS_GetMeter()
-    s.meter = meter or {}
+    local meter, total, dps = nil, 0, 0
+    if type(AZS_GetMeter) == "function" then
+        meter, total, dps = AZS_GetMeter()
+    end
+    s.meter = meter or (type(AZS_METER) == "table" and AZS_METER) or {}
     s.meterTotal = total or 0
     s.meterDps = dps or 0
     s.taken = AZS_TAKEN or {}

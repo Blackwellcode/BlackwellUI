@@ -92,7 +92,7 @@ function mod:Update(state)
         f:Hide()
         return
     end
-    local s = AZS_STATS
+    local s = (type(AZS_STATS) == "table" and AZS_STATS) or nil
 
     if not s or (state and state.demo) or B.unlocked then
         s = {

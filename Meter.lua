@@ -46,7 +46,7 @@ function B:ResetMeter(restoreAll)
     local rawDone = (s and s.meter) or (type(AZS_METER) == "table" and AZS_METER) or {}
     for i = 1, table.getn(rawDone) do
         local item = rawDone[i]
-        if item and item.name then
+        if type(item) == "table" and item.name then
             self.meterOffsets.done[item.name] = tonumber(item.dmg) or 0
         end
     end
@@ -54,7 +54,7 @@ function B:ResetMeter(restoreAll)
     local rawTaken = (s and s.taken) or (type(AZS_TAKEN) == "table" and AZS_TAKEN) or {}
     for i = 1, table.getn(rawTaken) do
         local item = rawTaken[i]
-        if item and item.source then
+        if type(item) == "table" and item.source then
             self.meterOffsets.taken[item.source] = tonumber(item.dmg) or 0
         end
     end
@@ -243,18 +243,21 @@ function mod:Update(state)
 
         for i = 1, count do
             local item = rawTaken[i]
-            local rawD = tonumber(item.dmg) or 0
-            local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.taken and B.meterOffsets.taken[item.source]) or 0
-            local d = rawD - base
-            if d < 0 then d = 0 end
-            if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
-                table.insert(takenList, { source = item.source, dmg = d })
-                totalTaken = totalTaken + d
-                if d > maxVal then maxVal = d end
+            if type(item) == "table" then
+                local rawD = tonumber(item.dmg) or 0
+                local src = item.source or "Unknown"
+                local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.taken and B.meterOffsets.taken[src]) or 0
+                local d = rawD - base
+                if d < 0 then d = 0 end
+                if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
+                    table.insert(takenList, { source = src, dmg = d })
+                    totalTaken = totalTaken + d
+                    if d > maxVal then maxVal = d end
+                end
             end
         end
 
-        table.sort(takenList, function(a, b) return a.dmg > b.dmg end)
+        table.sort(takenList, function(a, b) return (tonumber(a.dmg) or 0) > (tonumber(b.dmg) or 0) end)
         local displayCount = table.getn(takenList)
 
         f.header.value:SetText(B:Short(totalTaken))
@@ -309,18 +312,21 @@ function mod:Update(state)
 
         for i = 1, count do
             local item = rawMeter[i]
-            local rawD = tonumber(item.dmg) or 0
-            local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.done and B.meterOffsets.done[item.name]) or 0
-            local d = rawD - base
-            if d < 0 then d = 0 end
-            if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
-                table.insert(meterList, { name = item.name, dmg = d })
-                totalDmg = totalDmg + d
-                if d > maxVal then maxVal = d end
+            if type(item) == "table" then
+                local rawD = tonumber(item.dmg) or 0
+                local sName = item.name or "Unknown"
+                local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.done and B.meterOffsets.done[sName]) or 0
+                local d = rawD - base
+                if d < 0 then d = 0 end
+                if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
+                    table.insert(meterList, { name = sName, dmg = d })
+                    totalDmg = totalDmg + d
+                    if d > maxVal then maxVal = d end
+                end
             end
         end
 
-        table.sort(meterList, function(a, b) return a.dmg > b.dmg end)
+        table.sort(meterList, function(a, b) return (tonumber(a.dmg) or 0) > (tonumber(b.dmg) or 0) end)
         local displayCount = table.getn(meterList)
 
         local curT = 0

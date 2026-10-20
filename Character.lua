@@ -39,36 +39,42 @@ local function UpdateSlotQuality(slot)
     if GetInventoryItemQuality then
         q = GetInventoryItemQuality("player", id)
     end
-    if q and q > 1 then
+    if q and q > 1 and GetItemQualityColor then
         local r, g, b = GetItemQualityColor(q)
-        B:Border(slot, r, g, b, 1)
-    else
-        B:Border(slot, 0.18, 0.18, 0.18, 1)
+        if r and g and b then
+            B:SetBorderColor(slot, r, g, b, 1)
+            return
+        end
     end
+    B:SetBorderColor(slot, 0.18, 0.18, 0.18, 1)
 end
 
 local function SkinRunStatsPanel()
-    local p = AZSMoreStats or _G["AZSMoreStats"]
+    local p = AZSMoreStats or (getglobal and getglobal("AZSMoreStats"))
     if not p then return end
 
-    CleanFrameTextures(p)
-    B:Backdrop(p, 0.94)
-    B:Border(p, 0, 0, 0, 1)
+    if not p.buiSkinned then
+        p.buiSkinned = true
+        CleanFrameTextures(p)
+        B:Backdrop(p, 0.94)
+        B:Border(p, 0, 0, 0, 1)
 
-    -- Dock cleanly to the right of CharacterFrame
-    p:ClearAllPoints()
-    p:SetPoint("TOPLEFT", CharacterFrame, "TOPRIGHT", 2, 0)
-    p:SetPoint("BOTTOMLEFT", CharacterFrame, "BOTTOMRIGHT", 2, 0)
-    p:SetWidth(165)
+        -- Dock cleanly to the right of CharacterFrame
+        p:ClearAllPoints()
+        p:SetPoint("TOPLEFT", CharacterFrame, "TOPRIGHT", 2, 0)
+        p:SetPoint("BOTTOMLEFT", CharacterFrame, "BOTTOMRIGHT", 2, 0)
+        p:SetWidth(165)
 
-    if not p.buiAccentLine then
-        local sideTop = p:CreateTexture(nil, "ARTWORK")
-        sideTop:SetPoint("TOPLEFT", p, "TOPLEFT", 1, -1)
-        sideTop:SetPoint("TOPRIGHT", p, "TOPRIGHT", -1, -1)
-        sideTop:SetHeight(2)
-        sideTop:SetTexture(B.WHITE)
-        B:Accent(sideTop, "tex", 0.9)
-        p.buiAccentLine = sideTop
+        if not p.buiAccentLine then
+            local sideTop = p:CreateTexture(nil, "ARTWORK")
+            sideTop.buiKeep = true
+            sideTop:SetPoint("TOPLEFT", p, "TOPLEFT", 1, -1)
+            sideTop:SetPoint("TOPRIGHT", p, "TOPRIGHT", -1, -1)
+            sideTop:SetHeight(2)
+            sideTop:SetTexture(B.WHITE)
+            B:Accent(sideTop, "tex", 0.9)
+            p.buiAccentLine = sideTop
+        end
     end
 
     if AZSMoreStatsTitle then
@@ -80,11 +86,11 @@ local function SkinRunStatsPanel()
 
     -- Style rows AZSMoreStat1..25
     for i = 1, 25 do
-        local row = _G["AZSMoreStat" .. i]
+        local row = getglobal and getglobal("AZSMoreStat" .. i)
         if row then
             row:SetWidth(150)
-            local lbl = _G["AZSMoreStat" .. i .. "Label"]
-            local val = _G["AZSMoreStat" .. i .. "StatText"]
+            local lbl = getglobal and getglobal("AZSMoreStat" .. i .. "Label")
+            local val = getglobal and getglobal("AZSMoreStat" .. i .. "StatText")
             if lbl then
                 lbl:SetFont(B:GetFontPath(), 9, "")
                 lbl:SetTextColor(0.75, 0.75, 0.75)
@@ -97,58 +103,16 @@ local function SkinRunStatsPanel()
     end
 end
 
-local function SkinTabs()
+local function HideCharacterTabs()
     for i = 1, 5 do
-        local tab = _G["CharacterFrameTab" .. i]
+        local tab = getglobal and getglobal("CharacterFrameTab" .. i)
         if tab then
-            local tLeft = _G["CharacterFrameTab" .. i .. "Left"]
-            local tMid = _G["CharacterFrameTab" .. i .. "Middle"]
-            local tRight = _G["CharacterFrameTab" .. i .. "Right"]
-            if tLeft then tLeft:Hide() end
-            if tMid then tMid:Hide() end
-            if tRight then tRight:Hide() end
-            B:Backdrop(tab, 0.95)
-            B:Border(tab, 0.20, 0.20, 0.20, 1)
-            tab:SetHeight(22)
-            tab:SetWidth(74)
+            tab:Hide()
+            tab:SetAlpha(0)
             tab:ClearAllPoints()
-            if i == 1 then
-                tab:SetPoint("TOPLEFT", CharacterFrame, "BOTTOMLEFT", 14, -1)
-            else
-                local prevTab = _G["CharacterFrameTab" .. (i - 1)]
-                if prevTab then
-                    tab:SetPoint("LEFT", prevTab, "RIGHT", 4, 0)
-                end
-            end
-            local tabFs = tab:GetFontString()
-            if tabFs then
-                tabFs:SetFont(B:GetFontPath(), 10, "OUTLINE")
-            end
-            if not tab.buiHooked then
-                tab.buiHooked = true
-                local origClick = tab:GetScript("OnClick")
-                tab:SetScript("OnClick", function()
-                    if origClick then origClick() end
-                    SkinCharacterFrame()
-                    SkinTabs()
-                end)
-            end
-        end
-    end
-
-    local selTab = 1
-    if PanelTemplates_GetSelectedTab then
-        selTab = PanelTemplates_GetSelectedTab(CharacterFrame) or 1
-    end
-    local ar, ag, ab = B:GetAccent()
-    for i = 1, 5 do
-        local tab = _G["CharacterFrameTab" .. i]
-        if tab then
-            if i == selTab then
-                B:Border(tab, ar, ag, ab, 1)
-            else
-                B:Border(tab, 0.20, 0.20, 0.20, 1)
-            end
+            tab:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 5000, 5000)
+            tab:SetScript("OnShow", function() this:Hide() end)
+            tab.Show = function() end
         end
     end
 end
@@ -253,23 +217,23 @@ local function SkinCharacterFrame()
     local nSlots = table.getn(EQUIPMENT_SLOTS)
     for i = 1, nSlots do
         local slotName = EQUIPMENT_SLOTS[i]
-        local slot = _G[slotName]
+        local slot = getglobal and getglobal(slotName)
         if slot then
             B:Backdrop(slot, 0.85)
             B:Border(slot, 0.18, 0.18, 0.18, 1)
 
-            local norm = _G[slotName .. "NormalTexture"]
+            local norm = getglobal and getglobal(slotName .. "NormalTexture")
             if norm then norm:SetAlpha(0) end
 
-            local icon = _G[slotName .. "IconTexture"]
+            local icon = getglobal and getglobal(slotName .. "IconTexture")
             if icon then
                 icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
             end
         end
     end
 
-    -- 8. Tabs at the bottom
-    SkinTabs()
+    -- 8. Suppress and block bottom tabs (Character, Skills, Honor)
+    HideCharacterTabs()
 
     -- 9. Style attached Run Stats panel
     SkinRunStatsPanel()
@@ -278,13 +242,13 @@ end
 local function UpdateEquipment()
     local nSlots = table.getn(EQUIPMENT_SLOTS)
     for i = 1, nSlots do
-        local slot = _G[EQUIPMENT_SLOTS[i]]
+        local slot = getglobal and getglobal(EQUIPMENT_SLOTS[i])
         if slot then
             UpdateSlotQuality(slot)
         end
     end
 
-    SkinTabs()
+    HideCharacterTabs()
     SkinRunStatsPanel()
 end
 
@@ -295,6 +259,7 @@ function mod:Create()
     watcher:SetScript("OnEvent", function()
         if not B:IsEnabled("character") then return end
         SkinCharacterFrame()
+        HideCharacterTabs()
         if CharacterFrame and CharacterFrame:IsShown() then
             UpdateEquipment()
         end
@@ -312,7 +277,7 @@ function mod:Create()
             if B:IsEnabled("character") then
                 SkinCharacterFrame()
                 UpdateEquipment()
-                SkinTabs()
+                HideCharacterTabs()
                 SkinRunStatsPanel()
             end
         end)
