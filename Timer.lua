@@ -12,6 +12,34 @@ mod.label = "Run Timer"
 local MAX_SCHEDULE_ROWS = 8
 local TIMER_WIDTH = 260
 
+local guardianLairStatus = {}
+local guardiansSlainBefore8 = 0
+local lastRunResetTime = 0
+
+local function UpdateGuardianGoal(runTime)
+    if runTime < lastRunResetTime or runTime < 2 then
+        guardiansSlainBefore8 = 0
+        guardianLairStatus = {}
+    end
+    lastRunResetTime = runTime
+
+    local lairs = (type(AZS_GetLairs) == "function" and AZS_GetLairs()) or {}
+    local nLairs = table.getn(lairs)
+    for i = 1, nLairs do
+        local lair = lairs[i]
+        local idx = lair.index or i
+        local isActive = (lair.active == true or lair.active == 1 or (lair.awake and tonumber(lair.awake) > 0))
+        if guardianLairStatus[idx] == true and not isActive then
+            if runTime <= 480 then
+                guardiansSlainBefore8 = guardiansSlainBefore8 + 1
+            end
+        end
+        guardianLairStatus[idx] = isActive
+    end
+
+    return guardiansSlainBefore8
+end
+
 function mod:Create()
     local f = CreateFrame("Frame", "BUI_TimerFrame", UIParent)
     EUI_TimerFrame = f -- Compatibility alias
@@ -58,10 +86,17 @@ function mod:Create()
     B:Accent(nextFs, "text")
     f.nextFs = nextFs
 
+    -- Guardian Speedrun Goal line (Slay 4 before 8:00)
+    local goalFs = B:Font(f, 9, "LEFT")
+    goalFs:SetPoint("TOPLEFT", nextFs, "BOTTOMLEFT", 0, -3)
+    goalFs:SetWidth(TIMER_WIDTH - 16)
+    goalFs:SetHeight(12)
+    f.goalFs = goalFs
+
     -- Schedule list separator line
     local sep = f:CreateTexture(nil, "ARTWORK")
-    sep:SetPoint("TOPLEFT", nextFs, "BOTTOMLEFT", 0, -3)
-    sep:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -70)
+    sep:SetPoint("TOPLEFT", goalFs, "BOTTOMLEFT", 0, -3)
+    sep:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -84)
     sep:SetHeight(1)
     sep:SetTexture(B.WHITE)
     B:Solid(sep, 0.2, 0.2, 0.2, 0.8)
@@ -73,7 +108,7 @@ function mod:Create()
         local r = CreateFrame("Frame", nil, f)
         r:SetWidth(TIMER_WIDTH - 16)
         r:SetHeight(12)
-        r:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -75 - (i - 1) * 14)
+        r:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -88 - (i - 1) * 14)
 
         local leftFs = B:Font(r, 9, "LEFT")
         leftFs:SetPoint("LEFT", r, "LEFT", 0, 0)
@@ -148,6 +183,22 @@ function mod:Update(state)
         f.nextFs:SetText("Next Boss: None")
     end
 
+    -- Guardian 8:00 Speedrun Goal
+    local slainCount = UpdateGuardianGoal(runTime)
+    if f.goalFs then
+        if slainCount >= 4 then
+            f.goalFs:SetText(string.format("GOAL: %d/4 Guardians [ACHIEVED]", slainCount))
+            f.goalFs:SetTextColor(0.0, 1.0, 0.45)
+        elseif runTime < 480 then
+            local rem = 480 - runTime
+            f.goalFs:SetText(string.format("GOAL: %d/4 Guardians (Left: %s)", slainCount, B:Clock(rem)))
+            f.goalFs:SetTextColor(1.0, 0.82, 0.15)
+        else
+            f.goalFs:SetText(string.format("GOAL: %d/4 Guardians [EXPIRED]", slainCount))
+            f.goalFs:SetTextColor(0.55, 0.55, 0.55)
+        end
+    end
+
     -- Schedule List
     local schedule = state.schedule or {}
     local count = table.getn(schedule)
@@ -195,9 +246,9 @@ function mod:Update(state)
     end
 
     if shownRows > 0 then
-        f:SetHeight(75 + shownRows * 14 + 6)
+        f:SetHeight(89 + shownRows * 14 + 6)
     else
-        f:SetHeight(75)
+        f:SetHeight(89)
     end
 end
 

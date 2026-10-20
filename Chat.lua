@@ -160,6 +160,48 @@ function mod:Create()
     B:RegisterMover(panel, "chat", "Chat Frame", "BOTTOMLEFT", "BOTTOMLEFT", 12, 24)
 end
 
+-------------------------------------------------------------------------------
+--  Chat Spam Filter (Suppresses repetitive Azeroth Survivors level spam)
+-------------------------------------------------------------------------------
+local lastLevelUp = 0
+
+local function FilterChatMessage(ev, frame, msg)
+    if not (B.db and B.db.filterChatSpam ~= false) then
+        return false
+    end
+
+    if ev == "PLAYER_LEVEL_UP" then
+        lastLevelUp = GetTime()
+        return true
+    end
+
+    if ev == "CHAT_MSG_SYSTEM" and msg then
+        -- Suppress stat increases directly following level up "+3% damage..."
+        if (GetTime() - lastLevelUp < 1.5) and string.find(msg, "%+%d") then
+            return true
+        end
+    end
+
+    if ev == "CHAT_MSG_RAID_BOSS_EMOTE" and B.db and B.db.hideBanners then
+        return true
+    end
+
+    return false
+end
+
+if ChatFrame_OnEvent and not mod.hookedChatEvent then
+    mod.hookedChatEvent = true
+    local orig_ChatFrame_OnEvent = ChatFrame_OnEvent
+    ChatFrame_OnEvent = function(ev)
+        if FilterChatMessage(ev, this, arg1) then
+            return
+        end
+        if orig_ChatFrame_OnEvent then
+            orig_ChatFrame_OnEvent(ev)
+        end
+    end
+end
+
 function mod:Update(state)
 end
 

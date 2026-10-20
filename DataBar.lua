@@ -12,6 +12,34 @@ mod.label = "Data Bar"
 local BAR_WIDTH = 680
 local BAR_HEIGHT = 20
 
+local killHistory = {}
+
+local function GetKillPace(curKills)
+    local now = GetTime()
+    table.insert(killHistory, { t = now, kills = curKills })
+
+    local cleaned = {}
+    local n = table.getn(killHistory)
+    local oldest = nil
+    for i = 1, n do
+        local snap = killHistory[i]
+        if (now - snap.t) <= 20 then
+            table.insert(cleaned, snap)
+            if not oldest then oldest = snap end
+        end
+    end
+    killHistory = cleaned
+
+    if oldest and (now - oldest.t) >= 4.0 then
+        local dt = now - oldest.t
+        local dk = curKills - oldest.kills
+        if dk < 0 then dk = 0 end
+        local pace = math.floor((dk / dt) * 60 + 0.5)
+        return pace
+    end
+    return nil
+end
+
 local SEGMENT_DEFS = {
     { key = "lvl",     label = "LVL" },
     { key = "xp",      label = "XP" },
@@ -88,7 +116,20 @@ function mod:Update(state)
     local xpStr = string.format("%d%%", math.floor(xpPct * 100 + 0.5))
     f.xpBar:SetValue(xpPct)
 
-    local kills = tostring(run.kills or 0)
+    local rawKills = tonumber(run.kills) or 0
+    local kills = tostring(rawKills)
+    local pace = GetKillPace(rawKills)
+    if pace and pace > 0 then
+        if pace >= 120 then
+            kills = string.format("%s |cff00ff88[%d/m]|r", tostring(rawKills), pace)
+        elseif pace >= 80 then
+            kills = string.format("%s |cff00e5ff[%d/m]|r", tostring(rawKills), pace)
+        elseif pace >= 40 then
+            kills = string.format("%s |cffffb800[%d/m]|r", tostring(rawKills), pace)
+        else
+            kills = string.format("%s |cff999999[%d/m]|r", tostring(rawKills), pace)
+        end
+    end
     local gold = tostring(run.gold or 0)
     local chestVal = tonumber(run.chest) or 0
     local chestStr = (chestVal > 0) and (tostring(chestVal) .. "g") or "--"

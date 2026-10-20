@@ -110,7 +110,7 @@ local function BuildOptionsFrame()
     BlackwallUIOptionsFrame = f -- Compatibility alias
     EllesmereUIOptionsFrame = f -- Compatibility alias
     f:SetWidth(540)
-    f:SetHeight(520)
+    f:SetHeight(550)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
     f:SetFrameStrata("DIALOG")
     f:SetMovable(true)
@@ -334,16 +334,18 @@ local function BuildOptionsFrame()
     local modDefs = {
         { key = "actionbars", label = "Action Bars & Buttons" },
         { key = "minimap",    label = "Square Minimap & Coords" },
+        { key = "pins",       label = "Minimap Radar Pins" },
         { key = "unitframes", label = "Hero, Target & Encounters" },
         { key = "chat",       label = "Chat Window & EditBox" },
         { key = "castbar",    label = "Player Cast Bar" },
-        { key = "build",      label = "Build Spells & Aura Buffs" },
-        { key = "meter",      label = "Damage Done & Taken Meter" },
-        { key = "timer",      label = "Run Clock, Phase & Schedule" },
-        { key = "databar",    label = "Top Telemetry Data Bar" },
+        { key = "build",      label = "Build Spells & Cooldowns" },
+        { key = "meter",      label = "Combat Damage & Boss Meter" },
+        { key = "timer",      label = "Run Clock, Goal & Schedule" },
+        { key = "databar",    label = "Bottom Telemetry Data Bar" },
         { key = "stats",      label = "Left Multipliers & Stats" },
         { key = "nameplates", label = "Cyberpunk Nameplates" },
         { key = "character",  label = "Character Matrix ('C' Key)" },
+        { key = "loot",       label = "Loot Drop Telemetry Log" },
     }
 
     for i = 1, table.getn(modDefs) do
@@ -362,7 +364,7 @@ local function BuildOptionsFrame()
     local secHud = B:Font(f, 10, "LEFT")
     secHud:SetPoint("TOPLEFT", f, "TOPLEFT", 280, -108)
     secHud:SetTextColor(0.65, 0.65, 0.65)
-    secHud:SetText("STOCK GAME HUD & COLOR OPTIONS")
+    secHud:SetText("STOCK GAME HUD & RADAR OPTIONS")
 
     local cbReplace = CreateCheckbox(f, 280, -126, "Replace Stock Run HUD",
         function() return B.db.replaceHud end,
@@ -409,9 +411,33 @@ local function BuildOptionsFrame()
     )
     table.insert(checkList, cbClassHp)
 
+    local cbChatSpam = CreateCheckbox(f, 280, -236, "Filter Chat Level-Up Spam",
+        function() return B.db.filterChatSpam ~= false end,
+        function(val)
+            B.db.filterChatSpam = val
+        end
+    )
+    table.insert(checkList, cbChatSpam)
+
+    local cbPinCaches = CreateCheckbox(f, 280, -258, "Radar: Show Caches",
+        function() return B.db.pinCaches ~= false end,
+        function(val)
+            B.db.pinCaches = val
+        end
+    )
+    table.insert(checkList, cbPinCaches)
+
+    local cbPinLairs = CreateCheckbox(f, 280, -280, "Radar: Show Guardian Lairs",
+        function() return B.db.pinLairs ~= false end,
+        function(val)
+            B.db.pinLairs = val
+        end
+    )
+    table.insert(checkList, cbPinLairs)
+
     -- Warning note about CVars
     local noteFs = B:Font(f, 9, "LEFT")
-    noteFs:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -345)
+    noteFs:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -425)
     noteFs:SetWidth(508)
     noteFs:SetHeight(28)
     noteFs:SetTextColor(0.55, 0.55, 0.55)
@@ -491,6 +517,7 @@ SLASH_BLACKWELLUI4 = "/blackwall"
 SLASH_BLACKWELLUI5 = "/blackwallui"
 SLASH_BLACKWELLUI6 = "/eui"
 SLASH_BLACKWELLUI7 = "/ellesmere"
+SLASH_BLACKWELLUI8 = "/bw"
 
 local function HandleSlashCmd(msg)
     local cmd = string.lower((string.gsub(msg or "", "^%s*(.-)%s*$", "%1")))
@@ -510,8 +537,18 @@ local function HandleSlashCmd(msg)
         B.db.replaceHud = not B.db.replaceHud
         B:SyncHud()
         B:Print("Stock HUD replacement: " .. (B.db.replaceHud and "ON" or "OFF"))
+    elseif cmd == "pins" or cmd == "radar" then
+        local cur = B:IsEnabled("pins")
+        B.db.modules["pins"] = not cur
+        B:OnModulesChanged()
+        B:Print("Minimap Radar Pins: " .. (B:IsEnabled("pins") and "ON" or "OFF"))
+    elseif cmd == "loot" then
+        local cur = B:IsEnabled("loot")
+        B.db.modules["loot"] = not cur
+        B:OnModulesChanged()
+        B:Print("Loot Drop Log: " .. (B:IsEnabled("loot") and "ON" or "OFF"))
     elseif cmd == "help" then
-        B:Print("Commands: /bui (toggle panel), /bui unlock, /bui lock, /bui reset, /bui demo, /bui hud")
+        B:Print("Commands: /bw (options), /bw unlock, /bw lock, /bw reset, /bw demo, /bw hud, /bw pins, /bw loot")
     else
         B:ToggleOptions()
     end
