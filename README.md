@@ -21,19 +21,19 @@ Stock World of Warcraft UI (action bars, bag slots, micro menus, standard unitfr
 ## 📸 In-Game Screenshots
 
 ### 1. Tactical Combat HUD (Naxxramas: The Scourge Invasion)
-![BlackwellUI Combat HUD](media/screenshots/hud-overview.png)
+![BlackwellUI Combat HUD](media/screenshots/blackwell-hud-naxxramas.png)
 *Full in-game combat HUD during a Naxxramas run. Centered Hero & Target frames with ability cooldown matrix, streamlined chat panel, economy telemetry DataBar, encounter radar and damage meter on the right, and the overhauled character sheet on the left.*
 
 <br/>
 
 ### 2. Character Matrix & Run Stats Panel ('C' Key)
-![Character Info & Run Stats](media/screenshots/character-runstats.png)
+![Character Info & Run Stats](media/screenshots/blackwell-character-matrix.png)
 *Redesigned Character Info window: Crisp 3D model frame, item quality border highlights, zero redundant bottom tabs, and the Azeroth Survivors Run Stats panel cleanly docked to the right edge.*
 
 <br/>
 
 ### 3. Run Clock, Boss Schedule & Live Damage Meter
-![Run Timer & Damage Meter](media/screenshots/timer-meter.png)
+![Run Timer & Damage Meter](media/screenshots/blackwell-timer-meter.png)
 *Live 20-minute run clock with boss spawn countdowns (Gates of Ahn'Qiraj: Kurinnaxx, General Rajaxx, Princess Huhuran, C'Thun) stacked directly above the Damage Meter featuring ability icons, dynamic equipped weapon textures, DPS rates, and the interactive `[R]` session reset button.*
 
 ---
