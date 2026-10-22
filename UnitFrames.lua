@@ -308,7 +308,7 @@ function mod:Create()
     xpBar:SetHeight(2)
     hero.xpBar = xpBar
 
-    B:RegisterMover(hero, "hero", "Hero Frame", "BOTTOM", "BOTTOM", -245, 140)
+    B:RegisterMover(hero, "hero", "Hero Frame", "BOTTOM", "BOTTOM", -220, 140)
     self.hero = hero
 
     ---------------------------------------------------------------------------
@@ -429,7 +429,7 @@ function mod:Create()
     tgt.debuffs = debuffBars
 
     tgt:Hide()
-    B:RegisterMover(tgt, "target", "Target Frame", "BOTTOM", "BOTTOM", 245, 140)
+    B:RegisterMover(tgt, "target", "Target Frame", "BOTTOM", "BOTTOM", 220, 140)
     self.target = tgt
 
     ---------------------------------------------------------------------------
@@ -587,7 +587,7 @@ function mod:Create()
     enc.rows = rows
 
     enc:Hide()
-    B:RegisterMover(enc, "encounters", "Elites & Bosses", "TOPRIGHT", "TOPRIGHT", -12, -380)
+    B:RegisterMover(enc, "encounters", "Elites & Bosses", "TOPRIGHT", "TOPRIGHT", -12, -340)
     self.enc = enc
 
     local ufWatcher = CreateFrame("Frame")

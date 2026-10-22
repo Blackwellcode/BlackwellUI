@@ -83,7 +83,7 @@ function mod:Create()
     castBar.spark = spark
 
     castBar:Hide()
-    B:RegisterMover(castBar, "castbar", "Player Cast Bar", "BOTTOM", "BOTTOM", -245, 172)
+    B:RegisterMover(castBar, "castbar", "Player Cast Bar", "BOTTOM", "BOTTOM", -220, 172)
     self.castBar = castBar
 
     ---------------------------------------------------------------------------
