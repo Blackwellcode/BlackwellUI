@@ -110,7 +110,7 @@ local function BuildOptionsFrame()
     BlackwallUIOptionsFrame = f -- Compatibility alias
     EllesmereUIOptionsFrame = f -- Compatibility alias
     f:SetWidth(540)
-    f:SetHeight(550)
+    f:SetHeight(575)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
     f:SetFrameStrata("DIALOG")
     f:SetMovable(true)
@@ -356,6 +356,7 @@ local function BuildOptionsFrame()
         { key = "databar",    label = "Bottom Telemetry Data Bar" },
         { key = "stats",      label = "Left Multipliers & Stats" },
         { key = "nameplates", label = "Cyberpunk Nameplates" },
+        { key = "combattext", label = "Combat Text (MSBT Style)" },
         { key = "character",  label = "Character Matrix ('C' Key)" },
         { key = "loot",       label = "Loot Drop Telemetry Log" },
     }
@@ -449,7 +450,7 @@ local function BuildOptionsFrame()
 
     -- Warning note about CVars
     local noteFs = B:Font(f, 9, "LEFT")
-    noteFs:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -425)
+    noteFs:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -446)
     noteFs:SetWidth(508)
     noteFs:SetHeight(28)
     noteFs:SetTextColor(0.55, 0.55, 0.55)
@@ -559,11 +560,16 @@ local function HandleSlashCmd(msg)
         B.db.modules["loot"] = not cur
         B:OnModulesChanged()
         B:Print("Loot Drop Log: " .. (B:IsEnabled("loot") and "ON" or "OFF"))
-    elseif cmd == "nameplates" or cmd == "plates" then
+    elseif cmd == "nameplates" or cmd == "plates" or cmd == "splates" then
         local cur = B:IsEnabled("nameplates")
         B.db.modules["nameplates"] = not cur
         B:OnModulesChanged()
         B:Print("Cyberpunk Nameplates: " .. (B:IsEnabled("nameplates") and "ON" or "OFF"))
+    elseif cmd == "combattext" or cmd == "sct" or cmd == "msbt" then
+        local cur = B:IsEnabled("combattext")
+        B.db.modules["combattext"] = not cur
+        B:OnModulesChanged()
+        B:Print("Scrolling Combat Text: " .. (B:IsEnabled("combattext") and "ON" or "OFF"))
     elseif cmd == "autoscale" or cmd == "auto" then
         B.db.autoScale = not B.db.autoScale
         if B.db.autoScale then
@@ -583,7 +589,7 @@ local function HandleSlashCmd(msg)
             B:Print("Usage: /bw scale 0.80  (or /bw autoscale)")
         end
     elseif cmd == "help" then
-        B:Print("Commands: /bw (options), /bw unlock, /bw lock, /bw reset, /bw autoscale, /bw scale <val>, /bw demo, /bw hud, /bw pins, /bw loot, /bw plates")
+        B:Print("Commands: /bw (options), /bw unlock, /bw lock, /bw reset, /bw autoscale, /bw scale <val>, /bw demo, /bw hud, /bw pins, /bw loot, /bw plates, /bw sct")
     else
         B:ToggleOptions()
     end
@@ -592,3 +598,13 @@ end
 SlashCmdList["BLACKWELLUI"] = HandleSlashCmd
 SlashCmdList["BLACKWALLUI"] = HandleSlashCmd
 SlashCmdList["ELLESMEREUI"] = HandleSlashCmd
+
+SLASH_MSBT1 = "/msbt"
+SlashCmdList["MSBT"] = function(msg)
+    HandleSlashCmd("sct " .. (msg or ""))
+end
+
+SLASH_SPLATES1 = "/splates"
+SlashCmdList["SPLATES"] = function(msg)
+    HandleSlashCmd("plates " .. (msg or ""))
+end
