@@ -907,7 +907,14 @@ local ABILITY_DESCRIPTIONS = {
 
 local function GetAbilityIcon(nameOrId)
     if not nameOrId or nameOrId == "" then
-        return nil
+        return "Interface\\Icons\\INV_Misc_QuestionMark"
+    end
+
+    if B and type(B.GetAbilityIcon) == "function" then
+        local icon = B:GetAbilityIcon(nameOrId)
+        if icon and icon ~= "Interface\\Icons\\INV_Misc_QuestionMark" then
+            return icon
+        end
     end
 
     local norm = NormalizeName(nameOrId)
@@ -918,11 +925,17 @@ local function GetAbilityIcon(nameOrId)
         local idNorm = NormalizeName(idResolved)
         if ABILITY_ICONS[idNorm] then return ABILITY_ICONS[idNorm] end
         if ABILITY_ICONS[idResolved] then return ABILITY_ICONS[idResolved] end
+        if B and type(B.GetAbilityIcon) == "function" then
+            local icon = B:GetAbilityIcon(idResolved)
+            if icon and icon ~= "Interface\\Icons\\INV_Misc_QuestionMark" then
+                return icon
+            end
+        end
     end
 
     -- Dynamic weapon icon for Melee / Weapon swings
-    if norm == "melee" or norm == "attack" or norm == "auto_attack" or norm == "autoattack" or norm == "swing" or norm == "physical" or norm == "hero_melee" then
-        if GetInventoryItemTexture then
+    if norm == "melee" or norm == "attack" or norm == "auto_attack" or norm == "autoattack" or norm == "swing" or norm == "physical" or norm == "hero_melee" or norm == "cuerpo_a_cuerpo" or norm == "nahkampf" then
+        if type(GetInventoryItemTexture) == "function" then
             local wTex = GetInventoryItemTexture("player", 16)
             if wTex and wTex ~= "" then
                 return wTex
@@ -932,8 +945,8 @@ local function GetAbilityIcon(nameOrId)
     end
 
     -- Dynamic weapon icon for Ranged / Auto Shot
-    if norm == "shoot" or norm == "auto_shot" or norm == "autoshot" or norm == "ranged" or norm == "bow" then
-        if GetInventoryItemTexture then
+    if norm == "shoot" or norm == "auto_shot" or norm == "autoshot" or norm == "ranged" or norm == "bow" or norm == "disparo_automatico" or norm == "automatischer_schuss" then
+        if type(GetInventoryItemTexture) == "function" then
             local rTex = GetInventoryItemTexture("player", 18)
             if rTex and rTex ~= "" then
                 return rTex
@@ -944,7 +957,7 @@ local function GetAbilityIcon(nameOrId)
 
     -- Dynamic weapon icon for Wand
     if norm == "wand" or norm == "shoot_wand" then
-        if GetInventoryItemTexture then
+        if type(GetInventoryItemTexture) == "function" then
             local wandTex = GetInventoryItemTexture("player", 18)
             if wandTex and wandTex ~= "" then
                 return wandTex
@@ -993,17 +1006,7 @@ local function GetAbilityIcon(nameOrId)
         return SPELL_BUFF_DB[norm].icon
     end
 
-    return nil
-end
-
-B.GetAbilityIcon = function(self, nameOrId)
-    local ic = GetAbilityIcon(nameOrId)
-    if not ic and GetInventoryItemTexture then
-        -- Last resort fallback for physical attacks: check mainhand
-        local wTex = GetInventoryItemTexture("player", 16)
-        if wTex and wTex ~= "" then return wTex end
-    end
-    return ic or "Interface\\Icons\\INV_Misc_QuestionMark"
+    return "Interface\\Icons\\INV_Misc_QuestionMark"
 end
 
 -------------------------------------------------------------------------------

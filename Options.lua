@@ -547,8 +547,13 @@ local function HandleSlashCmd(msg)
         B.db.modules["loot"] = not cur
         B:OnModulesChanged()
         B:Print("Loot Drop Log: " .. (B:IsEnabled("loot") and "ON" or "OFF"))
+    elseif cmd == "nameplates" or cmd == "plates" then
+        local cur = B:IsEnabled("nameplates")
+        B.db.modules["nameplates"] = not cur
+        B:OnModulesChanged()
+        B:Print("Cyberpunk Nameplates: " .. (B:IsEnabled("nameplates") and "ON" or "OFF"))
     elseif cmd == "help" then
-        B:Print("Commands: /bw (options), /bw unlock, /bw lock, /bw reset, /bw demo, /bw hud, /bw pins, /bw loot")
+        B:Print("Commands: /bw (options), /bw unlock, /bw lock, /bw reset, /bw demo, /bw hud, /bw pins, /bw loot, /bw plates")
     else
         B:ToggleOptions()
     end
