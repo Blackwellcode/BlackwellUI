@@ -15,7 +15,7 @@ BlackwallUI = BlackwellUI -- Backwards compatibility alias
 EllesmereUI = BlackwellUI -- Backwards compatibility alias
 local E = BlackwellUI
 
-B.version = "2.4.2-azs"
+B.version = "2.5.0-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -144,6 +144,7 @@ local DEFAULTS = {
         databar = true,
         stats = true,
         nameplates = false,
+        combattext = true,
         character = true,
         loot = true,
     },
@@ -173,14 +174,21 @@ function B:InitDB()
     end
     BlackwellUIDB = MergeDefaults(DEFAULTS, BlackwellUIDB)
     self.db = BlackwellUIDB
-    if not self.db.layoutVersion or self.db.layoutVersion < 10 then
-        self.db.positions = {}
-        if self.db.modules then
-            self.db.modules.nameplates = false
+    if not self.db.layoutVersion or self.db.layoutVersion < 11 then
+        if self.db.layoutVersion and self.db.layoutVersion < 10 then
+            self.db.positions = {}
+            if self.db.modules then
+                self.db.modules.nameplates = false
+            end
+            self.db.autoScale = true
+            self.db.scale = self:GetOptimalScale()
         end
-        self.db.autoScale = true
-        self.db.scale = self:GetOptimalScale()
-        self.db.layoutVersion = 10
+        if self.db.modules then
+            if self.db.modules.combattext == nil then
+                self.db.modules.combattext = true
+            end
+        end
+        self.db.layoutVersion = 11
     end
     if self.db.autoScale == nil then
         self.db.autoScale = true
@@ -421,6 +429,7 @@ local MASTER_ABILITY_ICONS = {
     ["holy_nova"] = "Interface\\Icons\\Spell_Holy_HolyNova",
     ["pw_shield"] = "Interface\\Icons\\Spell_Holy_PowerWordShield",
     ["power_word_shield"] = "Interface\\Icons\\Spell_Holy_PowerWordShield",
+    ["weakened_soul"] = "Interface\\Icons\\Spell_Holy_AshesToAshes",
     ["renew"] = "Interface\\Icons\\Spell_Holy_Renew",
     ["holy_fire"] = "Interface\\Icons\\Spell_Holy_SearingLight",
     ["mind_flay"] = "Interface\\Icons\\Spell_Shadow_SiphonMana",
