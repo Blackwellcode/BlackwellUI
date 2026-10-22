@@ -170,6 +170,7 @@ local function BuildOptionsFrame()
     scaleLbl:SetTextColor(0.8, 0.8, 0.8)
 
     local scaleDown = CreateSimpleButton(f, 18, 22, "-", function()
+        B.db.autoScale = false
         local cur = B.db.scale or 1.0
         cur = cur - 0.05
         if cur < 0.5 then cur = 0.5 end
@@ -180,6 +181,7 @@ local function BuildOptionsFrame()
     scaleDown:SetPoint("LEFT", scaleLbl, "RIGHT", 4, 0)
 
     local scaleUp = CreateSimpleButton(f, 18, 22, "+", function()
+        B.db.autoScale = false
         local cur = B.db.scale or 1.0
         cur = cur + 0.05
         if cur > 2.0 then cur = 2.0 end
@@ -188,6 +190,16 @@ local function BuildOptionsFrame()
         scaleLbl:SetText(string.format("x%.2f", B.db.scale))
     end)
     scaleUp:SetPoint("LEFT", scaleDown, "RIGHT", 3, 0)
+
+    local autoScaleBtn = CreateSimpleButton(f, 44, 22, "Auto", function()
+        B.db.autoScale = not B.db.autoScale
+        if B.db.autoScale then
+            B.db.scale = B:GetOptimalScale()
+            B:ApplyScale()
+        end
+        scaleLbl:SetText(string.format("x%.2f%s", B.db.scale, B.db.autoScale and " (A)" or ""))
+    end)
+    autoScaleBtn:SetPoint("LEFT", scaleUp, "RIGHT", 3, 0)
 
     -- Row 2: Backdrop Opacity, HUD Font Size, Chat Font Size
     local bgAlphaLbl = B:Font(f, 10, "LEFT")
@@ -279,7 +291,7 @@ local function BuildOptionsFrame()
         end
         barBtn.label:SetText("Bars: " .. tostring(B.db.barTexture))
         fontBtn.label:SetText("Font: " .. tostring(B.db.font))
-        scaleLbl:SetText(string.format("x%.2f", B.db.scale or 1.0))
+        scaleLbl:SetText(string.format("x%.2f%s", B.db.scale or 1.0, B.db.autoScale and " (A)" or ""))
         bgAlphaLbl:SetText(string.format("Backdrop: %d%%", math.floor((B.db.backdropAlpha or 0.85) * 100 + 0.5)))
         fontModLbl:SetText(string.format("HUD Font: %+d", B.db.fontScaleMod or 0))
         chatFontLbl:SetText(string.format("Chat: %dpt", B.db.chatFontSize or 12))
@@ -552,8 +564,26 @@ local function HandleSlashCmd(msg)
         B.db.modules["nameplates"] = not cur
         B:OnModulesChanged()
         B:Print("Cyberpunk Nameplates: " .. (B:IsEnabled("nameplates") and "ON" or "OFF"))
+    elseif cmd == "autoscale" or cmd == "auto" then
+        B.db.autoScale = not B.db.autoScale
+        if B.db.autoScale then
+            B.db.scale = B:GetOptimalScale()
+            B:ApplyScale()
+        end
+        B:Print("Auto Resolution Scaling: " .. (B.db.autoScale and ("ON (x" .. string.format("%.2f", B.db.scale) .. ")") or "OFF"))
+    elseif string.find(cmd, "^scale%s*") then
+        local _, _, val = string.find(cmd, "^scale%s*([%d%.]+)")
+        local num = tonumber(val)
+        if num and num >= 0.5 and num <= 2.0 then
+            B.db.autoScale = false
+            B.db.scale = math.floor(num * 100 + 0.5) / 100
+            B:ApplyScale()
+            B:Print("Scale set to: " .. string.format("x%.2f", B.db.scale))
+        else
+            B:Print("Usage: /bw scale 0.80  (or /bw autoscale)")
+        end
     elseif cmd == "help" then
-        B:Print("Commands: /bw (options), /bw unlock, /bw lock, /bw reset, /bw demo, /bw hud, /bw pins, /bw loot, /bw plates")
+        B:Print("Commands: /bw (options), /bw unlock, /bw lock, /bw reset, /bw autoscale, /bw scale <val>, /bw demo, /bw hud, /bw pins, /bw loot, /bw plates")
     else
         B:ToggleOptions()
     end

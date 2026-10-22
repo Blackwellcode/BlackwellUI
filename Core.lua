@@ -15,7 +15,7 @@ BlackwallUI = BlackwellUI -- Backwards compatibility alias
 EllesmereUI = BlackwellUI -- Backwards compatibility alias
 local E = BlackwellUI
 
-B.version = "2.4.1-azs"
+B.version = "2.4.2-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -120,6 +120,7 @@ local DEFAULTS = {
     fontScaleMod = 0,
     chatFontSize = 12,
     scale = 1.0,
+    autoScale = true,
     demo = false,
     replaceHud = true,
     hideBanners = false,
@@ -172,12 +173,20 @@ function B:InitDB()
     end
     BlackwellUIDB = MergeDefaults(DEFAULTS, BlackwellUIDB)
     self.db = BlackwellUIDB
-    if not self.db.layoutVersion or self.db.layoutVersion < 9 then
+    if not self.db.layoutVersion or self.db.layoutVersion < 10 then
         self.db.positions = {}
         if self.db.modules then
             self.db.modules.nameplates = false
         end
-        self.db.layoutVersion = 9
+        self.db.autoScale = true
+        self.db.scale = self:GetOptimalScale()
+        self.db.layoutVersion = 10
+    end
+    if self.db.autoScale == nil then
+        self.db.autoScale = true
+    end
+    if self.db.autoScale then
+        self.db.scale = self:GetOptimalScale()
     end
     if not self.THEMES[self.db.theme] then self.db.theme = DEFAULTS.theme end
     if not self.BAR_TEXTURES[self.db.barTexture] then self.db.barTexture = DEFAULTS.barTexture end
@@ -1017,6 +1026,66 @@ function B:ResetPositions()
     self:Print("Positions reset.")
 end
 
+function B:GetScreenDimensions()
+    local resWidth, resHeight
+    if type(GetCurrentResolution) == "function" and type(GetScreenResolutions) == "function" then
+        local idx = GetCurrentResolution()
+        if idx and idx > 0 then
+            local list = { GetScreenResolutions() }
+            local str = list[idx]
+            if str and str ~= "" then
+                local _, _, w, h = string.find(str, "(%d+)x(%d+)")
+                if w and h then
+                    resWidth = tonumber(w)
+                    resHeight = tonumber(h)
+                end
+            end
+        end
+    end
+    if not resWidth or not resHeight or resWidth <= 0 or resHeight <= 0 then
+        resWidth = (type(GetScreenWidth) == "function" and GetScreenWidth()) or (UIParent and UIParent:GetWidth()) or 1365
+        resHeight = (type(GetScreenHeight) == "function" and GetScreenHeight()) or (UIParent and UIParent:GetHeight()) or 768
+    end
+    return resWidth, resHeight
+end
+
+function B:GetOptimalScale()
+    local uiW = (UIParent and UIParent:GetWidth()) or (type(GetScreenWidth) == "function" and GetScreenWidth()) or 1365
+    local uiH = (UIParent and UIParent:GetHeight()) or (type(GetScreenHeight) == "function" and GetScreenHeight()) or 768
+    if uiW <= 0 then uiW = 1365 end
+    if uiH <= 0 then uiH = 768 end
+
+    -- Horizontal constraint: ensure dual meters (518px), target (310px from center),
+    -- and 24px safety margin fit on the right half of the screen.
+    local rightSpan = 518 + 310 + 24
+    local scaleX = (uiW / 2) / rightSpan
+
+    -- Vertical constraint: ensure right-side stack (Minimap 140, Timer 130, Encounters 180, gap 20 = 470px)
+    -- and bottom meters (160px) + 30px safety margin fit vertically.
+    local vertSpan = 470 + 160 + 30
+    local scaleY = uiH / vertSpan
+
+    local optimal = scaleX
+    if scaleY < optimal then optimal = scaleY end
+
+    -- Clamp optimal scale between 0.60 (smallest screens) and 1.05 (ultrawide / high-res)
+    if optimal < 0.60 then optimal = 0.60 end
+    if optimal > 1.05 then optimal = 1.05 end
+
+    -- Round to 2 decimal places for clean, crisp rendering
+    return math.floor(optimal * 100 + 0.5) / 100
+end
+
+function B:CheckResolution()
+    if self.db and self.db.autoScale then
+        local newScale = self:GetOptimalScale()
+        if not self.db.scale or math.abs(newScale - self.db.scale) >= 0.01 then
+            self.db.scale = newScale
+            self:ApplyScale()
+        end
+    end
+end
+
 function B:ApplyScale()
     for i = 1, table.getn(self.moverOrder) do
         local f = self.movers[self.moverOrder[i]]
@@ -1278,6 +1347,17 @@ end
 
 function B:Tick()
     if not self.built then return end
+
+    if self.db and self.db.autoScale then
+        local curW = (UIParent and UIParent:GetWidth()) or 0
+        local curH = (UIParent and UIParent:GetHeight()) or 0
+        if curW > 0 and (curW ~= self.lastUiWidth or curH ~= self.lastUiHeight) then
+            self.lastUiWidth = curW
+            self.lastUiHeight = curH
+            self:CheckResolution()
+        end
+    end
+
     local s = self:GetState()
     for i = 1, table.getn(self.moduleOrder) do
         local mod = self.modules[self.moduleOrder[i]]
@@ -1435,6 +1515,8 @@ EllesmereUIBoot = BlackwellUIBoot -- Compatibility alias
 boot:RegisterEvent("ADDON_LOADED")
 boot:RegisterEvent("VARIABLES_LOADED")
 boot:RegisterEvent("PLAYER_ENTERING_WORLD")
+boot:RegisterEvent("DISPLAY_SIZE_CHANGED")
+boot:RegisterEvent("UI_SCALE_CHANGED")
 
 local function Build()
     B:InitDB()
@@ -1443,6 +1525,7 @@ local function Build()
         B.built = true
         B:RefreshTheme()
         B:InitTooltip()
+        B:CheckResolution()
     end
     if B:IsEnabled("nameplates") then
         if type(ShowNameplates) == "function" then ShowNameplates() end
@@ -1460,6 +1543,8 @@ boot:SetScript("OnEvent", function()
         B:InitDB()
     elseif event == "PLAYER_ENTERING_WORLD" then
         Build()
+    elseif event == "DISPLAY_SIZE_CHANGED" or event == "UI_SCALE_CHANGED" then
+        B:CheckResolution()
     end
 end)
 
