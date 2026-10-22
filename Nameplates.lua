@@ -165,29 +165,15 @@ local function UpdatePlate(plate)
         end
     end
 
-    -- Filter: Only show Nameplates of Bosses and Rares (and player's current target)
-    if not isImportant and not isTarget then
-        plate.buiFiltered = true
-        if healthBar:IsShown() then
-            healthBar:Hide()
-        end
-        healthBar:SetAlpha(0)
-        if name and name:IsShown() then name:Hide(); name:SetAlpha(0) end
-        if level and level:IsShown() then level:Hide(); level:SetAlpha(0) end
-        if hpFs and hpFs:IsShown() then hpFs:Hide(); hpFs:SetAlpha(0) end
-        if plate.castBar and plate.castBar:IsShown() then plate.castBar:Hide(); plate.castBar:SetAlpha(0) end
-        return
-    end
-
-    -- Unfilter if previously filtered
+    -- Ensure unsuppressed and visible for all mobs
     if plate.buiFiltered then
         plate.buiFiltered = nil
-        healthBar:Show()
-        healthBar:SetAlpha(1)
-        if name then name:Show(); name:SetAlpha(1) end
-        if level then level:Show(); level:SetAlpha(1) end
-        if hpFs then hpFs:Show(); hpFs:SetAlpha(1) end
     end
+    if not healthBar:IsShown() then healthBar:Show() end
+    healthBar:SetAlpha(1)
+    if name and not name:IsShown() then name:Show() name:SetAlpha(1) end
+    if level and not level:IsShown() then level:Show() level:SetAlpha(1) end
+    if hpFs and not hpFs:IsShown() then hpFs:Show() hpFs:SetAlpha(1) end
 
     -- Value & Percentage
     local cur = healthBar:GetValue() or 0
@@ -354,16 +340,9 @@ local function SkinPlate(plate)
         plate.castBar = castBar
     end
 
-    -- Hook healthBar:OnShow to suppress C++ engine re-shows whenever plate is filtered
+    -- Update plate when shown
     healthBar:SetScript("OnShow", function()
-        if plate.buiFiltered then
-            this:Hide()
-            this:SetAlpha(0)
-            if plate.nameFs then plate.nameFs:Hide(); plate.nameFs:SetAlpha(0) end
-            if plate.levelFs then plate.levelFs:Hide(); plate.levelFs:SetAlpha(0) end
-            if plate.hpFs then plate.hpFs:Hide(); plate.hpFs:SetAlpha(0) end
-            if plate.castBar then plate.castBar:Hide(); plate.castBar:SetAlpha(0) end
-        end
+        UpdatePlate(plate)
     end)
 
     -- Attach per-frame watcher child frame for instantaneous response to movement/targeting
@@ -378,9 +357,10 @@ local function SkinPlate(plate)
 end
 
 function mod:Create()
-    -- Ensure enemy nameplates are turned on in the WoW client
-    if type(ShowNameplates) == "function" then
-        ShowNameplates()
+    if B:IsEnabled("nameplates") then
+        if type(ShowNameplates) == "function" then ShowNameplates() end
+    else
+        if type(HideNameplates) == "function" then HideNameplates() end
     end
 
     local scanner = CreateFrame("Frame", "BUI_NameplateScanner", UIParent)
@@ -404,8 +384,10 @@ function mod:Create()
 
     scanner:RegisterEvent("PLAYER_ENTERING_WORLD")
     scanner:SetScript("OnEvent", function()
-        if type(ShowNameplates) == "function" and B:IsEnabled("nameplates") then
-            ShowNameplates()
+        if B:IsEnabled("nameplates") then
+            if type(ShowNameplates) == "function" then ShowNameplates() end
+        else
+            if type(HideNameplates) == "function" then HideNameplates() end
         end
     end)
 
@@ -414,7 +396,11 @@ function mod:Create()
 end
 
 function mod:Update(state)
-    -- Nameplates are driven via OnUpdate scanner & per-plate watchers
+    if B:IsEnabled("nameplates") then
+        if type(ShowNameplates) == "function" then ShowNameplates() end
+    else
+        if type(HideNameplates) == "function" then HideNameplates() end
+    end
 end
 
 B:RegisterModule("nameplates", mod)

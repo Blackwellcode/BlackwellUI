@@ -15,7 +15,7 @@ BlackwallUI = BlackwellUI -- Backwards compatibility alias
 EllesmereUI = BlackwellUI -- Backwards compatibility alias
 local E = BlackwellUI
 
-B.version = "2.4.0-azs"
+B.version = "2.4.1-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -142,7 +142,7 @@ local DEFAULTS = {
         timer = true,
         databar = true,
         stats = true,
-        nameplates = true,
+        nameplates = false,
         character = true,
         loot = true,
     },
@@ -172,9 +172,12 @@ function B:InitDB()
     end
     BlackwellUIDB = MergeDefaults(DEFAULTS, BlackwellUIDB)
     self.db = BlackwellUIDB
-    if not self.db.layoutVersion or self.db.layoutVersion < 8 then
+    if not self.db.layoutVersion or self.db.layoutVersion < 9 then
         self.db.positions = {}
-        self.db.layoutVersion = 8
+        if self.db.modules then
+            self.db.modules.nameplates = false
+        end
+        self.db.layoutVersion = 9
     end
     if not self.THEMES[self.db.theme] then self.db.theme = DEFAULTS.theme end
     if not self.BAR_TEXTURES[self.db.barTexture] then self.db.barTexture = DEFAULTS.barTexture end
@@ -280,9 +283,31 @@ function B:Initials(v)
     return out
 end
 
+local function StripAccents(s)
+    if not s or s == "" then return "" end
+    s = string.gsub(s, "á", "a")
+    s = string.gsub(s, "é", "e")
+    s = string.gsub(s, "í", "i")
+    s = string.gsub(s, "ó", "o")
+    s = string.gsub(s, "ú", "u")
+    s = string.gsub(s, "ñ", "n")
+    s = string.gsub(s, "ü", "ue")
+    s = string.gsub(s, "ä", "ae")
+    s = string.gsub(s, "ö", "oe")
+    s = string.gsub(s, "ß", "ss")
+    s = string.gsub(s, "Á", "a")
+    s = string.gsub(s, "É", "e")
+    s = string.gsub(s, "Í", "i")
+    s = string.gsub(s, "Ó", "o")
+    s = string.gsub(s, "Ú", "u")
+    s = string.gsub(s, "Ñ", "n")
+    return s
+end
+
 local function CoreNormalize(name)
     if not name then return "" end
     local s = string.lower(name)
+    s = StripAccents(s)
     s = string.gsub(s, "^%d+%.%s*", "")
     s = string.gsub(s, "%s*%([%w%s]+%)%s*$", "")
     s = string.gsub(s, "[%s%-%p]+", "_")
@@ -306,14 +331,36 @@ local MASTER_ABILITY_ICONS = {
     ["shield_slam"] = "Interface\\Icons\\INV_Shield_05",
     ["bloodrage"] = "Interface\\Icons\\Ability_Racial_BloodRage",
     ["charge"] = "Interface\\Icons\\Ability_Warrior_Charge",
+    ["heroic_leap"] = "Interface\\Icons\\Ability_Warrior_Charge",
+    ["bladestorm"] = "Interface\\Icons\\Ability_Whirlwind",
+    ["deep_wounds"] = "Interface\\Icons\\Ability_BackStab",
     ["rampage"] = "Interface\\Icons\\Ability_Warrior_Rampage",
     ["flurry"] = "Interface\\Icons\\Ability_GhoulFrenzy",
     ["sweeping_strikes"] = "Interface\\Icons\\Ability_Rogue_SliceDice",
+    ["enrage"] = "Interface\\Icons\\Spell_Shadow_UnholyFrenzy",
+    ["death_wish"] = "Interface\\Icons\\Spell_Shadow_DeathPact",
+    ["last_stand"] = "Interface\\Icons\\Spell_Holy_AshesToAshes",
+    ["shield_wall"] = "Interface\\Icons\\Ability_Warrior_ShieldWall",
+    ["retaliation"] = "Interface\\Icons\\Ability_Warrior_Challange",
+    ["recklessness"] = "Interface\\Icons\\Ability_CriticalStrike",
     ["overpower"] = "Interface\\Icons\\Ability_MeleeDamage",
     ["slam"] = "Interface\\Icons\\Ability_Warrior_DecisiveStrike",
     ["hamstring"] = "Interface\\Icons\\Ability_ShockWave",
-    ["shield_wall"] = "Interface\\Icons\\Ability_Warrior_ShieldWall",
-    ["recklessness"] = "Interface\\Icons\\Ability_CriticalStrike",
+    ["mocking_blow"] = "Interface\\Icons\\Ability_Warrior_PunishingBlow",
+    ["taunt"] = "Interface\\Icons\\Spell_Nature_Reincarnation",
+    ["disarm"] = "Interface\\Icons\\Ability_Warrior_Disarm",
+    ["pummel"] = "Interface\\Icons\\INV_Gauntlets_04",
+    ["shield_bash"] = "Interface\\Icons\\Ability_Warrior_ShieldBash",
+    ["intercept"] = "Interface\\Icons\\Ability_Rogue_Sprint",
+    ["berserker_rage"] = "Interface\\Icons\\Spell_Nature_AncestralGuardian",
+    ["blood_frenzy"] = "Interface\\Icons\\Ability_Warrior_BloodFrenzy",
+    ["second_wind"] = "Interface\\Icons\\Ability_Hunter_Harass",
+    ["victory_rush"] = "Interface\\Icons\\Ability_Warrior_Devastate",
+    ["devastate"] = "Interface\\Icons\\INV_Sword_11",
+    ["shockwave"] = "Interface\\Icons\\Ability_Warrior_Shockwave",
+    ["heroic_strike"] = "Interface\\Icons\\Ability_Rogue_Ambush",
+    ["sunder_armor"] = "Interface\\Icons\\Ability_Warrior_Sunder",
+    ["concussion_blow"] = "Interface\\Icons\\Ability_ThunderBolt",
 
     -- Paladin
     ["consecration"] = "Interface\\Icons\\Spell_Holy_InnerFire",
@@ -326,6 +373,8 @@ local MASTER_ABILITY_ICONS = {
     ["holy_light"] = "Interface\\Icons\\Spell_Holy_HolyBolt",
     ["divine_shield"] = "Interface\\Icons\\Spell_Holy_DivineIntervention",
     ["holy_shield"] = "Interface\\Icons\\Spell_Holy_BlessingOfProtection",
+    ["redemption"] = "Interface\\Icons\\Spell_Holy_Resurrection",
+    ["blessing_of_freedom"] = "Interface\\Icons\\Spell_Holy_SealOfValor",
 
     -- Hunter
     ["auto_shot"] = "Interface\\Icons\\INV_Weapon_Bow_07",
@@ -336,6 +385,10 @@ local MASTER_ABILITY_ICONS = {
     ["explosive_trap"] = "Interface\\Icons\\Spell_Fire_SelfDestruct",
     ["concussive_shot"] = "Interface\\Icons\\Spell_Frost_Stun",
     ["aimed_shot"] = "Interface\\Icons\\INV_Spear_07",
+    ["immolation_trap"] = "Interface\\Icons\\Spell_Fire_FlameShock",
+    ["frost_trap"] = "Interface\\Icons\\Spell_Frost_FreezingBreath",
+    ["hunters_mark"] = "Interface\\Icons\\Ability_Hunter_SniperShot",
+    ["aspect_of_the_cheetah"] = "Interface\\Icons\\Ability_Mount_JungleTiger",
 
     -- Rogue
     ["sinister_strike"] = "Interface\\Icons\\Spell_Shadow_RitualOfSacrifice",
@@ -344,9 +397,12 @@ local MASTER_ABILITY_ICONS = {
     ["rupture"] = "Interface\\Icons\\Ability_Rogue_Rupture",
     ["kidney_shot"] = "Interface\\Icons\\Ability_Rogue_KidneyShot",
     ["gouge"] = "Interface\\Icons\\Ability_Gouge",
+    ["ghostly_strike"] = "Interface\\Icons\\Spell_Shadow_Curse",
     ["adrenaline_rush"] = "Interface\\Icons\\Spell_Shadow_ShadowWordDominate",
     ["backstab"] = "Interface\\Icons\\Ability_BackStab",
     ["slice_and_dice"] = "Interface\\Icons\\Ability_Rogue_SliceDice",
+    ["seal_fate"] = "Interface\\Icons\\Spell_Shadow_ChillTouch",
+    ["sprint"] = "Interface\\Icons\\Ability_Rogue_Sprint",
 
     -- Priest
     ["smite"] = "Interface\\Icons\\Spell_Holy_HolySmite",
@@ -357,7 +413,13 @@ local MASTER_ABILITY_ICONS = {
     ["pw_shield"] = "Interface\\Icons\\Spell_Holy_PowerWordShield",
     ["power_word_shield"] = "Interface\\Icons\\Spell_Holy_PowerWordShield",
     ["renew"] = "Interface\\Icons\\Spell_Holy_Renew",
+    ["holy_fire"] = "Interface\\Icons\\Spell_Holy_SearingLight",
     ["mind_flay"] = "Interface\\Icons\\Spell_Shadow_SiphonMana",
+    ["psychic_scream"] = "Interface\\Icons\\Spell_Shadow_PsychicScream",
+    ["devouring_plague"] = "Interface\\Icons\\Spell_Shadow_BlackPlague",
+    ["lightwell"] = "Interface\\Icons\\Spell_Holy_SummonLightwell",
+    ["penance"] = "Interface\\Icons\\Spell_Holy_HolySmite",
+    ["fade"] = "Interface\\Icons\\Spell_Magic_LesserInvisibilty",
 
     -- Shaman
     ["lightning_bolt"] = "Interface\\Icons\\Spell_Nature_Lightning",
@@ -366,6 +428,12 @@ local MASTER_ABILITY_ICONS = {
     ["flame_shock"] = "Interface\\Icons\\Spell_Fire_FlameShock",
     ["frost_shock"] = "Interface\\Icons\\Spell_Frost_FrostShock",
     ["lightning_shield"] = "Interface\\Icons\\Spell_Nature_LightningShield",
+    ["magma_totem"] = "Interface\\Icons\\Spell_Fire_SelfDestruct",
+    ["searing_totem"] = "Interface\\Icons\\Spell_Fire_SearingTotem",
+    ["fire_nova"] = "Interface\\Icons\\Spell_Fire_SealOfFire",
+    ["healing_wave"] = "Interface\\Icons\\Spell_Nature_MagicImmunity",
+    ["call_of_flame"] = "Interface\\Icons\\Spell_Fire_Immolation",
+    ["ghost_wolf"] = "Interface\\Icons\\Spell_Nature_SpiritWolf",
 
     -- Mage
     ["fireball"] = "Interface\\Icons\\Spell_Fire_FlameBolt",
@@ -375,7 +443,14 @@ local MASTER_ABILITY_ICONS = {
     ["arcane_explosion"] = "Interface\\Icons\\Spell_Nature_WispSplode",
     ["blizzard"] = "Interface\\Icons\\Spell_Frost_IceStorm",
     ["flamestrike"] = "Interface\\Icons\\Spell_Fire_SelfDestruct",
+    ["fire_blast"] = "Interface\\Icons\\Spell_Fire_Fireball",
+    ["cone_of_cold"] = "Interface\\Icons\\Spell_Frost_Glacier",
+    ["blast_wave"] = "Interface\\Icons\\Spell_Holy_Excorcism_02",
     ["pyroblast"] = "Interface\\Icons\\Spell_Fire_Fireball02",
+    ["ice_barrier"] = "Interface\\Icons\\Spell_Ice_Lament",
+    ["polymorph"] = "Interface\\Icons\\Spell_Nature_Polymorph",
+    ["arcane_power"] = "Interface\\Icons\\Spell_Nature_Lightning",
+    ["blink"] = "Interface\\Icons\\Spell_Arcane_Blink",
 
     -- Warlock
     ["shadow_bolt"] = "Interface\\Icons\\Spell_Shadow_ShadowBolt",
@@ -385,15 +460,23 @@ local MASTER_ABILITY_ICONS = {
     ["rain_of_fire"] = "Interface\\Icons\\Spell_Shadow_RainOfFire",
     ["hellfire"] = "Interface\\Icons\\Spell_Fire_Incinerate",
     ["death_coil"] = "Interface\\Icons\\Spell_Shadow_DeathCoil",
+    ["searing_pain"] = "Interface\\Icons\\Spell_Fire_SoulBurn",
     ["drain_life"] = "Interface\\Icons\\Spell_Shadow_LifeDrain02",
+    ["fear"] = "Interface\\Icons\\Spell_Shadow_Possession",
+    ["soul_fire"] = "Interface\\Icons\\Spell_Fire_Fireball02",
 
     -- Druid
     ["wrath"] = "Interface\\Icons\\Spell_Nature_AbolishMagic",
     ["moonfire"] = "Interface\\Icons\\Spell_Nature_StarFall",
     ["starfire"] = "Interface\\Icons\\Spell_Arcane_StarFire",
     ["hurricane"] = "Interface\\Icons\\Spell_Nature_Cyclone",
-    ["swipe"] = "Interface\\Icons\\INV_Misc_MonsterClaw_03",
+    ["insect_swarm"] = "Interface\\Icons\\Spell_Nature_InsectSwarm",
+    ["entangling_roots"] = "Interface\\Icons\\Spell_Nature_StrangleVines",
+    ["rejuvenation"] = "Interface\\Icons\\Spell_Nature_Rejuvenation",
+    ["regrowth"] = "Interface\\Icons\\Spell_Nature_ResistNature",
     ["thorns"] = "Interface\\Icons\\Spell_Nature_Thorns",
+    ["swipe"] = "Interface\\Icons\\INV_Misc_MonsterClaw_03",
+    ["faerie_fire"] = "Interface\\Icons\\Spell_Nature_FaerieFire",
 
     -- Racials
     ["blood_fury"] = "Interface\\Icons\\Racial_Orc_BerserkerStrength",
@@ -401,16 +484,200 @@ local MASTER_ABILITY_ICONS = {
     ["war_stomp"] = "Interface\\Icons\\Ability_WarStomp",
     ["will_of_the_forsaken"] = "Interface\\Icons\\Spell_Shadow_RaiseDead",
     ["stoneform"] = "Interface\\Icons\\Spell_Shadow_UnholyStrength",
+    ["escape_artist"] = "Interface\\Icons\\Ability_Rogue_Trip",
+    ["shadowmeld"] = "Interface\\Icons\\Ability_Ambush",
+    ["perception"] = "Interface\\Icons\\Spell_Nature_Sleep",
 }
 B.MASTER_ABILITY_ICONS = MASTER_ABILITY_ICONS
 
+local LOCALIZED_SPELL_MAP = {
+    -- Spanish (esES)
+    ["rajar"] = "cleave",
+    ["torbellino"] = "whirlwind",
+    ["rafaga"] = "flurry",
+    ["desenfreno"] = "rampage",
+    ["ejecutar"] = "execute",
+    ["heridas_profundas"] = "deep_wounds",
+    ["golpe_mortal"] = "mortal_strike",
+    ["atronar"] = "thunder_clap",
+    ["grito_de_batalla"] = "battle_shout",
+    ["grito_desmoralizador"] = "demoralizing_shout",
+    ["sed_de_sangre"] = "bloodthirst",
+    ["desgarrar"] = "rend",
+    ["embate_con_escudo"] = "shield_slam",
+    ["ira_sangrienta"] = "bloodrage",
+    ["cargar"] = "charge",
+    ["golpes_de_barrido"] = "sweeping_strikes",
+    ["abrumar"] = "overpower",
+    ["embate"] = "slam",
+    ["seccionar"] = "hamstring",
+    ["muro_de_escudo"] = "shield_wall",
+    ["temeridad"] = "recklessness",
+    ["ira_rabiosa"] = "berserker_rage",
+    ["torbellino_de_acero"] = "bladestorm",
+    ["filotormenta"] = "bladestorm",
+    ["salto_heroico"] = "heroic_leap",
+    ["provocar"] = "taunt",
+    ["desarmar"] = "disarm",
+    ["zurrar"] = "pummel",
+    ["azote_de_escudo"] = "shield_bash",
+    ["interceptar"] = "intercept",
+    ["ola_de_choque"] = "shockwave",
+    ["golpe_heroico"] = "heroic_strike",
+    ["hender_armadura"] = "sunder_armor",
+    ["golpe_de_conmocion"] = "concussion_blow",
+    ["consagracion"] = "consecration",
+    ["exorcismo"] = "exorcism",
+    ["martillo_de_colera"] = "hammer_of_wrath",
+    ["choque_sagrado"] = "holy_shock",
+    ["colera_sagrada"] = "holy_wrath",
+    ["sentencia"] = "judgement",
+    ["martillo_de_justicia"] = "hammer_of_justice",
+    ["luz_sagrada"] = "holy_light",
+    ["escudo_divino"] = "divine_shield",
+    ["escudo_sagrado"] = "holy_shield",
+    ["disparo_automatico"] = "auto_shot",
+    ["disparo_arcano"] = "arcane_shot",
+    ["multidisparo"] = "multi_shot",
+    ["picadura_de_serpiente"] = "serpent_sting",
+    ["salva"] = "volley",
+    ["trampa_explosiva"] = "explosive_trap",
+    ["disparo_de_conmocion"] = "concussive_shot",
+    ["disparo_de_punteria"] = "aimed_shot",
+    ["golpe_siniestro"] = "sinister_strike",
+    ["eviscerar"] = "eviscerate",
+    ["aluvion_de_acero"] = "blade_flurry",
+    ["ruptura"] = "rupture",
+    ["golpe_en_los_rinones"] = "kidney_shot",
+    ["gubia"] = "gouge",
+    ["subidon_de_adrenalina"] = "adrenaline_rush",
+    ["punalada"] = "backstab",
+    ["hacer_picadillo"] = "slice_and_dice",
+    ["bola_de_fuego"] = "fireball",
+    ["descarga_de_escarcha"] = "frostbolt",
+    ["misiles_arcanos"] = "arcane_missiles",
+    ["nueva_de_escarcha"] = "frost_nova",
+    ["deflagracion_arcana"] = "arcane_explosion",
+    ["ventisca"] = "blizzard",
+    ["fogonazo"] = "flamestrike",
+    ["explosion_de_fuego"] = "fire_blast",
+    ["piroexplosion"] = "pyroblast",
+    ["barrera_de_hielo"] = "ice_barrier",
+    ["polimorfia"] = "polymorph",
+    ["castigo"] = "smite",
+    ["palabra_de_sombras_dolor"] = "shadow_word_pain",
+    ["explosion_mental"] = "mind_blast",
+    ["nueva_sagrada"] = "holy_nova",
+    ["palabra_de_poder_escudo"] = "power_word_shield",
+    ["renovar"] = "renew",
+    ["tortura_mental"] = "mind_flay",
+    ["descarga_de_las_sombras"] = "shadow_bolt",
+    ["corrupcion"] = "corruption",
+    ["inmolar"] = "immolate",
+    ["maldicion_de_agonia"] = "curse_of_agony",
+    ["lluvia_de_fuego"] = "rain_of_fire",
+    ["llamas_infernales"] = "hellfire",
+    ["espiral_de_la_muerte"] = "death_coil",
+    ["drenar_vida"] = "drain_life",
+    ["colera"] = "wrath",
+    ["fuego_lunar"] = "moonfire",
+    ["fuego_estelar"] = "starfire",
+    ["huracan"] = "hurricane",
+    ["flagelo"] = "swipe",
+    ["espinas"] = "thorns",
+    ["rejuvenecimiento"] = "rejuvenation",
+    ["recrecimiento"] = "regrowth",
+
+    -- German (deDE)
+    ["spalten"] = "cleave",
+    ["wirbelwind"] = "whirlwind",
+    ["donnerknall"] = "thunder_clap",
+    ["toedlicher_stoss"] = "mortal_strike",
+    ["hinrichten"] = "execute",
+    ["demoralisierender_ruf"] = "demoralizing_shout",
+    ["schlachtruf"] = "battle_shout",
+    ["blutdurst"] = "bloodthirst",
+    ["verwunden"] = "rend",
+    ["schildschlag"] = "shield_slam",
+    ["blutrausch"] = "bloodrage",
+    ["sturmangriff"] = "charge",
+    ["toben"] = "rampage",
+    ["schlaghagel"] = "flurry",
+    ["weitreichende_stoesse"] = "sweeping_strikes",
+    ["ueberwaeltigen"] = "overpower",
+    ["zerschmettern"] = "slam",
+    ["kniesehne"] = "hamstring",
+    ["schildwall"] = "shield_wall",
+    ["tollkuehnheit"] = "recklessness",
+    ["tiefe_wunden"] = "deep_wounds",
+    ["klingensturm"] = "bladestorm",
+    ["heldenhafter_stoss"] = "heroic_strike",
+    ["ruestung_zerreissen"] = "sunder_armor",
+    ["erschuetternder_schlag"] = "concussion_blow",
+    ["weihe"] = "consecration",
+    ["automatischer_schuss"] = "auto_shot",
+    ["finsterer_stoss"] = "sinister_strike",
+    ["ausweiden"] = "eviscerate",
+    ["feuerball"] = "fireball",
+    ["frostblitz"] = "frostbolt",
+    ["schattenblitz"] = "shadow_bolt",
+    ["verderbnis"] = "corruption",
+    ["zorn"] = "wrath",
+    ["mondfeuer"] = "moonfire",
+}
+B.LOCALIZED_SPELL_MAP = LOCALIZED_SPELL_MAP
+
+local scannedSpellbook = {}
+local scannedTalents = {}
+local lastSpellScan = 0
+
+local function ScanClientSpells()
+    local now = (type(GetTime) == "function" and GetTime()) or 0
+    if now - lastSpellScan < 2 and lastSpellScan > 0 then return end
+    lastSpellScan = now
+
+    if type(GetSpellName) == "function" and type(GetSpellTexture) == "function" then
+        local book = BOOKTYPE_SPELL or "spell"
+        local i = 1
+        while true do
+            local name = GetSpellName(i, book)
+            if not name then break end
+            local tex = GetSpellTexture(i, book)
+            if tex and tex ~= "" then
+                scannedSpellbook[name] = tex
+                local norm = CoreNormalize(name)
+                if norm ~= "" then scannedSpellbook[norm] = tex end
+            end
+            i = i + 1
+        end
+    end
+
+    if type(GetNumTalentTabs) == "function" and type(GetNumTalents) == "function" and type(GetTalentInfo) == "function" then
+        local numTabs = GetNumTalentTabs() or 0
+        for tab = 1, numTabs do
+            local numTalents = GetNumTalents(tab) or 0
+            for t = 1, numTalents do
+                local tName, tTex = GetTalentInfo(tab, t)
+                if tName and tTex and tTex ~= "" then
+                    scannedTalents[tName] = tTex
+                    local norm = CoreNormalize(tName)
+                    if norm ~= "" then scannedTalents[norm] = tTex end
+                end
+            end
+        end
+    end
+end
+
 function B:GetAbilityIcon(nameOrId)
-    local s = string.lower(nameOrId or "")
+    if not nameOrId or nameOrId == "" then
+        return "Interface\\Icons\\INV_Misc_QuestionMark"
+    end
+
     local norm = CoreNormalize(nameOrId)
 
     -- Dynamic weapon icon for Melee / Weapon swings
-    if norm == "melee" or norm == "attack" or norm == "auto_attack" or norm == "autoattack" or norm == "swing" or norm == "physical" or norm == "hero_melee" or string.find(s, "melee") or string.find(s, "attack") or string.find(s, "swing") then
-        if GetInventoryItemTexture then
+    if norm == "melee" or norm == "attack" or norm == "auto_attack" or norm == "autoattack" or norm == "swing" or norm == "physical" or norm == "hero_melee" or norm == "cuerpo_a_cuerpo" or norm == "nahkampf" then
+        if type(GetInventoryItemTexture) == "function" then
             local wTex = GetInventoryItemTexture("player", 16)
             if wTex and wTex ~= "" then return wTex end
         end
@@ -418,19 +685,41 @@ function B:GetAbilityIcon(nameOrId)
     end
 
     -- Dynamic weapon icon for Ranged / Auto Shot
-    if norm == "shoot" or norm == "auto_shot" or norm == "autoshot" or norm == "ranged" or norm == "bow" then
-        if GetInventoryItemTexture then
+    if norm == "shoot" or norm == "auto_shot" or norm == "autoshot" or norm == "ranged" or norm == "bow" or norm == "disparo_automatico" or norm == "automatischer_schuss" then
+        if type(GetInventoryItemTexture) == "function" then
             local rTex = GetInventoryItemTexture("player", 18)
             if rTex and rTex ~= "" then return rTex end
         end
         return "Interface\\Icons\\INV_Weapon_Bow_07"
     end
 
-    -- Direct dictionary match
+    -- Dynamic weapon icon for Wand
+    if norm == "wand" or norm == "shoot_wand" then
+        if type(GetInventoryItemTexture) == "function" then
+            local wandTex = GetInventoryItemTexture("player", 18)
+            if wandTex and wandTex ~= "" then return wandTex end
+        end
+        return "Interface\\Icons\\INV_Wand_01"
+    end
+
+    -- 1. Direct dictionary match
     if MASTER_ABILITY_ICONS[nameOrId] then return MASTER_ABILITY_ICONS[nameOrId] end
     if MASTER_ABILITY_ICONS[norm] then return MASTER_ABILITY_ICONS[norm] end
 
-    -- Fallback prefix match (safe string.sub without pattern metacharacter hazards)
+    -- 2. Localized spell translation (Spanish / German)
+    local canon = LOCALIZED_SPELL_MAP[norm] or LOCALIZED_SPELL_MAP[nameOrId]
+    if canon and MASTER_ABILITY_ICONS[canon] then
+        return MASTER_ABILITY_ICONS[canon]
+    end
+
+    -- 3. Live Client Spellbook & Talents scan
+    ScanClientSpells()
+    if scannedSpellbook[nameOrId] then return scannedSpellbook[nameOrId] end
+    if scannedSpellbook[norm] then return scannedSpellbook[norm] end
+    if scannedTalents[nameOrId] then return scannedTalents[nameOrId] end
+    if scannedTalents[norm] then return scannedTalents[norm] end
+
+    -- 4. Prefix match in master dictionary (safe string.sub without pattern metacharacter hazards)
     if string.len(norm) >= 4 then
         local lenNorm = string.len(norm)
         for k, v in pairs(MASTER_ABILITY_ICONS) do
@@ -1005,6 +1294,11 @@ function B:Tick()
 end
 
 function B:OnModulesChanged()
+    if self:IsEnabled("nameplates") then
+        if type(ShowNameplates) == "function" then ShowNameplates() end
+    else
+        if type(HideNameplates) == "function" then HideNameplates() end
+    end
     self:BuildModules()
     self:SyncHud()
     self:Tick()
@@ -1149,6 +1443,11 @@ local function Build()
         B.built = true
         B:RefreshTheme()
         B:InitTooltip()
+    end
+    if B:IsEnabled("nameplates") then
+        if type(ShowNameplates) == "function" then ShowNameplates() end
+    else
+        if type(HideNameplates) == "function" then HideNameplates() end
     end
     B:SyncHud()
     B:Tick()
