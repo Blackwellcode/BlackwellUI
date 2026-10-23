@@ -194,8 +194,48 @@ local function UpdatePlateDebuffs(plate, isTarget, lift)
     end
 end
 
+local function HideAllPlates()
+    if not WorldFrame then return end
+    local children = { WorldFrame:GetChildren() }
+    local n = table.getn(children)
+    for i = 1, n do
+        local c = children[i]
+        if c and c.buiSkinned then
+            if c.healthBar and c.healthBar:IsShown() then c.healthBar:Hide() end
+            if c.nameFs and c.nameFs:IsShown() then c.nameFs:Hide() end
+            if c.levelFs and c.levelFs:IsShown() then c.levelFs:Hide() end
+            if c.hpFs and c.hpFs:IsShown() then c.hpFs:Hide() end
+            if c.marker and c.marker:IsShown() then c.marker:Hide() end
+            if c.castBar and c.castBar:IsShown() then c.castBar:Hide() end
+            if c.debuffs then
+                for d = 1, PLATE_DEBUFFS do
+                    if c.debuffs[d] and c.debuffs[d]:IsShown() then c.debuffs[d]:Hide() end
+                end
+            end
+        end
+    end
+end
+
 local function UpdatePlate(plate)
-    if not plate or not plate.buiSkinned or not plate:IsShown() then return end
+    if not plate or not plate.buiSkinned then return end
+
+    -- When enemy nameplates are turned off ('V' key sets NAMEPLATES_ON = nil), hide all elements
+    if not NAMEPLATES_ON or not B:IsEnabled("nameplates") then
+        if plate.healthBar and plate.healthBar:IsShown() then plate.healthBar:Hide() end
+        if plate.nameFs and plate.nameFs:IsShown() then plate.nameFs:Hide() end
+        if plate.levelFs and plate.levelFs:IsShown() then plate.levelFs:Hide() end
+        if plate.hpFs and plate.hpFs:IsShown() then plate.hpFs:Hide() end
+        if plate.marker and plate.marker:IsShown() then plate.marker:Hide() end
+        if plate.castBar and plate.castBar:IsShown() then plate.castBar:Hide() end
+        if plate.debuffs then
+            for d = 1, PLATE_DEBUFFS do
+                if plate.debuffs[d] and plate.debuffs[d]:IsShown() then plate.debuffs[d]:Hide() end
+            end
+        end
+        return
+    end
+
+    if not plate:IsShown() then return end
 
     local healthBar = plate.healthBar
     local hpFs = plate.hpFs
@@ -479,15 +519,15 @@ local function SkinPlate(plate)
 end
 
 function mod:Create()
-    if B:IsEnabled("nameplates") then
-        if type(ShowNameplates) == "function" then ShowNameplates() end
-    else
+    -- At startup, ensure plates stay hidden if module is disabled or NAMEPLATES_ON is nil
+    if not B:IsEnabled("nameplates") or not NAMEPLATES_ON then
         if type(HideNameplates) == "function" then HideNameplates() end
+        HideAllPlates()
     end
 
     local scanner = CreateFrame("Frame", "BUI_NameplateScanner", UIParent)
     scanner:SetScript("OnUpdate", function()
-        if not B:IsEnabled("nameplates") then return end
+        if not B:IsEnabled("nameplates") or not NAMEPLATES_ON then return end
         if not WorldFrame then return end
 
         local children = { WorldFrame:GetChildren() }
@@ -506,22 +546,37 @@ function mod:Create()
 
     scanner:RegisterEvent("PLAYER_ENTERING_WORLD")
     scanner:SetScript("OnEvent", function()
-        if B:IsEnabled("nameplates") then
-            if type(ShowNameplates) == "function" then ShowNameplates() end
-        else
+        if not B:IsEnabled("nameplates") or not NAMEPLATES_ON then
             if type(HideNameplates) == "function" then HideNameplates() end
+            HideAllPlates()
         end
     end)
+
+    -- Hook ShowNameplates & HideNameplates so pressing 'V' cleanly controls NAMEPLATES_ON and visibility
+    if type(ShowNameplates) == "function" and not mod.origShowNameplates then
+        mod.origShowNameplates = ShowNameplates
+        ShowNameplates = function()
+            _G.NAMEPLATES_ON = 1
+            mod.origShowNameplates()
+        end
+    end
+    if type(HideNameplates) == "function" and not mod.origHideNameplates then
+        mod.origHideNameplates = HideNameplates
+        HideNameplates = function()
+            _G.NAMEPLATES_ON = nil
+            mod.origHideNameplates()
+            HideAllPlates()
+        end
+    end
 
     self.frame = scanner
     self.scanner = scanner
 end
 
 function mod:Update(state)
-    if B:IsEnabled("nameplates") then
-        if type(ShowNameplates) == "function" then ShowNameplates() end
-    else
-        if type(HideNameplates) == "function" then HideNameplates() end
+    -- Never force ShowNameplates() here! Visibility is toggled by the player via 'V' (NAMEPLATES_ON).
+    if not B:IsEnabled("nameplates") or not NAMEPLATES_ON then
+        HideAllPlates()
     end
 end
 

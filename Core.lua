@@ -1197,14 +1197,40 @@ end
 function B:SyncHud()
     if not self.db then return end
     self:SuppressStockCombatText()
-    if type(AZS_SetHudShown) ~= "function" or type(AZS_IsHudShown) ~= "function" then return end
-    for i = 1, table.getn(self.HUD_PARTS) do
-        local part = self.HUD_PARTS[i]
-        local cur = AZS_IsHudShown(part)
-        if cur ~= nil then
-            local want = self:WantStockHud(part)
-            if (cur and true or false) ~= want then
-                AZS_SetHudShown(part, want)
+
+    -- Direct CVar enforcement for the stock AZS HUD parts
+    if self.db.replaceHud then
+        if self:IsEnabled("unitframes") then
+            local ok, val = pcall(GetCVar, "hudBosses")
+            if ok and val ~= "0" then pcall(SetCVar, "hudBosses", "0") end
+        end
+        if self:IsEnabled("timer") then
+            local ok, val = pcall(GetCVar, "hudClock")
+            if ok and val ~= "0" then pcall(SetCVar, "hudClock", "0") end
+        end
+        if self:IsEnabled("databar") then
+            local ok, val = pcall(GetCVar, "hudTally")
+            if ok and val ~= "0" then pcall(SetCVar, "hudTally", "0") end
+        end
+        if self:IsEnabled("build") then
+            local ok, val = pcall(GetCVar, "hudBuild")
+            if ok and val ~= "0" then pcall(SetCVar, "hudBuild", "0") end
+        end
+        if self:IsEnabled("meter") then
+            local ok, val = pcall(GetCVar, "hudMeter")
+            if ok and val ~= "0" then pcall(SetCVar, "hudMeter", "0") end
+        end
+    end
+
+    if type(AZS_SetHudShown) == "function" and type(AZS_IsHudShown) == "function" then
+        for i = 1, table.getn(self.HUD_PARTS) do
+            local part = self.HUD_PARTS[i]
+            local cur = AZS_IsHudShown(part)
+            if cur ~= nil then
+                local want = self:WantStockHud(part)
+                if (cur and true or false) ~= want then
+                    AZS_SetHudShown(part, want)
+                end
             end
         end
     end
@@ -1609,9 +1635,7 @@ local function Build()
         B:InitTooltip()
         B:CheckResolution()
     end
-    if B:IsEnabled("nameplates") then
-        if type(ShowNameplates) == "function" then ShowNameplates() end
-    else
+    if not B:IsEnabled("nameplates") then
         if type(HideNameplates) == "function" then HideNameplates() end
     end
     B:SyncHud()
@@ -1624,9 +1648,11 @@ boot:SetScript("OnEvent", function()
     elseif event == "VARIABLES_LOADED" then
         B:InitDB()
         B:SuppressStockCombatText()
+        B:SyncHud()
     elseif event == "PLAYER_ENTERING_WORLD" then
         Build()
         B:SuppressStockCombatText()
+        B:SyncHud()
     elseif event == "DISPLAY_SIZE_CHANGED" or event == "UI_SCALE_CHANGED" then
         B:CheckResolution()
     end
