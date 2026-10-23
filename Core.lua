@@ -1108,6 +1108,7 @@ end
 -------------------------------------------------------------------------------
 B.STOCK_COMBAT_CVARS = {
     "SHOW_COMBAT_TEXT",
+    "SHOW_COMBAT_STATE",
     "enableFloatingCombatText",
     "fctCombatState",
     "fctDamage",
@@ -1127,6 +1128,7 @@ B.STOCK_COMBAT_CVARS = {
     "CombatDamage",
     "CombatLogPeriodicSpells",
     "PetMeleeDamage",
+    "PetSpellDamage",
     "CombatHealing",
 }
 
@@ -1157,7 +1159,25 @@ function B:SuppressStockCombatText()
         CombatText_UpdateDisplayedMessages = function() end
     end
 
-    -- 2. Zero-out stock CVars (only if non-zero to prevent redundant engine writes)
+    -- 2. Clear stock Lua option globals
+    if _G then
+        _G.SHOW_COMBAT_TEXT = "0"
+        _G.SHOW_COMBAT_STATE = "0"
+        _G.COMBAT_TEXT_SHOW_LOW_HEALTH_MANA = "0"
+        _G.COMBAT_TEXT_SHOW_AURAS = "0"
+        _G.COMBAT_TEXT_SHOW_AURA_FADE = "0"
+        _G.COMBAT_TEXT_SHOW_COMBAT_STATE = "0"
+        _G.COMBAT_TEXT_SHOW_DODGE_PARRY_MISS = "0"
+        _G.COMBAT_TEXT_SHOW_RESISTANCES = "0"
+        _G.COMBAT_TEXT_SHOW_REPUTATION = "0"
+        _G.COMBAT_TEXT_SHOW_REACTIVES = "0"
+        _G.COMBAT_TEXT_SHOW_FRIENDLY_NAMES = "0"
+        _G.COMBAT_TEXT_SHOW_COMBO_POINTS = "0"
+        _G.COMBAT_TEXT_SHOW_MANA = "0"
+        _G.COMBAT_TEXT_SHOW_HONOR_GAINED = "0"
+    end
+
+    -- 3. Zero-out stock CVars (only if non-zero to prevent redundant engine writes)
     if type(GetCVar) == "function" and type(SetCVar) == "function" then
         local n = table.getn(self.STOCK_COMBAT_CVARS)
         for i = 1, n do
@@ -1625,6 +1645,7 @@ boot:SetScript("OnEvent", function()
         B:SuppressStockCombatText()
     elseif event == "PLAYER_ENTERING_WORLD" then
         Build()
+        B:SuppressStockCombatText()
     elseif event == "DISPLAY_SIZE_CHANGED" or event == "UI_SCALE_CHANGED" then
         B:CheckResolution()
     end
