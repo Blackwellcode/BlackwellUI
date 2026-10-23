@@ -1104,6 +1104,73 @@ function B:ApplyScale()
 end
 
 -------------------------------------------------------------------------------
+--  Stock Combat Text & Floating Numbers Suppression
+-------------------------------------------------------------------------------
+B.STOCK_COMBAT_CVARS = {
+    "SHOW_COMBAT_TEXT",
+    "enableFloatingCombatText",
+    "fctCombatState",
+    "fctDamage",
+    "fctHealing",
+    "fctAuras",
+    "fctReactives",
+    "fctLowManaHealth",
+    "fctComboPoints",
+    "fctEnergyGains",
+    "fctPeriodicEnergyGains",
+    "fctHonorGains",
+    "fctReputation",
+    "fctSpellMechanics",
+    "fctAll",
+    "fctTargetMode",
+    "fctFriendlyHealers",
+    "CombatDamage",
+    "CombatLogPeriodicSpells",
+    "PetMeleeDamage",
+    "CombatHealing",
+}
+
+function B:SuppressStockCombatText()
+    -- 1. Silence Blizzard CombatText frame
+    if CombatText then
+        if type(CombatText.UnregisterAllEvents) == "function" then
+            CombatText:UnregisterAllEvents()
+        end
+        if type(CombatText.Hide) == "function" then
+            CombatText:Hide()
+        end
+        if type(CombatText.SetScript) == "function" then
+            CombatText:SetScript("OnUpdate", nil)
+            CombatText:SetScript("OnEvent", nil)
+        end
+    end
+    if type(CombatText_AddMessage) == "function" then
+        CombatText_AddMessage = function() end
+    end
+    if type(CombatText_OnUpdate) == "function" then
+        CombatText_OnUpdate = function() end
+    end
+    if type(CombatText_OnEvent) == "function" then
+        CombatText_OnEvent = function() end
+    end
+    if type(CombatText_UpdateDisplayedMessages) == "function" then
+        CombatText_UpdateDisplayedMessages = function() end
+    end
+
+    -- 2. Zero-out stock CVars (only if non-zero to prevent redundant engine writes)
+    if type(GetCVar) == "function" and type(SetCVar) == "function" then
+        local n = table.getn(self.STOCK_COMBAT_CVARS)
+        for i = 1, n do
+            local cv = self.STOCK_COMBAT_CVARS[i]
+            local val = GetCVar(cv)
+            if val and val ~= "0" then
+                SetCVar(cv, "0")
+            end
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
 --  Stock run HUD (AZS_SetHudShown). The setting is a CVar the game keeps, so it
 --  is written only when it differs from what we want: never in a loop.
 -------------------------------------------------------------------------------
@@ -1128,6 +1195,7 @@ end
 
 function B:SyncHud()
     if not self.db then return end
+    self:SuppressStockCombatText()
     if type(AZS_SetHudShown) ~= "function" or type(AZS_IsHudShown) ~= "function" then return end
     for i = 1, table.getn(self.HUD_PARTS) do
         local part = self.HUD_PARTS[i]
@@ -1388,6 +1456,10 @@ function B:OnModulesChanged()
     else
         if type(HideNameplates) == "function" then HideNameplates() end
     end
+    local sct = self.modules["combattext"]
+    if sct and type(sct.Update) == "function" then
+        sct:Update()
+    end
     self:BuildModules()
     self:SyncHud()
     self:Tick()
@@ -1550,6 +1622,7 @@ boot:SetScript("OnEvent", function()
         if arg1 == "BlackwellUI" or arg1 == "BlackwallUI" or arg1 == "EllesmereUI" then B:InitDB() end
     elseif event == "VARIABLES_LOADED" then
         B:InitDB()
+        B:SuppressStockCombatText()
     elseif event == "PLAYER_ENTERING_WORLD" then
         Build()
     elseif event == "DISPLAY_SIZE_CHANGED" or event == "UI_SCALE_CHANGED" then

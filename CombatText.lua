@@ -518,7 +518,12 @@ end
 --  Module Setup & Event Registration
 -------------------------------------------------------------------------------
 function mod:Create()
-    -- 1. Create Zone Anchors (Movers)
+    -- 1. Suppress Blizzard stock CombatText & Floating Combat Damage
+    if B.SuppressStockCombatText then
+        B:SuppressStockCombatText()
+    end
+
+    -- 2. Create Zone Anchors (Movers)
     local aInc = CreateFrame("Frame", "BUI_SCT_Incoming", UIParent)
     aInc:SetWidth(120)
     aInc:SetHeight(40)
@@ -576,8 +581,15 @@ function mod:Create()
     driver:RegisterEvent("CHAT_MSG_SPELL_AURA_GONE_SELF")
     driver:RegisterEvent("SPELL_UPDATE_COOLDOWN")
     driver:RegisterEvent("UNIT_HEALTH")
+    driver:RegisterEvent("PLAYER_ENTERING_WORLD")
 
     driver:SetScript("OnEvent", function()
+        if event == "PLAYER_ENTERING_WORLD" then
+            if B.SuppressStockCombatText then
+                B:SuppressStockCombatText()
+            end
+            return
+        end
         if not B:IsEnabled("combattext") then return end
         local msg = arg1 or ""
 
@@ -675,12 +687,47 @@ function mod:Create()
         end
     end)
 
+    driver:SetScript("OnHide", function()
+        local hidePool = function(pool)
+            local n = table.getn(pool)
+            for i = 1, n do
+                local f = pool[i]
+                if f then
+                    f.inUse = false
+                    f:Hide()
+                end
+            end
+        end
+        hidePool(poolIncoming)
+        hidePool(poolOutgoing)
+        hidePool(poolStatic)
+        hidePool(poolAlerts)
+    end)
+
     self.driver = driver
     self.frame = driver
 end
 
 function mod:Update(state)
-    -- Refresh state if needed
+    if B.SuppressStockCombatText then
+        B:SuppressStockCombatText()
+    end
+    if not B:IsEnabled("combattext") then
+        local hidePool = function(pool)
+            local n = table.getn(pool)
+            for i = 1, n do
+                local f = pool[i]
+                if f then
+                    f.inUse = false
+                    f:Hide()
+                end
+            end
+        end
+        hidePool(poolIncoming)
+        hidePool(poolOutgoing)
+        hidePool(poolStatic)
+        hidePool(poolAlerts)
+    end
 end
 
 B:RegisterModule("combattext", mod)
