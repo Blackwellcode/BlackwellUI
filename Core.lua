@@ -1107,29 +1107,10 @@ end
 --  Stock Combat Text & Floating Numbers Suppression
 -------------------------------------------------------------------------------
 B.STOCK_COMBAT_CVARS = {
-    "SHOW_COMBAT_TEXT",
-    "SHOW_COMBAT_STATE",
-    "enableFloatingCombatText",
-    "fctCombatState",
-    "fctDamage",
-    "fctHealing",
-    "fctAuras",
-    "fctReactives",
-    "fctLowManaHealth",
-    "fctComboPoints",
-    "fctEnergyGains",
-    "fctPeriodicEnergyGains",
-    "fctHonorGains",
-    "fctReputation",
-    "fctSpellMechanics",
-    "fctAll",
-    "fctTargetMode",
-    "fctFriendlyHealers",
     "CombatDamage",
     "CombatLogPeriodicSpells",
     "PetMeleeDamage",
     "PetSpellDamage",
-    "CombatHealing",
 }
 
 function B:SuppressStockCombatText()
@@ -1177,14 +1158,14 @@ function B:SuppressStockCombatText()
         _G.COMBAT_TEXT_SHOW_HONOR_GAINED = "0"
     end
 
-    -- 3. Zero-out stock CVars (only if non-zero to prevent redundant engine writes)
+    -- 3. Zero-out stock CVars (protected with pcall to prevent host-registered panics)
     if type(GetCVar) == "function" and type(SetCVar) == "function" then
         local n = table.getn(self.STOCK_COMBAT_CVARS)
         for i = 1, n do
             local cv = self.STOCK_COMBAT_CVARS[i]
-            local val = GetCVar(cv)
-            if val and val ~= "0" then
-                SetCVar(cv, "0")
+            local ok, val = pcall(GetCVar, cv)
+            if ok and val and val ~= "0" then
+                pcall(SetCVar, cv, "0")
             end
         end
     end
