@@ -174,7 +174,7 @@ function B:InitDB()
     end
     BlackwellUIDB = MergeDefaults(DEFAULTS, BlackwellUIDB)
     self.db = BlackwellUIDB
-    if not self.db.layoutVersion or self.db.layoutVersion < 11 then
+    if not self.db.layoutVersion or self.db.layoutVersion < 12 then
         if self.db.layoutVersion and self.db.layoutVersion < 10 then
             self.db.positions = {}
             if self.db.modules then
@@ -187,8 +187,10 @@ function B:InitDB()
             if self.db.modules.combattext == nil then
                 self.db.modules.combattext = true
             end
+            self.db.modules.nameplates = false
         end
-        self.db.layoutVersion = 11
+        self.db.replaceHud = true
+        self.db.layoutVersion = 12
     end
     if self.db.autoScale == nil then
         self.db.autoScale = true
