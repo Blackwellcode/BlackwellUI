@@ -15,7 +15,7 @@ BlackwallUI = BlackwellUI -- Backwards compatibility alias
 EllesmereUI = BlackwellUI -- Backwards compatibility alias
 local E = BlackwellUI
 
-B.version = "2.6.4-azs"
+B.version = "2.6.5-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -1068,9 +1068,30 @@ end
 -------------------------------------------------------------------------------
 --  Colours
 -------------------------------------------------------------------------------
+local CLASS_ID_MAP = {
+    [1] = "WARRIOR",
+    [2] = "PALADIN",
+    [3] = "HUNTER",
+    [4] = "ROGUE",
+    [5] = "PRIEST",
+    [7] = "SHAMAN",
+    [8] = "MAGE",
+    [9] = "WARLOCK",
+    [11] = "DRUID",
+}
+
 function B:ResolveClassColor(token)
-    if not token or type(token) ~= "string" then return nil end
+    if not token then return nil end
+    if type(token) == "number" then
+        token = CLASS_ID_MAP[token]
+        if not token then return nil end
+    end
+    if type(token) ~= "string" then return nil end
     local clean = string.gsub(token, "%s", "")
+    local num = tonumber(clean)
+    if num and CLASS_ID_MAP[num] then
+        clean = CLASS_ID_MAP[num]
+    end
     return self.CLASS_COLORS[clean]
         or self.CLASS_COLORS[string.upper(clean)]
         or self.CLASS_COLORS[string.lower(clean)]
@@ -1078,8 +1099,13 @@ end
 
 function B:GetClassColor()
     local c
-    if AZS_ZONE and type(AZS_ZONE.cname) == "string" then
-        c = self:ResolveClassColor(AZS_ZONE.cname)
+    if AZS_ZONE then
+        if type(AZS_ZONE.cname) == "string" and AZS_ZONE.cname ~= "" then
+            c = self:ResolveClassColor(AZS_ZONE.cname)
+        end
+        if not c and AZS_ZONE.class then
+            c = self:ResolveClassColor(AZS_ZONE.class)
+        end
     end
     if not c then
         local loc, eng = UnitClass("player")
@@ -1215,7 +1241,7 @@ function B:Bar(parent, name, r, g, b)
     local sb = CreateFrame("StatusBar", name, parent)
     sb:SetStatusBarTexture(self:GetBarTexture())
     sb:SetMinMaxValues(0, 1)
-    sb:SetValue(0)
+    sb:SetValue(1)
     local bg = sb:CreateTexture(nil, "BACKGROUND")
     self:Solid(bg, 0, 0, 0, 0.55)
     bg:SetAllPoints(sb)

@@ -721,6 +721,11 @@ function mod:Update(state)
         hp = UnitHealth("player") or 0
         hpm = UnitHealthMax("player") or 1
     end
+    -- Fallback for lobby/preview: if HP is 0 and player is not dead in an active run, display full bar
+    if hp <= 0 and (not run.ph or run.ph == "ready" or run.ph == "choosing") then
+        hp = 1
+        hpm = 1
+    end
     if hpm <= 0 then hpm = 1 end
     local hpPct = B:Percent(hp, hpm)
     hero.hpBar:SetValue(hpPct)
