@@ -15,7 +15,7 @@ BlackwallUI = BlackwellUI -- Backwards compatibility alias
 EllesmereUI = BlackwellUI -- Backwards compatibility alias
 local E = BlackwellUI
 
-B.version = "2.6.1-azs"
+B.version = "2.6.2-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -1472,7 +1472,7 @@ end
 --  Stock run HUD (AZS_SetHudShown). The setting is a CVar the game keeps, so it
 --  is written only when it differs from what we want: never in a loop.
 -------------------------------------------------------------------------------
-B.HUD_PARTS = { "clock", "bosses", "tally", "build", "meter", "banners", "loot", "flag" }
+B.HUD_PARTS = { "clock", "bosses", "tally", "build", "meter", "banners", "loot", "flag", "levels" }
 B.HUD_REPLACED_BY = {
     clock = "timer",
     bosses = "unitframes",
@@ -1480,6 +1480,7 @@ B.HUD_REPLACED_BY = {
     build = "build",
     meter = "meter",
     flag = "pins",
+    levels = "build",
 }
 
 function B:WantStockHud(part)
@@ -1513,6 +1514,8 @@ function B:SyncHud()
         if self:IsEnabled("build") then
             local ok, val = pcall(GetCVar, "hudBuild")
             if ok and val ~= "0" then pcall(SetCVar, "hudBuild", "0") end
+            local okL, valL = pcall(GetCVar, "hudLevels")
+            if okL and valL ~= "0" then pcall(SetCVar, "hudLevels", "0") end
         end
         if self:IsEnabled("meter") then
             local ok, val = pcall(GetCVar, "hudMeter")
