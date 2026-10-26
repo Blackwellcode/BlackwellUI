@@ -602,17 +602,32 @@ local SPELL_ID_TO_NAME = {
     ["779"] = "Swipe",
 
     -- Racials
+    ["20600"] = "Perception",
+    ["20598"] = "Perception",
+    ["20550"] = "Perception",
     ["20572"] = "Blood Fury",
+    ["20573"] = "Blood Fury",
+    ["20574"] = "Blood Fury",
+    ["23234"] = "Blood Fury",
     ["20594"] = "Stoneform",
     ["20549"] = "War Stomp",
-    ["20577"] = "Cannibalize",
+    ["7744"]  = "Will of the Forsaken",
+    ["20577"] = "Will of the Forsaken",
+    ["20575"] = "Will of the Forsaken",
+    ["20578"] = "Cannibalize",
+    ["20579"] = "Cannibalize",
     ["20580"] = "Shadowmeld",
+    ["21008"] = "Shadowmeld",
     ["20554"] = "Berserking",
     ["26297"] = "Berserking",
+    ["26296"] = "Berserking",
+    ["26669"] = "Berserking",
     ["28730"] = "Arcane Torrent",
+    ["25046"] = "Arcane Torrent",
+    ["28734"] = "Arcane Torrent",
+    ["20589"] = "Escape Artist",
     ["20552"] = "Escape Artist",
-    ["20575"] = "Will of the Forsaken",
-    ["20550"] = "Perception",
+    ["2481"]  = "Find Treasure",
 }
 
 local KEY_NAMES = {
@@ -1073,11 +1088,21 @@ local SPELL_BUFF_DB = {
     ["flurry"] = { name = "Flurry", icon = "Interface\\Icons\\Ability_GhoulFrenzy", color = { r = 0.90, g = 0.35, b = 0.10 } },
 
     -- Racials
+    ["20600"] = { name = "Perception", icon = "Interface\\Icons\\Spell_Nature_Sleep", color = { r = 0.90, g = 0.75, b = 0.30 } },
+    ["20598"] = { name = "Perception", icon = "Interface\\Icons\\Spell_Nature_Sleep", color = { r = 0.90, g = 0.75, b = 0.30 } },
+    ["20550"] = { name = "Perception", icon = "Interface\\Icons\\Spell_Nature_Sleep", color = { r = 0.90, g = 0.75, b = 0.30 } },
+    ["perception"] = { name = "Perception", icon = "Interface\\Icons\\Spell_Nature_Sleep", color = { r = 0.90, g = 0.75, b = 0.30 } },
+
     ["23234"] = { name = "Blood Fury", icon = "Interface\\Icons\\Racial_Orc_BerserkerStrength", color = { r = 0.90, g = 0.15, b = 0.15 } },
     ["20572"] = { name = "Blood Fury", icon = "Interface\\Icons\\Racial_Orc_BerserkerStrength", color = { r = 0.90, g = 0.15, b = 0.15 } },
+    ["20573"] = { name = "Blood Fury", icon = "Interface\\Icons\\Racial_Orc_BerserkerStrength", color = { r = 0.90, g = 0.15, b = 0.15 } },
+    ["20574"] = { name = "Blood Fury", icon = "Interface\\Icons\\Racial_Orc_BerserkerStrength", color = { r = 0.90, g = 0.15, b = 0.15 } },
     ["blood_fury"] = { name = "Blood Fury", icon = "Interface\\Icons\\Racial_Orc_BerserkerStrength", color = { r = 0.90, g = 0.15, b = 0.15 } },
     ["blood fury"] = { name = "Blood Fury", icon = "Interface\\Icons\\Racial_Orc_BerserkerStrength", color = { r = 0.90, g = 0.15, b = 0.15 } },
 
+    ["20554"] = { name = "Berserking", icon = "Interface\\Icons\\Racial_Troll_Berserk", color = { r = 0.95, g = 0.40, b = 0.10 } },
+    ["26297"] = { name = "Berserking", icon = "Interface\\Icons\\Racial_Troll_Berserk", color = { r = 0.95, g = 0.40, b = 0.10 } },
+    ["26296"] = { name = "Berserking", icon = "Interface\\Icons\\Racial_Troll_Berserk", color = { r = 0.95, g = 0.40, b = 0.10 } },
     ["26669"] = { name = "Berserking", icon = "Interface\\Icons\\Racial_Troll_Berserk", color = { r = 0.95, g = 0.40, b = 0.10 } },
     ["berserking"] = { name = "Berserking", icon = "Interface\\Icons\\Racial_Troll_Berserk", color = { r = 0.95, g = 0.40, b = 0.10 } },
 
@@ -1085,70 +1110,394 @@ local SPELL_BUFF_DB = {
     ["stoneform"] = { name = "Stoneform", icon = "Interface\\Icons\\Spell_Shadow_UnholyStrength", color = { r = 0.65, g = 0.65, b = 0.65 } },
 
     ["7744"]  = { name = "Will of the Forsaken", icon = "Interface\\Icons\\Spell_Shadow_RaiseDead", color = { r = 0.55, g = 0.25, b = 0.70 } },
+    ["20577"] = { name = "Will of the Forsaken", icon = "Interface\\Icons\\Spell_Shadow_RaiseDead", color = { r = 0.55, g = 0.25, b = 0.70 } },
+    ["20575"] = { name = "Will of the Forsaken", icon = "Interface\\Icons\\Spell_Shadow_RaiseDead", color = { r = 0.55, g = 0.25, b = 0.70 } },
     ["will_of_the_forsaken"] = { name = "Will of the Forsaken", icon = "Interface\\Icons\\Spell_Shadow_RaiseDead", color = { r = 0.55, g = 0.25, b = 0.70 } },
+    ["will of the forsaken"] = { name = "Will of the Forsaken", icon = "Interface\\Icons\\Spell_Shadow_RaiseDead", color = { r = 0.55, g = 0.25, b = 0.70 } },
+
+    ["20578"] = { name = "Cannibalize", icon = "Interface\\Icons\\Ability_Racial_Cannibalize", color = { r = 0.60, g = 0.20, b = 0.20 } },
+    ["20579"] = { name = "Cannibalize", icon = "Interface\\Icons\\Ability_Racial_Cannibalize", color = { r = 0.60, g = 0.20, b = 0.20 } },
+    ["cannibalize"] = { name = "Cannibalize", icon = "Interface\\Icons\\Ability_Racial_Cannibalize", color = { r = 0.60, g = 0.20, b = 0.20 } },
+
+    ["20549"] = { name = "War Stomp", icon = "Interface\\Icons\\Ability_WarStomp", color = { r = 0.85, g = 0.50, b = 0.18 } },
+    ["war_stomp"] = { name = "War Stomp", icon = "Interface\\Icons\\Ability_WarStomp", color = { r = 0.85, g = 0.50, b = 0.18 } },
+    ["war stomp"] = { name = "War Stomp", icon = "Interface\\Icons\\Ability_WarStomp", color = { r = 0.85, g = 0.50, b = 0.18 } },
+
+    ["20580"] = { name = "Shadowmeld", icon = "Interface\\Icons\\Ability_Ambush", color = { r = 0.40, g = 0.30, b = 0.70 } },
+    ["21008"] = { name = "Shadowmeld", icon = "Interface\\Icons\\Ability_Ambush", color = { r = 0.40, g = 0.30, b = 0.70 } },
+    ["shadowmeld"] = { name = "Shadowmeld", icon = "Interface\\Icons\\Ability_Ambush", color = { r = 0.40, g = 0.30, b = 0.70 } },
+
+    ["20589"] = { name = "Escape Artist", icon = "Interface\\Icons\\Ability_Rogue_Trip", color = { r = 0.30, g = 0.80, b = 0.90 } },
+    ["20552"] = { name = "Escape Artist", icon = "Interface\\Icons\\Ability_Rogue_Trip", color = { r = 0.30, g = 0.80, b = 0.90 } },
+    ["escape_artist"] = { name = "Escape Artist", icon = "Interface\\Icons\\Ability_Rogue_Trip", color = { r = 0.30, g = 0.80, b = 0.90 } },
+    ["escape artist"] = { name = "Escape Artist", icon = "Interface\\Icons\\Ability_Rogue_Trip", color = { r = 0.30, g = 0.80, b = 0.90 } },
+
+    ["28730"] = { name = "Arcane Torrent", icon = "Interface\\Icons\\Spell_Holy_SilencingStrike", color = { r = 0.40, g = 0.65, b = 1.00 } },
+    ["25046"] = { name = "Arcane Torrent", icon = "Interface\\Icons\\Spell_Holy_SilencingStrike", color = { r = 0.40, g = 0.65, b = 1.00 } },
+    ["28734"] = { name = "Arcane Torrent", icon = "Interface\\Icons\\Spell_Holy_SilencingStrike", color = { r = 0.40, g = 0.65, b = 1.00 } },
+    ["arcane_torrent"] = { name = "Arcane Torrent", icon = "Interface\\Icons\\Spell_Holy_SilencingStrike", color = { r = 0.40, g = 0.65, b = 1.00 } },
+    ["arcane torrent"] = { name = "Arcane Torrent", icon = "Interface\\Icons\\Spell_Holy_SilencingStrike", color = { r = 0.40, g = 0.65, b = 1.00 } },
+
+    ["2481"]  = { name = "Find Treasure", icon = "Interface\\Icons\\Racial_Dwarf_FindTreasure", color = { r = 0.95, g = 0.82, b = 0.20 } },
+    ["find_treasure"] = { name = "Find Treasure", icon = "Interface\\Icons\\Racial_Dwarf_FindTreasure", color = { r = 0.95, g = 0.82, b = 0.20 } },
+    ["find treasure"] = { name = "Find Treasure", icon = "Interface\\Icons\\Racial_Dwarf_FindTreasure", color = { r = 0.95, g = 0.82, b = 0.20 } },
 
     -- Shaman / Bloodlust
     ["2825"]  = { name = "Bloodlust", icon = "Interface\\Icons\\Spell_Nature_BloodLust", color = { r = 0.95, g = 0.20, b = 0.05 } },
     ["bloodlust"] = { name = "Bloodlust", icon = "Interface\\Icons\\Spell_Nature_BloodLust", color = { r = 0.95, g = 0.20, b = 0.05 } },
+    ["32182"] = { name = "Heroism", icon = "Interface\\Icons\\Ability_Shaman_Heroism", color = { r = 0.95, g = 0.20, b = 0.05 } },
+    ["heroism"] = { name = "Heroism", icon = "Interface\\Icons\\Ability_Shaman_Heroism", color = { r = 0.95, g = 0.20, b = 0.05 } },
+    ["324"]   = { name = "Lightning Shield", icon = "Interface\\Icons\\Spell_Nature_LightningShield", color = { r = 0.30, g = 0.75, b = 1.00 } },
+    ["325"]   = { name = "Lightning Shield", icon = "Interface\\Icons\\Spell_Nature_LightningShield", color = { r = 0.30, g = 0.75, b = 1.00 } },
+    ["905"]   = { name = "Lightning Shield", icon = "Interface\\Icons\\Spell_Nature_LightningShield", color = { r = 0.30, g = 0.75, b = 1.00 } },
+    ["945"]   = { name = "Lightning Shield", icon = "Interface\\Icons\\Spell_Nature_LightningShield", color = { r = 0.30, g = 0.75, b = 1.00 } },
+    ["8134"]  = { name = "Lightning Shield", icon = "Interface\\Icons\\Spell_Nature_LightningShield", color = { r = 0.30, g = 0.75, b = 1.00 } },
+    ["10431"] = { name = "Lightning Shield", icon = "Interface\\Icons\\Spell_Nature_LightningShield", color = { r = 0.30, g = 0.75, b = 1.00 } },
+    ["10432"] = { name = "Lightning Shield", icon = "Interface\\Icons\\Spell_Nature_LightningShield", color = { r = 0.30, g = 0.75, b = 1.00 } },
+    ["lightning_shield"] = { name = "Lightning Shield", icon = "Interface\\Icons\\Spell_Nature_LightningShield", color = { r = 0.30, g = 0.75, b = 1.00 } },
+    ["lightning shield"] = { name = "Lightning Shield", icon = "Interface\\Icons\\Spell_Nature_LightningShield", color = { r = 0.30, g = 0.75, b = 1.00 } },
+    ["24398"] = { name = "Water Shield", icon = "Interface\\Icons\\Ability_Shaman_WaterShield", color = { r = 0.25, g = 0.80, b = 0.95 } },
+    ["33736"] = { name = "Water Shield", icon = "Interface\\Icons\\Ability_Shaman_WaterShield", color = { r = 0.25, g = 0.80, b = 0.95 } },
+    ["water_shield"] = { name = "Water Shield", icon = "Interface\\Icons\\Ability_Shaman_WaterShield", color = { r = 0.25, g = 0.80, b = 0.95 } },
+    ["water shield"] = { name = "Water Shield", icon = "Interface\\Icons\\Ability_Shaman_WaterShield", color = { r = 0.25, g = 0.80, b = 0.95 } },
+    ["16166"] = { name = "Elemental Mastery", icon = "Interface\\Icons\\Spell_Nature_WispHeal", color = { r = 0.95, g = 0.50, b = 0.10 } },
+    ["elemental_mastery"] = { name = "Elemental Mastery", icon = "Interface\\Icons\\Spell_Nature_WispHeal", color = { r = 0.95, g = 0.50, b = 0.10 } },
+    ["16164"] = { name = "Elemental Focus", icon = "Interface\\Icons\\Spell_Shadow_ManaBurn", color = { r = 0.30, g = 0.70, b = 0.95 } },
+    ["elemental_focus"] = { name = "Elemental Focus", icon = "Interface\\Icons\\Spell_Shadow_ManaBurn", color = { r = 0.30, g = 0.70, b = 0.95 } },
 
     -- Rogue
     ["13750"] = { name = "Adrenaline Rush", icon = "Interface\\Icons\\Spell_Shadow_ShadowWordDominate", color = { r = 0.95, g = 0.80, b = 0.15 } },
     ["adrenaline_rush"] = { name = "Adrenaline Rush", icon = "Interface\\Icons\\Spell_Shadow_ShadowWordDominate", color = { r = 0.95, g = 0.80, b = 0.15 } },
+    ["adrenaline rush"] = { name = "Adrenaline Rush", icon = "Interface\\Icons\\Spell_Shadow_ShadowWordDominate", color = { r = 0.95, g = 0.80, b = 0.15 } },
     ["13877"] = { name = "Blade Flurry", icon = "Interface\\Icons\\Ability_Warrior_PunishingBlow", color = { r = 0.90, g = 0.70, b = 0.20 } },
     ["blade_flurry"] = { name = "Blade Flurry", icon = "Interface\\Icons\\Ability_Warrior_PunishingBlow", color = { r = 0.90, g = 0.70, b = 0.20 } },
+    ["blade flurry"] = { name = "Blade Flurry", icon = "Interface\\Icons\\Ability_Warrior_PunishingBlow", color = { r = 0.90, g = 0.70, b = 0.20 } },
     ["5171"]  = { name = "Slice and Dice", icon = "Interface\\Icons\\Ability_Rogue_SliceDice", color = { r = 0.85, g = 0.85, b = 0.25 } },
+    ["6774"]  = { name = "Slice and Dice", icon = "Interface\\Icons\\Ability_Rogue_SliceDice", color = { r = 0.85, g = 0.85, b = 0.25 } },
     ["slice_and_dice"] = { name = "Slice and Dice", icon = "Interface\\Icons\\Ability_Rogue_SliceDice", color = { r = 0.85, g = 0.85, b = 0.25 } },
+    ["slice and dice"] = { name = "Slice and Dice", icon = "Interface\\Icons\\Ability_Rogue_SliceDice", color = { r = 0.85, g = 0.85, b = 0.25 } },
     ["2983"]  = { name = "Sprint", icon = "Interface\\Icons\\Ability_Rogue_Sprint", color = { r = 0.30, g = 0.80, b = 0.90 } },
+    ["8696"]  = { name = "Sprint", icon = "Interface\\Icons\\Ability_Rogue_Sprint", color = { r = 0.30, g = 0.80, b = 0.90 } },
+    ["11305"] = { name = "Sprint", icon = "Interface\\Icons\\Ability_Rogue_Sprint", color = { r = 0.30, g = 0.80, b = 0.90 } },
     ["sprint"] = { name = "Sprint", icon = "Interface\\Icons\\Ability_Rogue_Sprint", color = { r = 0.30, g = 0.80, b = 0.90 } },
     ["5277"]  = { name = "Evasion", icon = "Interface\\Icons\\Spell_Shadow_ShadowWard", color = { r = 0.40, g = 0.75, b = 0.40 } },
     ["evasion"] = { name = "Evasion", icon = "Interface\\Icons\\Spell_Shadow_ShadowWard", color = { r = 0.40, g = 0.75, b = 0.40 } },
+    ["1784"]  = { name = "Stealth", icon = "Interface\\Icons\\Ability_Stealth", color = { r = 0.40, g = 0.40, b = 0.60 } },
+    ["stealth"] = { name = "Stealth", icon = "Interface\\Icons\\Ability_Stealth", color = { r = 0.40, g = 0.40, b = 0.60 } },
+
+    -- Hunter
+    ["3045"]  = { name = "Rapid Fire", icon = "Interface\\Icons\\Ability_Hunter_RunningShot", color = { r = 0.95, g = 0.60, b = 0.15 } },
+    ["rapid_fire"] = { name = "Rapid Fire", icon = "Interface\\Icons\\Ability_Hunter_RunningShot", color = { r = 0.95, g = 0.60, b = 0.15 } },
+    ["rapid fire"] = { name = "Rapid Fire", icon = "Interface\\Icons\\Ability_Hunter_RunningShot", color = { r = 0.95, g = 0.60, b = 0.15 } },
+    ["19574"] = { name = "Bestial Wrath", icon = "Interface\\Icons\\Ability_Druid_FerociousBite", color = { r = 0.95, g = 0.20, b = 0.10 } },
+    ["bestial_wrath"] = { name = "Bestial Wrath", icon = "Interface\\Icons\\Ability_Druid_FerociousBite", color = { r = 0.95, g = 0.20, b = 0.10 } },
+    ["bestial wrath"] = { name = "Bestial Wrath", icon = "Interface\\Icons\\Ability_Druid_FerociousBite", color = { r = 0.95, g = 0.20, b = 0.10 } },
+    ["19263"] = { name = "Deterrence", icon = "Interface\\Icons\\Ability_Whirlwind", color = { r = 0.35, g = 0.70, b = 0.90 } },
+    ["deterrence"] = { name = "Deterrence", icon = "Interface\\Icons\\Ability_Whirlwind", color = { r = 0.35, g = 0.70, b = 0.90 } },
+    ["19506"] = { name = "Trueshot Aura", icon = "Interface\\Icons\\Ability_TrueShot", color = { r = 0.85, g = 0.75, b = 0.20 } },
+    ["20905"] = { name = "Trueshot Aura", icon = "Interface\\Icons\\Ability_TrueShot", color = { r = 0.85, g = 0.75, b = 0.20 } },
+    ["20906"] = { name = "Trueshot Aura", icon = "Interface\\Icons\\Ability_TrueShot", color = { r = 0.85, g = 0.75, b = 0.20 } },
+    ["trueshot_aura"] = { name = "Trueshot Aura", icon = "Interface\\Icons\\Ability_TrueShot", color = { r = 0.85, g = 0.75, b = 0.20 } },
+    ["trueshot aura"] = { name = "Trueshot Aura", icon = "Interface\\Icons\\Ability_TrueShot", color = { r = 0.85, g = 0.75, b = 0.20 } },
+    ["13165"] = { name = "Aspect of the Hawk", icon = "Interface\\Icons\\Spell_Nature_RavenForm", color = { r = 0.80, g = 0.60, b = 0.20 } },
+    ["aspect_of_the_hawk"] = { name = "Aspect of the Hawk", icon = "Interface\\Icons\\Spell_Nature_RavenForm", color = { r = 0.80, g = 0.60, b = 0.20 } },
+    ["aspect of the hawk"] = { name = "Aspect of the Hawk", icon = "Interface\\Icons\\Spell_Nature_RavenForm", color = { r = 0.80, g = 0.60, b = 0.20 } },
+    ["13163"] = { name = "Aspect of the Monkey", icon = "Interface\\Icons\\Ability_Hunter_AspectOfTheMonkey", color = { r = 0.50, g = 0.75, b = 0.40 } },
+    ["aspect_of_the_monkey"] = { name = "Aspect of the Monkey", icon = "Interface\\Icons\\Ability_Hunter_AspectOfTheMonkey", color = { r = 0.50, g = 0.75, b = 0.40 } },
+    ["aspect of the monkey"] = { name = "Aspect of the Monkey", icon = "Interface\\Icons\\Ability_Hunter_AspectOfTheMonkey", color = { r = 0.50, g = 0.75, b = 0.40 } },
+    ["5118"]  = { name = "Aspect of the Cheetah", icon = "Interface\\Icons\\Ability_Mount_JungleTiger", color = { r = 0.85, g = 0.70, b = 0.30 } },
+    ["aspect_of_the_cheetah"] = { name = "Aspect of the Cheetah", icon = "Interface\\Icons\\Ability_Mount_JungleTiger", color = { r = 0.85, g = 0.70, b = 0.30 } },
+    ["aspect of the cheetah"] = { name = "Aspect of the Cheetah", icon = "Interface\\Icons\\Ability_Mount_JungleTiger", color = { r = 0.85, g = 0.70, b = 0.30 } },
 
     -- Priest
     ["17"]    = { name = "Power Word: Shield", icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", color = { r = 0.95, g = 0.85, b = 0.45 } },
+    ["592"]   = { name = "Power Word: Shield", icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", color = { r = 0.95, g = 0.85, b = 0.45 } },
+    ["600"]   = { name = "Power Word: Shield", icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", color = { r = 0.95, g = 0.85, b = 0.45 } },
+    ["3747"]  = { name = "Power Word: Shield", icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", color = { r = 0.95, g = 0.85, b = 0.45 } },
+    ["6065"]  = { name = "Power Word: Shield", icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", color = { r = 0.95, g = 0.85, b = 0.45 } },
+    ["6066"]  = { name = "Power Word: Shield", icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", color = { r = 0.95, g = 0.85, b = 0.45 } },
+    ["10898"] = { name = "Power Word: Shield", icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", color = { r = 0.95, g = 0.85, b = 0.45 } },
+    ["10899"] = { name = "Power Word: Shield", icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", color = { r = 0.95, g = 0.85, b = 0.45 } },
+    ["10900"] = { name = "Power Word: Shield", icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", color = { r = 0.95, g = 0.85, b = 0.45 } },
+    ["10901"] = { name = "Power Word: Shield", icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", color = { r = 0.95, g = 0.85, b = 0.45 } },
     ["pw_shield"] = { name = "Power Word: Shield", icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", color = { r = 0.95, g = 0.85, b = 0.45 } },
     ["power_word_shield"] = { name = "Power Word: Shield", icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", color = { r = 0.95, g = 0.85, b = 0.45 } },
+    ["power word: shield"] = { name = "Power Word: Shield", icon = "Interface\\Icons\\Spell_Holy_PowerWordShield", color = { r = 0.95, g = 0.85, b = 0.45 } },
+
     ["1243"]  = { name = "Power Word: Fortitude", icon = "Interface\\Icons\\Spell_Holy_WordFortitude", color = { r = 0.90, g = 0.80, b = 0.50 } },
+    ["1244"]  = { name = "Power Word: Fortitude", icon = "Interface\\Icons\\Spell_Holy_WordFortitude", color = { r = 0.90, g = 0.80, b = 0.50 } },
+    ["1245"]  = { name = "Power Word: Fortitude", icon = "Interface\\Icons\\Spell_Holy_WordFortitude", color = { r = 0.90, g = 0.80, b = 0.50 } },
+    ["2791"]  = { name = "Power Word: Fortitude", icon = "Interface\\Icons\\Spell_Holy_WordFortitude", color = { r = 0.90, g = 0.80, b = 0.50 } },
+    ["10937"] = { name = "Power Word: Fortitude", icon = "Interface\\Icons\\Spell_Holy_WordFortitude", color = { r = 0.90, g = 0.80, b = 0.50 } },
+    ["10938"] = { name = "Power Word: Fortitude", icon = "Interface\\Icons\\Spell_Holy_WordFortitude", color = { r = 0.90, g = 0.80, b = 0.50 } },
+    ["21562"] = { name = "Prayer of Fortitude", icon = "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", color = { r = 0.90, g = 0.80, b = 0.50 } },
+    ["21564"] = { name = "Prayer of Fortitude", icon = "Interface\\Icons\\Spell_Holy_PrayerOfFortitude", color = { r = 0.90, g = 0.80, b = 0.50 } },
     ["power_word_fortitude"] = { name = "Power Word: Fortitude", icon = "Interface\\Icons\\Spell_Holy_WordFortitude", color = { r = 0.90, g = 0.80, b = 0.50 } },
+    ["power word: fortitude"] = { name = "Power Word: Fortitude", icon = "Interface\\Icons\\Spell_Holy_WordFortitude", color = { r = 0.90, g = 0.80, b = 0.50 } },
+
     ["10060"] = { name = "Power Infusion", icon = "Interface\\Icons\\Spell_Holy_PowerInfusion", color = { r = 1.00, g = 0.85, b = 0.20 } },
     ["power_infusion"] = { name = "Power Infusion", icon = "Interface\\Icons\\Spell_Holy_PowerInfusion", color = { r = 1.00, g = 0.85, b = 0.20 } },
+    ["power infusion"] = { name = "Power Infusion", icon = "Interface\\Icons\\Spell_Holy_PowerInfusion", color = { r = 1.00, g = 0.85, b = 0.20 } },
+
     ["139"]   = { name = "Renew", icon = "Interface\\Icons\\Spell_Holy_Renew", color = { r = 0.40, g = 0.90, b = 0.50 } },
+    ["6074"]  = { name = "Renew", icon = "Interface\\Icons\\Spell_Holy_Renew", color = { r = 0.40, g = 0.90, b = 0.50 } },
+    ["6075"]  = { name = "Renew", icon = "Interface\\Icons\\Spell_Holy_Renew", color = { r = 0.40, g = 0.90, b = 0.50 } },
+    ["6076"]  = { name = "Renew", icon = "Interface\\Icons\\Spell_Holy_Renew", color = { r = 0.40, g = 0.90, b = 0.50 } },
+    ["6077"]  = { name = "Renew", icon = "Interface\\Icons\\Spell_Holy_Renew", color = { r = 0.40, g = 0.90, b = 0.50 } },
+    ["6078"]  = { name = "Renew", icon = "Interface\\Icons\\Spell_Holy_Renew", color = { r = 0.40, g = 0.90, b = 0.50 } },
+    ["10927"] = { name = "Renew", icon = "Interface\\Icons\\Spell_Holy_Renew", color = { r = 0.40, g = 0.90, b = 0.50 } },
+    ["10928"] = { name = "Renew", icon = "Interface\\Icons\\Spell_Holy_Renew", color = { r = 0.40, g = 0.90, b = 0.50 } },
+    ["10929"] = { name = "Renew", icon = "Interface\\Icons\\Spell_Holy_Renew", color = { r = 0.40, g = 0.90, b = 0.50 } },
+    ["25315"] = { name = "Renew", icon = "Interface\\Icons\\Spell_Holy_Renew", color = { r = 0.40, g = 0.90, b = 0.50 } },
     ["renew"] = { name = "Renew", icon = "Interface\\Icons\\Spell_Holy_Renew", color = { r = 0.40, g = 0.90, b = 0.50 } },
+
+    ["588"]   = { name = "Inner Fire", icon = "Interface\\Icons\\Spell_Holy_InnerFire", color = { r = 0.95, g = 0.50, b = 0.20 } },
+    ["7128"]  = { name = "Inner Fire", icon = "Interface\\Icons\\Spell_Holy_InnerFire", color = { r = 0.95, g = 0.50, b = 0.20 } },
+    ["602"]   = { name = "Inner Fire", icon = "Interface\\Icons\\Spell_Holy_InnerFire", color = { r = 0.95, g = 0.50, b = 0.20 } },
+    ["1006"]  = { name = "Inner Fire", icon = "Interface\\Icons\\Spell_Holy_InnerFire", color = { r = 0.95, g = 0.50, b = 0.20 } },
+    ["10951"] = { name = "Inner Fire", icon = "Interface\\Icons\\Spell_Holy_InnerFire", color = { r = 0.95, g = 0.50, b = 0.20 } },
+    ["10952"] = { name = "Inner Fire", icon = "Interface\\Icons\\Spell_Holy_InnerFire", color = { r = 0.95, g = 0.50, b = 0.20 } },
+    ["10953"] = { name = "Inner Fire", icon = "Interface\\Icons\\Spell_Holy_InnerFire", color = { r = 0.95, g = 0.50, b = 0.20 } },
+    ["inner_fire"] = { name = "Inner Fire", icon = "Interface\\Icons\\Spell_Holy_InnerFire", color = { r = 0.95, g = 0.50, b = 0.20 } },
+    ["inner fire"] = { name = "Inner Fire", icon = "Interface\\Icons\\Spell_Holy_InnerFire", color = { r = 0.95, g = 0.50, b = 0.20 } },
+
+    ["6346"]  = { name = "Fear Ward", icon = "Interface\\Icons\\Spell_Holy_Excorcism", color = { r = 0.70, g = 0.60, b = 0.90 } },
+    ["fear_ward"] = { name = "Fear Ward", icon = "Interface\\Icons\\Spell_Holy_Excorcism", color = { r = 0.70, g = 0.60, b = 0.90 } },
+    ["fear ward"] = { name = "Fear Ward", icon = "Interface\\Icons\\Spell_Holy_Excorcism", color = { r = 0.70, g = 0.60, b = 0.90 } },
+    ["15473"] = { name = "Shadowform", icon = "Interface\\Icons\\Spell_Shadow_Shadowform", color = { r = 0.50, g = 0.20, b = 0.75 } },
+    ["shadowform"] = { name = "Shadowform", icon = "Interface\\Icons\\Spell_Shadow_Shadowform", color = { r = 0.50, g = 0.20, b = 0.75 } },
 
     -- Mage
     ["1459"]  = { name = "Arcane Intellect", icon = "Interface\\Icons\\Spell_Holy_MagicalSentry", color = { r = 0.35, g = 0.75, b = 1.00 } },
+    ["1460"]  = { name = "Arcane Intellect", icon = "Interface\\Icons\\Spell_Holy_MagicalSentry", color = { r = 0.35, g = 0.75, b = 1.00 } },
+    ["1461"]  = { name = "Arcane Intellect", icon = "Interface\\Icons\\Spell_Holy_MagicalSentry", color = { r = 0.35, g = 0.75, b = 1.00 } },
+    ["10156"] = { name = "Arcane Intellect", icon = "Interface\\Icons\\Spell_Holy_MagicalSentry", color = { r = 0.35, g = 0.75, b = 1.00 } },
+    ["10157"] = { name = "Arcane Intellect", icon = "Interface\\Icons\\Spell_Holy_MagicalSentry", color = { r = 0.35, g = 0.75, b = 1.00 } },
+    ["23028"] = { name = "Arcane Brilliance", icon = "Interface\\Icons\\Spell_Holy_ArcaneIntellect", color = { r = 0.35, g = 0.75, b = 1.00 } },
     ["arcane_intellect"] = { name = "Arcane Intellect", icon = "Interface\\Icons\\Spell_Holy_MagicalSentry", color = { r = 0.35, g = 0.75, b = 1.00 } },
+    ["arcane intellect"] = { name = "Arcane Intellect", icon = "Interface\\Icons\\Spell_Holy_MagicalSentry", color = { r = 0.35, g = 0.75, b = 1.00 } },
+    ["arcane_brilliance"] = { name = "Arcane Brilliance", icon = "Interface\\Icons\\Spell_Holy_ArcaneIntellect", color = { r = 0.35, g = 0.75, b = 1.00 } },
+    ["arcane brilliance"] = { name = "Arcane Brilliance", icon = "Interface\\Icons\\Spell_Holy_ArcaneIntellect", color = { r = 0.35, g = 0.75, b = 1.00 } },
+
     ["12042"] = { name = "Arcane Power", icon = "Interface\\Icons\\Spell_Nature_Lightning", color = { r = 0.40, g = 0.60, b = 1.00 } },
     ["arcane_power"] = { name = "Arcane Power", icon = "Interface\\Icons\\Spell_Nature_Lightning", color = { r = 0.40, g = 0.60, b = 1.00 } },
+    ["arcane power"] = { name = "Arcane Power", icon = "Interface\\Icons\\Spell_Nature_Lightning", color = { r = 0.40, g = 0.60, b = 1.00 } },
+
     ["11426"] = { name = "Ice Barrier", icon = "Interface\\Icons\\Spell_Ice_Lament", color = { r = 0.30, g = 0.70, b = 1.00 } },
+    ["13031"] = { name = "Ice Barrier", icon = "Interface\\Icons\\Spell_Ice_Lament", color = { r = 0.30, g = 0.70, b = 1.00 } },
+    ["13032"] = { name = "Ice Barrier", icon = "Interface\\Icons\\Spell_Ice_Lament", color = { r = 0.30, g = 0.70, b = 1.00 } },
+    ["13033"] = { name = "Ice Barrier", icon = "Interface\\Icons\\Spell_Ice_Lament", color = { r = 0.30, g = 0.70, b = 1.00 } },
     ["ice_barrier"] = { name = "Ice Barrier", icon = "Interface\\Icons\\Spell_Ice_Lament", color = { r = 0.30, g = 0.70, b = 1.00 } },
+    ["ice barrier"] = { name = "Ice Barrier", icon = "Interface\\Icons\\Spell_Ice_Lament", color = { r = 0.30, g = 0.70, b = 1.00 } },
+
+    ["1463"]  = { name = "Mana Shield", icon = "Interface\\Icons\\Spell_Shadow_DetectLesserInvisibility", color = { r = 0.30, g = 0.65, b = 0.95 } },
+    ["8494"]  = { name = "Mana Shield", icon = "Interface\\Icons\\Spell_Shadow_DetectLesserInvisibility", color = { r = 0.30, g = 0.65, b = 0.95 } },
+    ["8495"]  = { name = "Mana Shield", icon = "Interface\\Icons\\Spell_Shadow_DetectLesserInvisibility", color = { r = 0.30, g = 0.65, b = 0.95 } },
+    ["10191"] = { name = "Mana Shield", icon = "Interface\\Icons\\Spell_Shadow_DetectLesserInvisibility", color = { r = 0.30, g = 0.65, b = 0.95 } },
+    ["10192"] = { name = "Mana Shield", icon = "Interface\\Icons\\Spell_Shadow_DetectLesserInvisibility", color = { r = 0.30, g = 0.65, b = 0.95 } },
+    ["10193"] = { name = "Mana Shield", icon = "Interface\\Icons\\Spell_Shadow_DetectLesserInvisibility", color = { r = 0.30, g = 0.65, b = 0.95 } },
+    ["mana_shield"] = { name = "Mana Shield", icon = "Interface\\Icons\\Spell_Shadow_DetectLesserInvisibility", color = { r = 0.30, g = 0.65, b = 0.95 } },
+    ["mana shield"] = { name = "Mana Shield", icon = "Interface\\Icons\\Spell_Shadow_DetectLesserInvisibility", color = { r = 0.30, g = 0.65, b = 0.95 } },
+
+    ["168"]   = { name = "Frost Armor", icon = "Interface\\Icons\\Spell_Frost_FrostArmor02", color = { r = 0.25, g = 0.75, b = 1.00 } },
+    ["7300"]  = { name = "Frost Armor", icon = "Interface\\Icons\\Spell_Frost_FrostArmor02", color = { r = 0.25, g = 0.75, b = 1.00 } },
+    ["7301"]  = { name = "Frost Armor", icon = "Interface\\Icons\\Spell_Frost_FrostArmor02", color = { r = 0.25, g = 0.75, b = 1.00 } },
+    ["7320"]  = { name = "Ice Armor", icon = "Interface\\Icons\\Spell_Frost_FrostArmor02", color = { r = 0.25, g = 0.75, b = 1.00 } },
+    ["10219"] = { name = "Ice Armor", icon = "Interface\\Icons\\Spell_Frost_FrostArmor02", color = { r = 0.25, g = 0.75, b = 1.00 } },
+    ["10220"] = { name = "Ice Armor", icon = "Interface\\Icons\\Spell_Frost_FrostArmor02", color = { r = 0.25, g = 0.75, b = 1.00 } },
+    ["frost_armor"] = { name = "Frost Armor", icon = "Interface\\Icons\\Spell_Frost_FrostArmor02", color = { r = 0.25, g = 0.75, b = 1.00 } },
+    ["frost armor"] = { name = "Frost Armor", icon = "Interface\\Icons\\Spell_Frost_FrostArmor02", color = { r = 0.25, g = 0.75, b = 1.00 } },
+    ["ice_armor"] = { name = "Ice Armor", icon = "Interface\\Icons\\Spell_Frost_FrostArmor02", color = { r = 0.25, g = 0.75, b = 1.00 } },
+    ["ice armor"] = { name = "Ice Armor", icon = "Interface\\Icons\\Spell_Frost_FrostArmor02", color = { r = 0.25, g = 0.75, b = 1.00 } },
+
+    ["6117"]  = { name = "Mage Armor", icon = "Interface\\Icons\\Spell_MageArmor", color = { r = 0.40, g = 0.55, b = 0.95 } },
+    ["22782"] = { name = "Mage Armor", icon = "Interface\\Icons\\Spell_MageArmor", color = { r = 0.40, g = 0.55, b = 0.95 } },
+    ["22783"] = { name = "Mage Armor", icon = "Interface\\Icons\\Spell_MageArmor", color = { r = 0.40, g = 0.55, b = 0.95 } },
+    ["mage_armor"] = { name = "Mage Armor", icon = "Interface\\Icons\\Spell_MageArmor", color = { r = 0.40, g = 0.55, b = 0.95 } },
+    ["mage armor"] = { name = "Mage Armor", icon = "Interface\\Icons\\Spell_MageArmor", color = { r = 0.40, g = 0.55, b = 0.95 } },
+
+    ["11129"] = { name = "Combustion", icon = "Interface\\Icons\\Spell_Fire_SealOfFire", color = { r = 1.00, g = 0.35, b = 0.05 } },
+    ["combustion"] = { name = "Combustion", icon = "Interface\\Icons\\Spell_Fire_SealOfFire", color = { r = 1.00, g = 0.35, b = 0.05 } },
+
     ["12051"] = { name = "Evocation", icon = "Interface\\Icons\\Spell_Nature_Purge", color = { r = 0.30, g = 0.85, b = 0.95 } },
     ["evocation"] = { name = "Evocation", icon = "Interface\\Icons\\Spell_Nature_Purge", color = { r = 0.30, g = 0.85, b = 0.95 } },
     ["12043"] = { name = "Presence of Mind", icon = "Interface\\Icons\\Spell_Nature_EnchantArmor", color = { r = 0.60, g = 0.40, b = 0.95 } },
     ["presence_of_mind"] = { name = "Presence of Mind", icon = "Interface\\Icons\\Spell_Nature_EnchantArmor", color = { r = 0.60, g = 0.40, b = 0.95 } },
+    ["presence of mind"] = { name = "Presence of Mind", icon = "Interface\\Icons\\Spell_Nature_EnchantArmor", color = { r = 0.60, g = 0.40, b = 0.95 } },
 
     -- Paladin
     ["19740"] = { name = "Blessing of Might", icon = "Interface\\Icons\\Spell_Holy_FistOfJustice", color = { r = 0.95, g = 0.65, b = 0.20 } },
+    ["19834"] = { name = "Blessing of Might", icon = "Interface\\Icons\\Spell_Holy_FistOfJustice", color = { r = 0.95, g = 0.65, b = 0.20 } },
+    ["19835"] = { name = "Blessing of Might", icon = "Interface\\Icons\\Spell_Holy_FistOfJustice", color = { r = 0.95, g = 0.65, b = 0.20 } },
+    ["19836"] = { name = "Blessing of Might", icon = "Interface\\Icons\\Spell_Holy_FistOfJustice", color = { r = 0.95, g = 0.65, b = 0.20 } },
+    ["19837"] = { name = "Blessing of Might", icon = "Interface\\Icons\\Spell_Holy_FistOfJustice", color = { r = 0.95, g = 0.65, b = 0.20 } },
+    ["19838"] = { name = "Blessing of Might", icon = "Interface\\Icons\\Spell_Holy_FistOfJustice", color = { r = 0.95, g = 0.65, b = 0.20 } },
+    ["25291"] = { name = "Blessing of Might", icon = "Interface\\Icons\\Spell_Holy_FistOfJustice", color = { r = 0.95, g = 0.65, b = 0.20 } },
+    ["25782"] = { name = "Greater Blessing of Might", icon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofKings", color = { r = 0.95, g = 0.65, b = 0.20 } },
+    ["25916"] = { name = "Greater Blessing of Might", icon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofKings", color = { r = 0.95, g = 0.65, b = 0.20 } },
     ["blessing_of_might"] = { name = "Blessing of Might", icon = "Interface\\Icons\\Spell_Holy_FistOfJustice", color = { r = 0.95, g = 0.65, b = 0.20 } },
+    ["blessing of might"] = { name = "Blessing of Might", icon = "Interface\\Icons\\Spell_Holy_FistOfJustice", color = { r = 0.95, g = 0.65, b = 0.20 } },
+
     ["20217"] = { name = "Blessing of Kings", icon = "Interface\\Icons\\Spell_Magic_MageArmor", color = { r = 0.90, g = 0.85, b = 0.30 } },
+    ["25898"] = { name = "Greater Blessing of Kings", icon = "Interface\\Icons\\Spell_Magic_GreaterMageArmor", color = { r = 0.90, g = 0.85, b = 0.30 } },
     ["blessing_of_kings"] = { name = "Blessing of Kings", icon = "Interface\\Icons\\Spell_Magic_MageArmor", color = { r = 0.90, g = 0.85, b = 0.30 } },
+    ["blessing of kings"] = { name = "Blessing of Kings", icon = "Interface\\Icons\\Spell_Magic_MageArmor", color = { r = 0.90, g = 0.85, b = 0.30 } },
+
     ["19742"] = { name = "Blessing of Wisdom", icon = "Interface\\Icons\\Spell_Holy_SealOfWisdom", color = { r = 0.40, g = 0.70, b = 0.95 } },
+    ["19850"] = { name = "Blessing of Wisdom", icon = "Interface\\Icons\\Spell_Holy_SealOfWisdom", color = { r = 0.40, g = 0.70, b = 0.95 } },
+    ["19852"] = { name = "Blessing of Wisdom", icon = "Interface\\Icons\\Spell_Holy_SealOfWisdom", color = { r = 0.40, g = 0.70, b = 0.95 } },
+    ["19853"] = { name = "Blessing of Wisdom", icon = "Interface\\Icons\\Spell_Holy_SealOfWisdom", color = { r = 0.40, g = 0.70, b = 0.95 } },
+    ["19854"] = { name = "Blessing of Wisdom", icon = "Interface\\Icons\\Spell_Holy_SealOfWisdom", color = { r = 0.40, g = 0.70, b = 0.95 } },
+    ["25290"] = { name = "Blessing of Wisdom", icon = "Interface\\Icons\\Spell_Holy_SealOfWisdom", color = { r = 0.40, g = 0.70, b = 0.95 } },
+    ["25894"] = { name = "Greater Blessing of Wisdom", icon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofWisdom", color = { r = 0.40, g = 0.70, b = 0.95 } },
+    ["25918"] = { name = "Greater Blessing of Wisdom", icon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofWisdom", color = { r = 0.40, g = 0.70, b = 0.95 } },
     ["blessing_of_wisdom"] = { name = "Blessing of Wisdom", icon = "Interface\\Icons\\Spell_Holy_SealOfWisdom", color = { r = 0.40, g = 0.70, b = 0.95 } },
+    ["blessing of wisdom"] = { name = "Blessing of Wisdom", icon = "Interface\\Icons\\Spell_Holy_SealOfWisdom", color = { r = 0.40, g = 0.70, b = 0.95 } },
+
     ["1044"]  = { name = "Blessing of Freedom", icon = "Interface\\Icons\\Spell_Holy_SealOfValor", color = { r = 0.95, g = 0.75, b = 0.15 } },
     ["blessing_of_freedom"] = { name = "Blessing of Freedom", icon = "Interface\\Icons\\Spell_Holy_SealOfValor", color = { r = 0.95, g = 0.75, b = 0.15 } },
+    ["blessing of freedom"] = { name = "Blessing of Freedom", icon = "Interface\\Icons\\Spell_Holy_SealOfValor", color = { r = 0.95, g = 0.75, b = 0.15 } },
+
     ["1022"]  = { name = "Blessing of Protection", icon = "Interface\\Icons\\Spell_Holy_BlessingOfProtection", color = { r = 0.90, g = 0.80, b = 0.30 } },
+    ["5599"]  = { name = "Blessing of Protection", icon = "Interface\\Icons\\Spell_Holy_BlessingOfProtection", color = { r = 0.90, g = 0.80, b = 0.30 } },
+    ["10278"] = { name = "Blessing of Protection", icon = "Interface\\Icons\\Spell_Holy_BlessingOfProtection", color = { r = 0.90, g = 0.80, b = 0.30 } },
     ["blessing_of_protection"] = { name = "Blessing of Protection", icon = "Interface\\Icons\\Spell_Holy_BlessingOfProtection", color = { r = 0.90, g = 0.80, b = 0.30 } },
+    ["blessing of protection"] = { name = "Blessing of Protection", icon = "Interface\\Icons\\Spell_Holy_BlessingOfProtection", color = { r = 0.90, g = 0.80, b = 0.30 } },
+
     ["642"]   = { name = "Divine Shield", icon = "Interface\\Icons\\Spell_Holy_DivineIntervention", color = { r = 1.00, g = 0.92, b = 0.40 } },
+    ["1020"]  = { name = "Divine Shield", icon = "Interface\\Icons\\Spell_Holy_DivineIntervention", color = { r = 1.00, g = 0.92, b = 0.40 } },
     ["divine_shield"] = { name = "Divine Shield", icon = "Interface\\Icons\\Spell_Holy_DivineIntervention", color = { r = 1.00, g = 0.92, b = 0.40 } },
+    ["divine shield"] = { name = "Divine Shield", icon = "Interface\\Icons\\Spell_Holy_DivineIntervention", color = { r = 1.00, g = 0.92, b = 0.40 } },
+
+    ["498"]   = { name = "Divine Protection", icon = "Interface\\Icons\\Spell_Holy_Restoration", color = { r = 0.95, g = 0.85, b = 0.35 } },
+    ["5573"]  = { name = "Divine Protection", icon = "Interface\\Icons\\Spell_Holy_Restoration", color = { r = 0.95, g = 0.85, b = 0.35 } },
+    ["divine_protection"] = { name = "Divine Protection", icon = "Interface\\Icons\\Spell_Holy_Restoration", color = { r = 0.95, g = 0.85, b = 0.35 } },
+    ["divine protection"] = { name = "Divine Protection", icon = "Interface\\Icons\\Spell_Holy_Restoration", color = { r = 0.95, g = 0.85, b = 0.35 } },
+
+    ["20925"] = { name = "Holy Shield", icon = "Interface\\Icons\\Spell_Holy_BlessingOfProtection", color = { r = 0.95, g = 0.80, b = 0.25 } },
+    ["20927"] = { name = "Holy Shield", icon = "Interface\\Icons\\Spell_Holy_BlessingOfProtection", color = { r = 0.95, g = 0.80, b = 0.25 } },
+    ["20928"] = { name = "Holy Shield", icon = "Interface\\Icons\\Spell_Holy_BlessingOfProtection", color = { r = 0.95, g = 0.80, b = 0.25 } },
+    ["holy_shield"] = { name = "Holy Shield", icon = "Interface\\Icons\\Spell_Holy_BlessingOfProtection", color = { r = 0.95, g = 0.80, b = 0.25 } },
+    ["holy shield"] = { name = "Holy Shield", icon = "Interface\\Icons\\Spell_Holy_BlessingOfProtection", color = { r = 0.95, g = 0.80, b = 0.25 } },
+    ["25780"] = { name = "Righteous Fury", icon = "Interface\\Icons\\Spell_Holy_SealOfFury", color = { r = 0.95, g = 0.70, b = 0.20 } },
+    ["righteous_fury"] = { name = "Righteous Fury", icon = "Interface\\Icons\\Spell_Holy_SealOfFury", color = { r = 0.95, g = 0.70, b = 0.20 } },
+    ["righteous fury"] = { name = "Righteous Fury", icon = "Interface\\Icons\\Spell_Holy_SealOfFury", color = { r = 0.95, g = 0.70, b = 0.20 } },
+
+    -- Warlock
+    ["687"]   = { name = "Demon Skin", icon = "Interface\\Icons\\Spell_Shadow_RagingScream", color = { r = 0.65, g = 0.25, b = 0.85 } },
+    ["696"]   = { name = "Demon Skin", icon = "Interface\\Icons\\Spell_Shadow_RagingScream", color = { r = 0.65, g = 0.25, b = 0.85 } },
+    ["706"]   = { name = "Demon Armor", icon = "Interface\\Icons\\Spell_Shadow_RagingScream", color = { r = 0.65, g = 0.25, b = 0.85 } },
+    ["1086"]  = { name = "Demon Armor", icon = "Interface\\Icons\\Spell_Shadow_RagingScream", color = { r = 0.65, g = 0.25, b = 0.85 } },
+    ["11733"] = { name = "Demon Armor", icon = "Interface\\Icons\\Spell_Shadow_RagingScream", color = { r = 0.65, g = 0.25, b = 0.85 } },
+    ["11734"] = { name = "Demon Armor", icon = "Interface\\Icons\\Spell_Shadow_RagingScream", color = { r = 0.65, g = 0.25, b = 0.85 } },
+    ["11735"] = { name = "Demon Armor", icon = "Interface\\Icons\\Spell_Shadow_RagingScream", color = { r = 0.65, g = 0.25, b = 0.85 } },
+    ["demon_armor"] = { name = "Demon Armor", icon = "Interface\\Icons\\Spell_Shadow_RagingScream", color = { r = 0.65, g = 0.25, b = 0.85 } },
+    ["demon armor"] = { name = "Demon Armor", icon = "Interface\\Icons\\Spell_Shadow_RagingScream", color = { r = 0.65, g = 0.25, b = 0.85 } },
+    ["demon_skin"] = { name = "Demon Skin", icon = "Interface\\Icons\\Spell_Shadow_RagingScream", color = { r = 0.65, g = 0.25, b = 0.85 } },
+    ["demon skin"] = { name = "Demon Skin", icon = "Interface\\Icons\\Spell_Shadow_RagingScream", color = { r = 0.65, g = 0.25, b = 0.85 } },
+    ["28176"] = { name = "Fel Armor", icon = "Interface\\Icons\\Spell_Shadow_FelMending", color = { r = 0.40, g = 0.85, b = 0.25 } },
+    ["28189"] = { name = "Fel Armor", icon = "Interface\\Icons\\Spell_Shadow_FelMending", color = { r = 0.40, g = 0.85, b = 0.25 } },
+    ["fel_armor"] = { name = "Fel Armor", icon = "Interface\\Icons\\Spell_Shadow_FelMending", color = { r = 0.40, g = 0.85, b = 0.25 } },
+    ["fel armor"] = { name = "Fel Armor", icon = "Interface\\Icons\\Spell_Shadow_FelMending", color = { r = 0.40, g = 0.85, b = 0.25 } },
+    ["19028"] = { name = "Soul Link", icon = "Interface\\Icons\\Spell_Shadow_GatherShadows", color = { r = 0.70, g = 0.25, b = 0.90 } },
+    ["soul_link"] = { name = "Soul Link", icon = "Interface\\Icons\\Spell_Shadow_GatherShadows", color = { r = 0.70, g = 0.25, b = 0.90 } },
+    ["soul link"] = { name = "Soul Link", icon = "Interface\\Icons\\Spell_Shadow_GatherShadows", color = { r = 0.70, g = 0.25, b = 0.90 } },
+    ["6229"]  = { name = "Shadow Ward", icon = "Interface\\Icons\\Spell_Shadow_AntiShadow", color = { r = 0.60, g = 0.20, b = 0.80 } },
+    ["11739"] = { name = "Shadow Ward", icon = "Interface\\Icons\\Spell_Shadow_AntiShadow", color = { r = 0.60, g = 0.20, b = 0.80 } },
+    ["11740"] = { name = "Shadow Ward", icon = "Interface\\Icons\\Spell_Shadow_AntiShadow", color = { r = 0.60, g = 0.20, b = 0.80 } },
+    ["shadow_ward"] = { name = "Shadow Ward", icon = "Interface\\Icons\\Spell_Shadow_AntiShadow", color = { r = 0.60, g = 0.20, b = 0.80 } },
+    ["shadow ward"] = { name = "Shadow Ward", icon = "Interface\\Icons\\Spell_Shadow_AntiShadow", color = { r = 0.60, g = 0.20, b = 0.80 } },
+    ["6307"]  = { name = "Blood Pact", icon = "Interface\\Icons\\Spell_Shadow_BloodBoil", color = { r = 0.85, g = 0.25, b = 0.25 } },
+    ["blood_pact"] = { name = "Blood Pact", icon = "Interface\\Icons\\Spell_Shadow_BloodBoil", color = { r = 0.85, g = 0.25, b = 0.25 } },
+    ["blood pact"] = { name = "Blood Pact", icon = "Interface\\Icons\\Spell_Shadow_BloodBoil", color = { r = 0.85, g = 0.25, b = 0.25 } },
 
     -- Druid
+    ["1126"]  = { name = "Mark of the Wild", icon = "Interface\\Icons\\Spell_Nature_Regeneration", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["5232"]  = { name = "Mark of the Wild", icon = "Interface\\Icons\\Spell_Nature_Regeneration", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["6756"]  = { name = "Mark of the Wild", icon = "Interface\\Icons\\Spell_Nature_Regeneration", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["5234"]  = { name = "Mark of the Wild", icon = "Interface\\Icons\\Spell_Nature_Regeneration", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["8907"]  = { name = "Mark of the Wild", icon = "Interface\\Icons\\Spell_Nature_Regeneration", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["9884"]  = { name = "Mark of the Wild", icon = "Interface\\Icons\\Spell_Nature_Regeneration", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["9885"]  = { name = "Mark of the Wild", icon = "Interface\\Icons\\Spell_Nature_Regeneration", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["21849"] = { name = "Gift of the Wild", icon = "Interface\\Icons\\Spell_Nature_Regeneration", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["21850"] = { name = "Gift of the Wild", icon = "Interface\\Icons\\Spell_Nature_Regeneration", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["mark_of_the_wild"] = { name = "Mark of the Wild", icon = "Interface\\Icons\\Spell_Nature_Regeneration", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["mark of the wild"] = { name = "Mark of the Wild", icon = "Interface\\Icons\\Spell_Nature_Regeneration", color = { r = 0.35, g = 0.85, b = 0.30 } },
+
+    ["467"]   = { name = "Thorns", icon = "Interface\\Icons\\Spell_Nature_Thorns", color = { r = 0.50, g = 0.80, b = 0.25 } },
+    ["782"]   = { name = "Thorns", icon = "Interface\\Icons\\Spell_Nature_Thorns", color = { r = 0.50, g = 0.80, b = 0.25 } },
+    ["1075"]  = { name = "Thorns", icon = "Interface\\Icons\\Spell_Nature_Thorns", color = { r = 0.50, g = 0.80, b = 0.25 } },
+    ["8914"]  = { name = "Thorns", icon = "Interface\\Icons\\Spell_Nature_Thorns", color = { r = 0.50, g = 0.80, b = 0.25 } },
+    ["9756"]  = { name = "Thorns", icon = "Interface\\Icons\\Spell_Nature_Thorns", color = { r = 0.50, g = 0.80, b = 0.25 } },
+    ["9910"]  = { name = "Thorns", icon = "Interface\\Icons\\Spell_Nature_Thorns", color = { r = 0.50, g = 0.80, b = 0.25 } },
+    ["thorns"] = { name = "Thorns", icon = "Interface\\Icons\\Spell_Nature_Thorns", color = { r = 0.50, g = 0.80, b = 0.25 } },
+
     ["22812"] = { name = "Barkskin", icon = "Interface\\Icons\\Spell_Nature_StoneClawTotem", color = { r = 0.60, g = 0.45, b = 0.25 } },
     ["barkskin"] = { name = "Barkskin", icon = "Interface\\Icons\\Spell_Nature_StoneClawTotem", color = { r = 0.60, g = 0.45, b = 0.25 } },
+
     ["29166"] = { name = "Innervate", icon = "Interface\\Icons\\Spell_Nature_Lightning", color = { r = 0.30, g = 0.85, b = 0.95 } },
     ["innervate"] = { name = "Innervate", icon = "Interface\\Icons\\Spell_Nature_Lightning", color = { r = 0.30, g = 0.85, b = 0.95 } },
+
     ["774"]   = { name = "Rejuvenation", icon = "Interface\\Icons\\Spell_Nature_Rejuvenation", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["1058"]  = { name = "Rejuvenation", icon = "Interface\\Icons\\Spell_Nature_Rejuvenation", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["1430"]  = { name = "Rejuvenation", icon = "Interface\\Icons\\Spell_Nature_Rejuvenation", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["2090"]  = { name = "Rejuvenation", icon = "Interface\\Icons\\Spell_Nature_Rejuvenation", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["2091"]  = { name = "Rejuvenation", icon = "Interface\\Icons\\Spell_Nature_Rejuvenation", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["3627"]  = { name = "Rejuvenation", icon = "Interface\\Icons\\Spell_Nature_Rejuvenation", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["8910"]  = { name = "Rejuvenation", icon = "Interface\\Icons\\Spell_Nature_Rejuvenation", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["9839"]  = { name = "Rejuvenation", icon = "Interface\\Icons\\Spell_Nature_Rejuvenation", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["9840"]  = { name = "Rejuvenation", icon = "Interface\\Icons\\Spell_Nature_Rejuvenation", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["9841"]  = { name = "Rejuvenation", icon = "Interface\\Icons\\Spell_Nature_Rejuvenation", color = { r = 0.35, g = 0.85, b = 0.30 } },
+    ["25299"] = { name = "Rejuvenation", icon = "Interface\\Icons\\Spell_Nature_Rejuvenation", color = { r = 0.35, g = 0.85, b = 0.30 } },
     ["rejuvenation"] = { name = "Rejuvenation", icon = "Interface\\Icons\\Spell_Nature_Rejuvenation", color = { r = 0.35, g = 0.85, b = 0.30 } },
+
     ["8936"]  = { name = "Regrowth", icon = "Interface\\Icons\\Spell_Nature_ResistNature", color = { r = 0.40, g = 0.90, b = 0.35 } },
+    ["8938"]  = { name = "Regrowth", icon = "Interface\\Icons\\Spell_Nature_ResistNature", color = { r = 0.40, g = 0.90, b = 0.35 } },
+    ["8939"]  = { name = "Regrowth", icon = "Interface\\Icons\\Spell_Nature_ResistNature", color = { r = 0.40, g = 0.90, b = 0.35 } },
+    ["8940"]  = { name = "Regrowth", icon = "Interface\\Icons\\Spell_Nature_ResistNature", color = { r = 0.40, g = 0.90, b = 0.35 } },
+    ["8941"]  = { name = "Regrowth", icon = "Interface\\Icons\\Spell_Nature_ResistNature", color = { r = 0.40, g = 0.90, b = 0.35 } },
+    ["9750"]  = { name = "Regrowth", icon = "Interface\\Icons\\Spell_Nature_ResistNature", color = { r = 0.40, g = 0.90, b = 0.35 } },
+    ["9856"]  = { name = "Regrowth", icon = "Interface\\Icons\\Spell_Nature_ResistNature", color = { r = 0.40, g = 0.90, b = 0.35 } },
+    ["9857"]  = { name = "Regrowth", icon = "Interface\\Icons\\Spell_Nature_ResistNature", color = { r = 0.40, g = 0.90, b = 0.35 } },
+    ["9858"]  = { name = "Regrowth", icon = "Interface\\Icons\\Spell_Nature_ResistNature", color = { r = 0.40, g = 0.90, b = 0.35 } },
     ["regrowth"] = { name = "Regrowth", icon = "Interface\\Icons\\Spell_Nature_ResistNature", color = { r = 0.40, g = 0.90, b = 0.35 } },
+
+    ["5217"]  = { name = "Tiger's Fury", icon = "Interface\\Icons\\Ability_Mount_JungleTiger", color = { r = 0.95, g = 0.50, b = 0.15 } },
+    ["tigers_fury"] = { name = "Tiger's Fury", icon = "Interface\\Icons\\Ability_Mount_JungleTiger", color = { r = 0.95, g = 0.50, b = 0.15 } },
+    ["tigers fury"] = { name = "Tiger's Fury", icon = "Interface\\Icons\\Ability_Mount_JungleTiger", color = { r = 0.95, g = 0.50, b = 0.15 } },
+    ["5229"]  = { name = "Enrage", icon = "Interface\\Icons\\Ability_Druid_Enrage", color = { r = 0.90, g = 0.20, b = 0.10 } },
+    ["22842"] = { name = "Frenzied Regeneration", icon = "Interface\\Icons\\Ability_BullRush", color = { r = 0.40, g = 0.85, b = 0.30 } },
+    ["frenzied_regeneration"] = { name = "Frenzied Regeneration", icon = "Interface\\Icons\\Ability_BullRush", color = { r = 0.40, g = 0.85, b = 0.30 } },
+
+    -- Consumables & Potions
+    ["2379"]  = { name = "Swiftness Potion", icon = "Interface\\Icons\\INV_Potion_19", color = { r = 0.30, g = 0.80, b = 0.95 } },
+    ["swiftness_potion"] = { name = "Swiftness Potion", icon = "Interface\\Icons\\INV_Potion_19", color = { r = 0.30, g = 0.80, b = 0.95 } },
+    ["6615"]  = { name = "Free Action", icon = "Interface\\Icons\\INV_Potion_04", color = { r = 0.20, g = 0.70, b = 1.00 } },
+    ["free_action"] = { name = "Free Action", icon = "Interface\\Icons\\INV_Potion_04", color = { r = 0.20, g = 0.70, b = 1.00 } },
+    ["free action"] = { name = "Free Action", icon = "Interface\\Icons\\INV_Potion_04", color = { r = 0.20, g = 0.70, b = 1.00 } },
+    ["24364"] = { name = "Living Action", icon = "Interface\\Icons\\INV_Potion_07", color = { r = 0.95, g = 0.85, b = 0.20 } },
+    ["living_action"] = { name = "Living Action", icon = "Interface\\Icons\\INV_Potion_07", color = { r = 0.95, g = 0.85, b = 0.20 } },
+    ["17538"] = { name = "Elixir of the Mongoose", icon = "Interface\\Icons\\INV_Potion_32", color = { r = 0.85, g = 0.75, b = 0.25 } },
+    ["mongoose"] = { name = "Elixir of the Mongoose", icon = "Interface\\Icons\\INV_Potion_32", color = { r = 0.85, g = 0.75, b = 0.25 } },
+    ["11405"] = { name = "Elixir of Giants", icon = "Interface\\Icons\\INV_Potion_61", color = { r = 0.90, g = 0.40, b = 0.15 } },
+    ["giants"] = { name = "Elixir of Giants", icon = "Interface\\Icons\\INV_Potion_61", color = { r = 0.90, g = 0.40, b = 0.15 } },
+    ["17539"] = { name = "Greater Arcane Elixir", icon = "Interface\\Icons\\INV_Potion_25", color = { r = 0.40, g = 0.65, b = 1.00 } },
+    ["17626"] = { name = "Flask of the Titans", icon = "Interface\\Icons\\INV_Potion_62", color = { r = 0.95, g = 0.80, b = 0.25 } },
+    ["17628"] = { name = "Flask of Supreme Power", icon = "Interface\\Icons\\INV_Potion_41", color = { r = 0.95, g = 0.35, b = 0.15 } },
+    ["17627"] = { name = "Flask of Distilled Wisdom", icon = "Interface\\Icons\\INV_Potion_76", color = { r = 0.35, g = 0.75, b = 0.95 } },
+
+    -- World Buffs
+    ["22888"] = { name = "Rallying Cry of the Dragonslayer", icon = "Interface\\Icons\\INV_Misc_Head_Dragon_01", color = { r = 1.00, g = 0.45, b = 0.10 } },
+    ["dragonslayer"] = { name = "Rallying Cry of the Dragonslayer", icon = "Interface\\Icons\\INV_Misc_Head_Dragon_01", color = { r = 1.00, g = 0.45, b = 0.10 } },
+    ["15366"] = { name = "Songflower Serenade", icon = "Interface\\Icons\\Spell_Holy_MindVision", color = { r = 0.95, g = 0.85, b = 0.30 } },
+    ["songflower"] = { name = "Songflower Serenade", icon = "Interface\\Icons\\Spell_Holy_MindVision", color = { r = 0.95, g = 0.85, b = 0.30 } },
+    ["24425"] = { name = "Spirit of Zandalar", icon = "Interface\\Icons\\Ability_Creature_Poison_05", color = { r = 0.95, g = 0.40, b = 0.10 } },
+    ["zandalar"] = { name = "Spirit of Zandalar", icon = "Interface\\Icons\\Ability_Creature_Poison_05", color = { r = 0.95, g = 0.40, b = 0.10 } },
+    ["16609"] = { name = "Warchief's Blessing", icon = "Interface\\Icons\\Spell_Arcane_TeleportOrgrimmar", color = { r = 0.90, g = 0.25, b = 0.15 } },
+    ["warchiefs_blessing"] = { name = "Warchief's Blessing", icon = "Interface\\Icons\\Spell_Arcane_TeleportOrgrimmar", color = { r = 0.90, g = 0.25, b = 0.15 } },
+    ["22817"] = { name = "Fengus' Ferocity", icon = "Interface\\Icons\\Spell_Nature_UndyingStrength", color = { r = 0.85, g = 0.45, b = 0.15 } },
+    ["22818"] = { name = "Mol'dar's Moxie", icon = "Interface\\Icons\\Spell_Nature_MassTeleport", color = { r = 0.35, g = 0.80, b = 0.40 } },
+    ["22820"] = { name = "Slip'kik's Savvy", icon = "Interface\\Icons\\Spell_Holy_LesserHeal02", color = { r = 0.95, g = 0.75, b = 0.20 } },
 }
 
 local COLOR_PALETTES = {
@@ -1182,6 +1531,8 @@ local function GetSpellColor(name)
         return { r = 0.40, g = 0.65, b = 1.00 }
     elseif string.find(s, "shout") or string.find(s, "strike") or string.find(s, "slam") or string.find(s, "flurry") or string.find(s, "enrage") then
         return { r = 0.85, g = 0.50, b = 0.18 }
+    elseif string.find(s, "perception") or string.find(s, "sight") or string.find(s, "stealth") or string.find(s, "detect") or string.find(s, "track") then
+        return { r = 0.90, g = 0.75, b = 0.30 }
     end
 
     local hash = 0
@@ -1209,22 +1560,87 @@ local function ResolveBuffInfo(rawSpell, timeLeft)
         return entry.name, entry.icon, entry.color
     end
 
-    -- 3. Dynamic in-game player aura scan (for active buffs on player)
-    if type(GetPlayerBuff) == "function" and timeLeft then
+    -- 3. Spell ID to canonical name lookup (SPELL_ID_TO_NAME / KEY_NAMES)
+    local idResolved = SPELL_ID_TO_NAME[key] or SPELL_ID_TO_NAME[norm] or KEY_NAMES[key] or KEY_NAMES[norm]
+    if idResolved then
+        local idNorm = NormalizeName(idResolved)
+        if SPELL_BUFF_DB[idResolved] then
+            local entry = SPELL_BUFF_DB[idResolved]
+            return entry.name, entry.icon, entry.color
+        end
+        if SPELL_BUFF_DB[idNorm] then
+            local entry = SPELL_BUFF_DB[idNorm]
+            return entry.name, entry.icon, entry.color
+        end
+        local rIcon = GetAbilityIcon(idResolved)
+        local rColor = GetSpellColor(idResolved)
+        return idResolved, rIcon, rColor
+    end
+
+    -- 4. Check active run abilities (AZS_SPELLS) for matching spell ID
+    if type(AZS_SPELLS) == "table" then
+        local numId = tonumber(key)
+        if numId then
+            for idx = 1, table.getn(AZS_SPELLS) do
+                local spEntry = AZS_SPELLS[idx]
+                if type(spEntry) == "table" then
+                    local spId = tonumber(spEntry.spell or spEntry[2])
+                    if spId == numId then
+                        local spKey = spEntry.key or spEntry[1] or ""
+                        local spName = spEntry.spell or ""
+                        local resolved = ResolveSpellKeyToName(spKey, spName)
+                        if resolved and resolved ~= "" and not tonumber(resolved) then
+                            local rNorm = NormalizeName(resolved)
+                            if SPELL_BUFF_DB[resolved] then
+                                local entry = SPELL_BUFF_DB[resolved]
+                                return entry.name, entry.icon, entry.color
+                            end
+                            if SPELL_BUFF_DB[rNorm] then
+                                local entry = SPELL_BUFF_DB[rNorm]
+                                return entry.name, entry.icon, entry.color
+                            end
+                            return resolved, GetAbilityIcon(resolved), GetSpellColor(resolved)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- 5. Dynamic client spell query (if client supports GetSpellInfo)
+    if type(GetSpellInfo) == "function" then
+        local numId = tonumber(key)
+        if numId then
+            local ok, sName, _, sIcon = pcall(GetSpellInfo, numId)
+            if ok and sName and sName ~= "" then
+                local sCol = GetSpellColor(sName)
+                local sIc = sIcon or GetAbilityIcon(sName)
+                return sName, sIc, sCol
+            end
+        end
+    end
+
+    -- 6. Dynamic in-game player aura scan
+    if type(GetPlayerBuff) == "function" then
         for bi = 0, 31 do
             local bIdx = GetPlayerBuff(bi, "HELPFUL")
             if bIdx and bIdx >= 0 then
                 local dur = GetPlayerBuffTimeLeft(bIdx) or 0
-                if math.abs(dur - timeLeft) <= 2.5 then
-                    local tex = GetPlayerBuffTexture(bIdx)
-                    if not scanTooltip then
-                        scanTooltip = CreateFrame("GameTooltip", "BUI_BuffScanTooltip", UIParent, "GameTooltipTemplate")
-                        scanTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+                local tex = GetPlayerBuffTexture(bIdx)
+                if not scanTooltip then
+                    scanTooltip = CreateFrame("GameTooltip", "BUI_BuffScanTooltip", UIParent, "GameTooltipTemplate")
+                    scanTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+                end
+                scanTooltip:ClearLines()
+                scanTooltip:SetPlayerBuff(bIdx)
+                local scannedName = BUI_BuffScanTooltipTextLeft1 and BUI_BuffScanTooltipTextLeft1:GetText()
+                if scannedName and scannedName ~= "" then
+                    local match = false
+                    if timeLeft and dur > 0 and math.abs(dur - timeLeft) <= 3.0 then
+                        match = true
                     end
-                    scanTooltip:ClearLines()
-                    scanTooltip:SetPlayerBuff(bIdx)
-                    local scannedName = BUI_BuffScanTooltipTextLeft1 and BUI_BuffScanTooltipTextLeft1:GetText()
-                    if scannedName and scannedName ~= "" then
+                    local normScanned = NormalizeName(scannedName)
+                    if match or normScanned == norm or scannedName == key then
                         local col = GetSpellColor(scannedName)
                         return scannedName, tex, col
                     end
@@ -1233,9 +1649,24 @@ local function ResolveBuffInfo(rawSpell, timeLeft)
         end
     end
 
-    -- 4. Ability icon lookup fallback
+    -- 7. Universal spell database lookup (SpellNames.lua / Icons.lua)
+    if AZSSpellMeterName and AZSSpellMeterName[key] then
+        local eng = AZSSpellMeterName[key]
+        local ic = (AZSSpellMeterIcon and AZSSpellMeterIcon[eng]) or GetAbilityIcon(eng)
+        if ic and not string.find(ic, "\\", 1, true) then ic = "Interface\\Icons\\" .. ic end
+        return eng, ic, GetSpellColor(eng)
+    end
+    if AZSSpellMeterIcon and AZSSpellMeterIcon[key] then
+        local ic = AZSSpellMeterIcon[key]
+        if ic and not string.find(ic, "\\", 1, true) then ic = "Interface\\Icons\\" .. ic end
+        return key, ic, GetSpellColor(key)
+    end
+
+    -- 8. Ability icon lookup fallback
     local icon = GetAbilityIcon(key)
-    if not icon then icon = GetAbilityIcon(norm) end
+    if not icon or icon == "Interface\\Icons\\INV_Misc_QuestionMark" then
+        icon = GetAbilityIcon(norm)
+    end
     if not icon then icon = "Interface\\Icons\\INV_Misc_QuestionMark" end
 
     local displayName = key
