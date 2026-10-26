@@ -2,7 +2,7 @@
 
 [![WoW Version](https://img.shields.io/badge/WoW-1.12.1%20Vanilla-blue.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI)
 [![Game Mode](https://img.shields.io/badge/Mode-Azeroth%20Survivors-red.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI)
-[![Release](https://img.shields.io/badge/Release-v2.6.4--azs-00e5ff.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI/releases)
+[![Release](https://img.shields.io/badge/Release-v2.6.5--azs-00e5ff.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI/releases)
 [![Lua Engine](https://img.shields.io/badge/Engine-Strict%20Lua%205.0-brightgreen.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI)
 [![License](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI/blob/main/LICENSE)
 
