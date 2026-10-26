@@ -1219,8 +1219,7 @@ function mod:Update(state)
 
             -- Status bar color
             if mode == "party" and not B.meterDrilldown then
-                local uCls = item.class and string.upper(item.class)
-                local cCol = (uCls and B.CLASS_COLORS[uCls]) or { r = 0.30, g = 0.75, b = 1.00 }
+                local cCol = B:ResolveClassColor(item.class) or { r = 0.30, g = 0.75, b = 1.00 }
                 B:SetBarColor(r.bar, cCol.r, cCol.g, cCol.b)
             elseif dataIdx == 1 then
                 B:SetBarColor(r.bar, themeR, themeG, themeB)

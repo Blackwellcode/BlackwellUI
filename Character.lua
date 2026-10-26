@@ -666,7 +666,7 @@ local function UpdateCharacterFrame()
         CharacterNameText:SetText(pName)
     end
     if CharacterLevelText then
-        local cCol = (pClassToken and B.CLASS_COLORS[pClassToken]) or { r = 1, g = 1, b = 1 }
+        local cCol = B:ResolveClassColor(pClassToken) or B:ResolveClassColor(pClass) or { r = 1, g = 1, b = 1 }
         local cr = math.floor((cCol.r or 1) * 255 + 0.5)
         local cg = math.floor((cCol.g or 1) * 255 + 0.5)
         local cb = math.floor((cCol.b or 1) * 255 + 0.5)

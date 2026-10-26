@@ -15,7 +15,7 @@ BlackwallUI = BlackwellUI -- Backwards compatibility alias
 EllesmereUI = BlackwellUI -- Backwards compatibility alias
 local E = BlackwellUI
 
-B.version = "2.6.3-azs"
+B.version = "2.6.4-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -88,6 +88,22 @@ B.CLASS_COLORS = {
     WARLOCK = { r = 0.58, g = 0.51, b = 0.79 },
     DRUID   = { r = 1.00, g = 0.49, b = 0.04 },
 }
+
+-- Comprehensive cross-platform aliases (TitleCase, lowercase, German localizations)
+local CLASS_ALIASES = {
+    ["Warrior"] = "WARRIOR", ["warrior"] = "WARRIOR", ["Krieger"] = "WARRIOR", ["krieger"] = "WARRIOR", ["KRIEGER"] = "WARRIOR",
+    ["Paladin"] = "PALADIN", ["paladin"] = "PALADIN",
+    ["Hunter"]  = "HUNTER",  ["hunter"]  = "HUNTER",  ["Jäger"] = "HUNTER",   ["jäger"] = "HUNTER",   ["JÄGER"] = "HUNTER", ["Jaeger"] = "HUNTER", ["jaeger"] = "HUNTER", ["JAEGER"] = "HUNTER",
+    ["Rogue"]   = "ROGUE",   ["rogue"]   = "ROGUE",   ["Schurke"] = "ROGUE",  ["schurke"] = "ROGUE",  ["SCHURKE"] = "ROGUE",
+    ["Priest"]  = "PRIEST",  ["priest"]  = "PRIEST",  ["Priester"] = "PRIEST", ["priester"] = "PRIEST", ["PRIESTER"] = "PRIEST",
+    ["Shaman"]  = "SHAMAN",  ["shaman"]  = "SHAMAN",  ["Schamane"] = "SHAMAN", ["schamane"] = "SHAMAN", ["SCHAMANE"] = "SHAMAN",
+    ["Mage"]    = "MAGE",    ["mage"]    = "MAGE",    ["Magier"] = "MAGE",   ["magier"] = "MAGE",   ["MAGIER"] = "MAGE",
+    ["Warlock"] = "WARLOCK", ["warlock"] = "WARLOCK", ["Hexenmeister"] = "WARLOCK", ["hexenmeister"] = "WARLOCK", ["HEXENMEISTER"] = "WARLOCK",
+    ["Druid"]   = "DRUID",   ["druid"]   = "DRUID",   ["Druide"] = "DRUID",  ["druide"] = "DRUID",  ["DRUIDE"] = "DRUID",
+}
+for alias, target in pairs(CLASS_ALIASES) do
+    B.CLASS_COLORS[alias] = B.CLASS_COLORS[target]
+end
 
 -- Unit kinds as AZS_UNITS / AZS_TARGET name them.
 B.KIND_COLORS = {
@@ -1052,16 +1068,23 @@ end
 -------------------------------------------------------------------------------
 --  Colours
 -------------------------------------------------------------------------------
+function B:ResolveClassColor(token)
+    if not token or type(token) ~= "string" then return nil end
+    local clean = string.gsub(token, "%s", "")
+    return self.CLASS_COLORS[clean]
+        or self.CLASS_COLORS[string.upper(clean)]
+        or self.CLASS_COLORS[string.lower(clean)]
+end
+
 function B:GetClassColor()
-    local token
+    local c
     if AZS_ZONE and type(AZS_ZONE.cname) == "string" then
-        token = string.upper((string.gsub(AZS_ZONE.cname, "%s", "")))
+        c = self:ResolveClassColor(AZS_ZONE.cname)
     end
-    if not token or not self.CLASS_COLORS[token] then
-        local _, t = UnitClass("player")
-        token = t
+    if not c then
+        local loc, eng = UnitClass("player")
+        c = self:ResolveClassColor(eng) or self:ResolveClassColor(loc)
     end
-    local c = token and self.CLASS_COLORS[token]
     if c then return c.r, c.g, c.b end
     return 0/255, 229/255, 255/255
 end
@@ -1938,8 +1961,8 @@ function B:InitTooltip()
         if UnitExists("mouseover") and GameTooltip:IsShown() then
             SkinTooltip(GameTooltip)
             if UnitIsPlayer("mouseover") then
-                local _, cl = UnitClass("mouseover")
-                local cc = cl and B.CLASS_COLORS[cl]
+                local loc, cl = UnitClass("mouseover")
+                local cc = B:ResolveClassColor(cl) or B:ResolveClassColor(loc)
                 if cc then
                     GameTooltip:SetBackdropBorderColor(cc.r, cc.g, cc.b, 1.0)
                 end
