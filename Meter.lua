@@ -381,9 +381,67 @@ function mod:Create()
     end)
     hdr.resetBtn = resetBtn
 
+    -- Merge Procs Button [M]
+    local mergeBtn = CreateFrame("Button", nil, hdr)
+    mergeBtn:SetWidth(14)
+    mergeBtn:SetHeight(14)
+    mergeBtn:SetPoint("RIGHT", resetBtn, "LEFT", -4, 0)
+    mergeBtn:EnableMouse(true)
+    B:Backdrop(mergeBtn, 0.90)
+    B:Border(mergeBtn, 0.35, 0.35, 0.35, 1)
+
+    local mergeFs = B:Font(mergeBtn, 9, "CENTER")
+    mergeFs:SetPoint("CENTER", mergeBtn, "CENTER", 0, 0)
+    mergeFs:SetText("M")
+    mergeFs:SetTextColor(0.85, 0.85, 0.85)
+    mergeBtn.fs = mergeFs
+
+    mergeBtn:SetScript("OnEnter", function()
+        B:Border(this, 1.0, 0.82, 0.10, 1)
+        this.fs:SetTextColor(1.0, 0.82, 0.10)
+        GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+        GameTooltip:ClearLines()
+        GameTooltip:AddLine("Merge Item Procs", 1.0, 0.82, 0.10)
+        GameTooltip:AddLine("Left-Click: Toggle merging legendary neck & item procs into base abilities", 0.85, 0.85, 0.85)
+        if B.db.mergeItemProcs then
+            GameTooltip:AddLine("Status: |cff00ff00Merged (Compact)|r", 1, 1, 1)
+        else
+            GameTooltip:AddLine("Status: |cffffaa00Separated (Detailed)|r", 1, 1, 1)
+        end
+        GameTooltip:Show()
+    end)
+    mergeBtn:SetScript("OnLeave", function()
+        if B.db.mergeItemProcs then
+            B:Border(this, 0.30, 0.75, 1.00, 1)
+            this.fs:SetTextColor(0.30, 0.75, 1.00)
+        else
+            B:Border(this, 0.35, 0.35, 0.35, 1)
+            this.fs:SetTextColor(0.60, 0.60, 0.60)
+        end
+        GameTooltip:Hide()
+    end)
+    mergeBtn:SetScript("OnClick", function()
+        B.db.mergeItemProcs = not B.db.mergeItemProcs
+        if B.db.mergeItemProcs then
+            B:Border(this, 0.30, 0.75, 1.00, 1)
+            this.fs:SetTextColor(0.30, 0.75, 1.00)
+            if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+                DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[BlackwellUI]|r Combat Meter: Item & neck procs merged.")
+            end
+        else
+            B:Border(this, 0.35, 0.35, 0.35, 1)
+            this.fs:SetTextColor(0.60, 0.60, 0.60)
+            if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+                DEFAULT_CHAT_FRAME:AddMessage("|cff00ffff[BlackwellUI]|r Combat Meter: Item & neck procs separated.")
+            end
+        end
+        B:Tick()
+    end)
+    hdr.mergeBtn = mergeBtn
+
     -- Total DPS text & Total Amount text
     local rateFs = B:Font(hdr, 9, "RIGHT")
-    rateFs:SetPoint("RIGHT", resetBtn, "LEFT", -6, 0)
+    rateFs:SetPoint("RIGHT", mergeBtn, "LEFT", -6, 0)
     rateFs:SetTextColor(0.70, 0.92, 0.68)
     hdr.rate = rateFs
 
@@ -622,6 +680,25 @@ function mod:Create()
                 GameTooltip:AddLine(string.format("DPS: %s", B:Short(d.dps)), 0.70, 0.92, 0.68)
             end
 
+            if d.procDmg and d.procDmg > 0 then
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine("Proc & Item Breakdown:", 0.30, 0.75, 1.00)
+                if d.baseDmg and d.baseDmg > 0 then
+                    local basePct = (d.dmg > 0) and (d.baseDmg / d.dmg * 100) or 0
+                    GameTooltip:AddDoubleLine("  Direct Casts:", string.format("%s (%.1f%%)", B:Short(d.baseDmg), basePct), 0.85, 0.85, 0.85, 1, 1, 1)
+                end
+                local totalProcPct = (d.dmg > 0) and (d.procDmg / d.dmg * 100) or 0
+                GameTooltip:AddDoubleLine("  Total Procs:", string.format("%s (%.1f%%)", B:Short(d.procDmg), totalProcPct), 0.30, 0.75, 1.00, 0.30, 0.75, 1.00)
+                if d.procs and table.getn(d.procs) > 0 then
+                    for pIdx = 1, table.getn(d.procs) do
+                        local pInfo = d.procs[pIdx]
+                        if pInfo and pInfo.name and pInfo.dmg then
+                            GameTooltip:AddDoubleLine(string.format("    - %s:", pInfo.name), B:Short(pInfo.dmg), 0.70, 0.70, 0.70, 0.90, 0.90, 0.90)
+                        end
+                    end
+                end
+            end
+
             if d.hits and d.hits > 0 then
                 local crits = d.crits or 0
                 local critPct = (d.hits > 0) and math.floor(crits / d.hits * 100 + 0.5) or 0
@@ -634,6 +711,18 @@ function mod:Create()
                     if string.lower(k) == string.lower(d.name) then
                         crit = v
                         break
+                    end
+                end
+            end
+            if d.procs and table.getn(d.procs) > 0 and B.biggestCrits then
+                for pIdx = 1, table.getn(d.procs) do
+                    local pInfo = d.procs[pIdx]
+                    if pInfo and pInfo.name then
+                        local pFull = pInfo.name .. ": " .. d.name
+                        local pCrit = B.biggestCrits[pFull]
+                        if pCrit and (not crit or pCrit > crit) then
+                            crit = pCrit
+                        end
                     end
                 end
             end
@@ -737,6 +826,18 @@ function mod:Update(state)
                 B:Border(btn, 0.25, 0.22, 0.20, 1)
                 btn:SetBackdropColor(0.06, 0.05, 0.04, 0.85)
             end
+        end
+    end
+
+    -- Update Merge Procs button style
+    if f.header and f.header.mergeBtn then
+        local mBtn = f.header.mergeBtn
+        if B.db.mergeItemProcs then
+            B:Border(mBtn, 0.30, 0.75, 1.00, 1)
+            mBtn.fs:SetTextColor(0.30, 0.75, 1.00)
+        else
+            B:Border(mBtn, 0.35, 0.35, 0.35, 1)
+            mBtn.fs:SetTextColor(0.60, 0.60, 0.60)
         end
     end
 
@@ -879,6 +980,7 @@ function mod:Update(state)
         local rawBoss = (type(AZS_GetBossMeter) == "function" and AZS_GetBossMeter()) or state.bossMeter or {}
         if type(rawBoss) ~= "table" then rawBoss = {} end
 
+        local mergedMap = {}
         for i = 1, table.getn(rawBoss) do
             local item = rawBoss[i]
             if type(item) == "table" then
@@ -888,14 +990,59 @@ function mod:Update(state)
                 local d = rawD - base
                 if d < 0 then d = 0 end
                 if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
-                    table.insert(list, {
-                        name = sName,
-                        dmg = d,
-                        dps = math.floor(d / runSec),
-                    })
                     totalAmt = totalAmt + d
-                    if d > maxVal then maxVal = d end
+                    if B.db.mergeItemProcs then
+                        local _, _, itemPrefix, spellSuffix = string.find(sName, "^(.-): (.+)$")
+                        if itemPrefix and spellSuffix and itemPrefix ~= "" and spellSuffix ~= "" then
+                            local k = string.lower(spellSuffix)
+                            local existing = mergedMap[k]
+                            if existing then
+                                existing.dmg = existing.dmg + d
+                                existing.procDmg = (existing.procDmg or 0) + d
+                                if not existing.procs then existing.procs = {} end
+                                table.insert(existing.procs, { name = itemPrefix, dmg = d })
+                            else
+                                local entry = {
+                                    name = spellSuffix,
+                                    dmg = d,
+                                    baseDmg = 0,
+                                    procDmg = d,
+                                    procs = { { name = itemPrefix, dmg = d } },
+                                }
+                                mergedMap[k] = entry
+                                table.insert(list, entry)
+                            end
+                        else
+                            local k = string.lower(sName)
+                            local existing = mergedMap[k]
+                            if existing then
+                                existing.dmg = existing.dmg + d
+                                existing.baseDmg = (existing.baseDmg or 0) + d
+                            else
+                                local entry = {
+                                    name = sName,
+                                    dmg = d,
+                                    baseDmg = d,
+                                    procDmg = 0,
+                                    procs = {},
+                                }
+                                mergedMap[k] = entry
+                                table.insert(list, entry)
+                            end
+                        end
+                    else
+                        table.insert(list, {
+                            name = sName,
+                            dmg = d,
+                            dps = math.floor(d / runSec),
+                        })
+                    end
                 end
+            end
+        end
+        if B.db.mergeItemProcs then
+            for i = 1, table.getn(list) do
+                list[i].dps = math.floor((list[i].dmg or 0) / runSec)
             end
         end
         totalRate = math.floor(totalAmt / runSec)
@@ -945,6 +1092,7 @@ function mod:Update(state)
         local rawMeter = (type(AZS_GetMeter) == "function" and AZS_GetMeter()) or state.meter or {}
         if type(rawMeter) ~= "table" then rawMeter = {} end
 
+        local mergedMap = {}
         for i = 1, table.getn(rawMeter) do
             local item = rawMeter[i]
             if type(item) == "table" then
@@ -954,14 +1102,59 @@ function mod:Update(state)
                 local d = rawD - base
                 if d < 0 then d = 0 end
                 if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
-                    table.insert(list, {
-                        name = sName,
-                        dmg = d,
-                        dps = math.floor(d / runSec),
-                    })
                     totalAmt = totalAmt + d
-                    if d > maxVal then maxVal = d end
+                    if B.db.mergeItemProcs then
+                        local _, _, itemPrefix, spellSuffix = string.find(sName, "^(.-): (.+)$")
+                        if itemPrefix and spellSuffix and itemPrefix ~= "" and spellSuffix ~= "" then
+                            local k = string.lower(spellSuffix)
+                            local existing = mergedMap[k]
+                            if existing then
+                                existing.dmg = existing.dmg + d
+                                existing.procDmg = (existing.procDmg or 0) + d
+                                if not existing.procs then existing.procs = {} end
+                                table.insert(existing.procs, { name = itemPrefix, dmg = d })
+                            else
+                                local entry = {
+                                    name = spellSuffix,
+                                    dmg = d,
+                                    baseDmg = 0,
+                                    procDmg = d,
+                                    procs = { { name = itemPrefix, dmg = d } },
+                                }
+                                mergedMap[k] = entry
+                                table.insert(list, entry)
+                            end
+                        else
+                            local k = string.lower(sName)
+                            local existing = mergedMap[k]
+                            if existing then
+                                existing.dmg = existing.dmg + d
+                                existing.baseDmg = (existing.baseDmg or 0) + d
+                            else
+                                local entry = {
+                                    name = sName,
+                                    dmg = d,
+                                    baseDmg = d,
+                                    procDmg = 0,
+                                    procs = {},
+                                }
+                                mergedMap[k] = entry
+                                table.insert(list, entry)
+                            end
+                        end
+                    else
+                        table.insert(list, {
+                            name = sName,
+                            dmg = d,
+                            dps = math.floor(d / runSec),
+                        })
+                    end
                 end
+            end
+        end
+        if B.db.mergeItemProcs then
+            for i = 1, table.getn(list) do
+                list[i].dps = math.floor((list[i].dmg or 0) / runSec)
             end
         end
         totalRate = math.floor(totalAmt / runSec)
@@ -969,6 +1162,8 @@ function mod:Update(state)
 
     -- Sort descending by amount
     table.sort(list, function(a, b) return (tonumber(a.dmg) or 0) > (tonumber(b.dmg) or 0) end)
+
+    local maxVal = (list[1] and list[1].dmg) or 0
 
     local totalEntries = table.getn(list)
     f.maxEntries = totalEntries
@@ -1015,7 +1210,7 @@ function mod:Update(state)
             local sharePct = share * 100
             item.share = sharePct
 
-            local fill = share
+            local fill = (maxVal > 0) and (d / maxVal) or 0
             if d > 0 and fill < 0.02 then fill = 0.02 end
             if fill > 1 then fill = 1 end
 
@@ -1070,7 +1265,13 @@ function mod:Update(state)
 
             -- Amount, Share, Rate
             r.textAmount:SetText(B:Short(d))
-            r.textShare:SetText(string.format("%d%%", math.floor(share + 0.5)))
+            if sharePct >= 9.95 then
+                r.textShare:SetText(string.format("%d%%", math.floor(sharePct + 0.5)))
+            elseif sharePct >= 0.05 then
+                r.textShare:SetText(string.format("%.1f%%", sharePct))
+            else
+                r.textShare:SetText("0%")
+            end
             r.textRate:SetText(B:Short(rate))
 
             r.valStr = string.format("%s: %s (%s %s)", amtColLabel, B:Short(d), B:Short(rate), rateLabel)

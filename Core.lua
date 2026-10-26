@@ -15,7 +15,7 @@ BlackwallUI = BlackwellUI -- Backwards compatibility alias
 EllesmereUI = BlackwellUI -- Backwards compatibility alias
 local E = BlackwellUI
 
-B.version = "2.6.2-azs"
+B.version = "2.6.3-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -126,6 +126,7 @@ local DEFAULTS = {
     hideBanners = false,
     hideLoot = false,
     meterMode = "done",
+    mergeItemProcs = false,
     colorHealthByClass = true,
     pinCaches = true,
     pinLairs = true,

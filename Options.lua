@@ -450,6 +450,15 @@ local function BuildOptionsFrame()
     )
     table.insert(checkList, cbPinLairs)
 
+    local cbMergeProcs = CreateCheckbox(f, 280, -302, "Meter: Merge Legendary Neck/Procs",
+        function() return B.db.mergeItemProcs == true end,
+        function(val)
+            B.db.mergeItemProcs = val
+            B:Tick()
+        end
+    )
+    table.insert(checkList, cbMergeProcs)
+
     -- Warning note about CVars
     local noteFs = B:Font(f, 9, "LEFT")
     noteFs:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -446)
