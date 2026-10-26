@@ -31,10 +31,6 @@ function mod:HideBlizzardArt()
         MiniMapMeetingStoneFrame,
         MiniMapBattlefieldFrame,
         MiniMapWorldMapButton,
-        MinimapBackdrop,
-        MinimapCompassTexture,
-        MinimapCompassTextureUnderlay,
-        MinimapCluster,
     }
     for i = 1, table.getn(hideList) do
         local f = hideList[i]
@@ -58,68 +54,8 @@ function mod:HideBlizzardArt()
         end
     end
 
-    if MinimapCluster then
-        MinimapCluster:Hide()
-        MinimapCluster:SetAlpha(0)
-        MinimapCluster:ClearAllPoints()
-        MinimapCluster:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 5000, 5000)
-        MinimapCluster.Show = function() end
-        if MinimapCluster.GetRegions then
-            local mcRegions = { MinimapCluster:GetRegions() }
-            for i = 1, table.getn(mcRegions) do
-                local r = mcRegions[i]
-                if r then
-                    if r.SetAlpha then r:SetAlpha(0) end
-                    if r.Hide then r:Hide() end
-                    if r.GetObjectType and r:GetObjectType() == "Texture" then
-                        r:SetTexture(nil)
-                    end
-                end
-            end
-        end
-        if MinimapCluster.GetChildren then
-            local mcChildren = { MinimapCluster:GetChildren() }
-            for i = 1, table.getn(mcChildren) do
-                local child = mcChildren[i]
-                if child and child ~= Minimap and child ~= self.container and child ~= self.frame then
-                    child:Hide()
-                    child:SetAlpha(0)
-                    if child.ClearAllPoints then
-                        child:ClearAllPoints()
-                        child:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 5000, 5000)
-                    end
-                    if child.EnableMouse then
-                        child:EnableMouse(false)
-                    end
-                    child.Show = function() end
-                end
-            end
-        end
-    end
-
-    if MinimapBackdrop and MinimapBackdrop.GetRegions then
-        local bRegions = { MinimapBackdrop:GetRegions() }
-        for i = 1, table.getn(bRegions) do
-            local r = bRegions[i]
-            if r and r.SetAlpha then
-                r:SetAlpha(0)
-                r:Hide()
-            end
-        end
-    end
-
-    if Minimap and Minimap.GetRegions then
-        local mRegions = { Minimap:GetRegions() }
-        for i = 1, table.getn(mRegions) do
-            local r = mRegions[i]
-            if r and r.GetObjectType and r:GetObjectType() == "Texture" then
-                local tex = r:GetTexture()
-                if tex and (string.find(tex, "Compass") or string.find(tex, "Border") or string.find(tex, "Cross") or string.find(tex, "Corner")) then
-                    r:SetAlpha(0)
-                    r:Hide()
-                end
-            end
-        end
+    if MinimapBorderTop and MinimapBorderTop.SetAlpha then
+        MinimapBorderTop:SetAlpha(0)
     end
 
     if MinimapNorthTag then
@@ -177,7 +113,6 @@ function mod:Create()
     ---------------------------------------------------------------------------
     local cont = CreateFrame("Frame", "BUI_Minimap", root)
     EUI_Minimap = cont -- Compatibility alias
-    cont:SetFrameStrata("MEDIUM")
     cont:SetWidth(MAP_SIZE + 2)
     cont:SetHeight(MAP_SIZE + 2)
     B:Backdrop(cont, 0.90)
@@ -192,6 +127,8 @@ function mod:Create()
         Minimap:SetPoint("BOTTOMRIGHT", cont, "BOTTOMRIGHT", -1, 1)
         Minimap:SetWidth(MAP_SIZE)
         Minimap:SetHeight(MAP_SIZE)
+        Minimap:SetFrameLevel(cont:GetFrameLevel() + 1)
+        Minimap:Show()
 
         -- Mask to 1.12 square if supported
         local smt = rawget(Minimap, "SetMaskTexture")
@@ -301,10 +238,6 @@ function mod:Update(state)
     if MinimapToggleButton and MinimapToggleButton:IsShown() then
         MinimapToggleButton:Hide()
         MinimapToggleButton:SetAlpha(0)
-    end
-    if MinimapCluster and MinimapCluster:IsShown() then
-        MinimapCluster:Hide()
-        MinimapCluster:SetAlpha(0)
     end
     -- Update Zone Name
     if self.zoneFs then
