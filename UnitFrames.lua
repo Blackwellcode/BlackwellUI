@@ -860,8 +860,8 @@ function mod:Update(state)
 
             -- Color target: reaction colored or class colored
             if UnitIsPlayer("target") then
-                local _, targetClass = UnitClass("target")
-                local tc = targetClass and B.CLASS_COLORS[targetClass]
+                local loc, targetClass = UnitClass("target")
+                local tc = B:ResolveClassColor(targetClass) or B:ResolveClassColor(loc)
                 if tc then
                     B:SetBarColor(tgt.hpBar, tc.r, tc.g, tc.b)
                 else
@@ -1180,7 +1180,7 @@ function mod:UpdateParty(state)
             f.nameText:SetText(d.name)
             local hpPct = d.hp / d.hpm
             f.hpBar:SetValue(hpPct)
-            local col = B.CLASS_COLORS[d.class] or { r = 0.2, g = 0.8, b = 0.2 }
+            local col = B:ResolveClassColor(d.class) or { r = 0.2, g = 0.8, b = 0.2 }
             B:SetBarColor(f.hpBar, col.r, col.g, col.b)
             local pctInt = math.floor(hpPct * 100 + 0.5)
             f.hpText:SetText(tostring(pctInt) .. "%")
@@ -1210,8 +1210,8 @@ function mod:UpdateParty(state)
             local uName = UnitName(unit) or ("Party " .. i)
             f.nameText:SetText(uName)
 
-            local _, uClass = UnitClass(unit)
-            local cColor = (uClass and B.CLASS_COLORS[uClass]) or { r = 0.2, g = 0.8, b = 0.2 }
+            local loc, uClass = UnitClass(unit)
+            local cColor = B:ResolveClassColor(uClass) or B:ResolveClassColor(loc) or { r = 0.2, g = 0.8, b = 0.2 }
             B:SetBarColor(f.hpBar, cColor.r, cColor.g, cColor.b)
 
             local isConn = (type(UnitIsConnected) == "function" and UnitIsConnected(unit))
@@ -1253,8 +1253,7 @@ function mod:UpdateParty(state)
             -- Fallback if server provides AZS_PARTY entries
             local pData = state.party[i + 1]
             f.nameText:SetText(pData.name or ("Party " .. i))
-            local cls = pData.class and string.upper(pData.class)
-            local cColor = (cls and B.CLASS_COLORS[cls]) or { r = 0.2, g = 0.8, b = 0.2 }
+            local cColor = B:ResolveClassColor(pData.class) or { r = 0.2, g = 0.8, b = 0.2 }
             B:SetBarColor(f.hpBar, cColor.r, cColor.g, cColor.b)
             f.hpBar:SetValue(1.0)
             f.hpText:SetText(B:Short(pData.dmg or 0))
