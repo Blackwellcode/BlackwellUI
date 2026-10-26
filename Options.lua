@@ -358,7 +358,9 @@ local function BuildOptionsFrame()
         { key = "nameplates", label = "Cyberpunk Nameplates" },
         { key = "combattext", label = "Combat Text (MSBT Style)" },
         { key = "character",  label = "Character Matrix ('C' Key)" },
+        { key = "equipment",  label = "Picked Items & Equipment HUD" },
         { key = "loot",       label = "Loot Drop Telemetry Log" },
+        { key = "rares",      label = "Rare Spawn Timers" },
     }
 
     for i = 1, table.getn(modDefs) do
@@ -560,6 +562,16 @@ local function HandleSlashCmd(msg)
         B.db.modules["loot"] = not cur
         B:OnModulesChanged()
         B:Print("Loot Drop Log: " .. (B:IsEnabled("loot") and "ON" or "OFF"))
+    elseif cmd == "rares" or cmd == "rare" then
+        local cur = B:IsEnabled("rares")
+        B.db.modules["rares"] = not cur
+        B:OnModulesChanged()
+        B:Print("Rare Spawn Timers: " .. (B:IsEnabled("rares") and "ON" or "OFF"))
+    elseif cmd == "equipment" or cmd == "items" or cmd == "gear" then
+        local cur = B:IsEnabled("equipment")
+        B.db.modules["equipment"] = not cur
+        B:OnModulesChanged()
+        B:Print("Equipment HUD: " .. (B:IsEnabled("equipment") and "ON" or "OFF"))
     elseif cmd == "nameplates" or cmd == "plates" or cmd == "splates" then
         local cur = B:IsEnabled("nameplates")
         B.db.modules["nameplates"] = not cur

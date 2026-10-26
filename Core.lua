@@ -15,7 +15,7 @@ BlackwallUI = BlackwellUI -- Backwards compatibility alias
 EllesmereUI = BlackwellUI -- Backwards compatibility alias
 local E = BlackwellUI
 
-B.version = "2.5.0-azs"
+B.version = "2.6.0-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -147,6 +147,8 @@ local DEFAULTS = {
         combattext = true,
         character = true,
         loot = true,
+        rares = true,
+        equipment = true,
     },
     positions = {},
 }
@@ -510,6 +512,148 @@ local MASTER_ABILITY_ICONS = {
 }
 B.MASTER_ABILITY_ICONS = MASTER_ABILITY_ICONS
 
+local EXTRA_ABILITY_ICONS = {
+    ["Pets"] = "Interface\\Icons\\Ability_Hunter_BeastCall",
+    ["Pet"] = "Interface\\Icons\\Ability_Hunter_BeastCall",
+    ["pets"] = "Interface\\Icons\\Ability_Hunter_BeastCall",
+    ["pet"] = "Interface\\Icons\\Ability_Hunter_BeastCall",
+    ["Pad"] = "Interface\\Icons\\Ability_Hunter_BeastCall",
+    ["pad"] = "Interface\\Icons\\Ability_Hunter_BeastCall",
+    ["Melee"] = "Interface\\Icons\\INV_Sword_04",
+    ["Auto Attack"] = "Interface\\Icons\\INV_Sword_04",
+    ["Damage Shield"] = "Interface\\Icons\\Spell_Nature_Thorns",
+    ["Hot Streak"] = "Interface\\Icons\\Spell_Fire_Fireball02",
+    ["Windfury"] = "Interface\\Icons\\Spell_Nature_Cyclone",
+    ["Lightning Overload"] = "Interface\\Icons\\Spell_Nature_CallStorm",
+    ["Shadowy Apparitions"] = "Interface\\Icons\\Spell_Shadow_Haunting",
+    ["Seed of Corruption"] = "Interface\\Icons\\Spell_Shadow_CurseOfMannoroth",
+    ["Maelstrom Weapon"] = "Interface\\Icons\\Spell_Nature_Lightning",
+    ["Leech"] = "Interface\\Icons\\Spell_Shadow_LifeDrain",
+    ["Onyxia Tooth Pendant"] = "Interface\\Icons\\INV_Jewelry_Necklace_09",
+    ["Choker of the Fire Lord"] = "Interface\\Icons\\INV_Jewelry_Amulet_05",
+    ["Choker of Enlightenment"] = "Interface\\Icons\\INV_Jewelry_Necklace_10",
+    ["Prestor's Talisman of Connivery"] = "Interface\\Icons\\INV_Jewelry_Necklace_17",
+    ["Animated Chain Necklace"] = "Interface\\Icons\\INV_Jewelry_Necklace_01",
+    ["Woven Ivy Necklace"] = "Interface\\Icons\\INV_Misc_Herb_15",
+    ["Amulet of the Darkmoon"] = "Interface\\Icons\\INV_Jewelry_Necklace_14",
+    ["Jeklik's Opaline Talisman"] = "Interface\\Icons\\INV_Jewelry_Necklace_03",
+    ["The Eye of Hakkar"] = "Interface\\Icons\\INV_Jewelry_Necklace_22",
+    ["Medallion of Steadfast Might"] = "Interface\\Icons\\INV_Jewelry_Amulet_03",
+    ["Amulet of Vek'nilash"] = "Interface\\Icons\\INV_Jewelry_Necklace_AhnQiraj_01",
+    ["Pendant of the Fallen Dragon"] = "Interface\\Icons\\INV_Jewelry_Necklace_12",
+    ["Malice Stone Pendant"] = "Interface\\Icons\\INV_Jewelry_Necklace_29",
+    ["Infernal"] = "Interface\\Icons\\Spell_Shadow_SummonInfernal",
+    ["Doomguard"] = "Interface\\Icons\\Spell_Shadow_SummonInfernal",
+    ["Felguard"] = "Interface\\Icons\\Spell_Shadow_Metamorphosis",
+    ["Divine Storm"] = "Interface\\Icons\\Spell_Holy_SealOfRighteousness",
+    ["Imp"] = "Interface\\Icons\\Spell_Shadow_SummonImp",
+    ["Felhunter"] = "Interface\\Icons\\Spell_Shadow_SummonFelHunter",
+    ["Succubus"] = "Interface\\Icons\\Spell_Shadow_SummonSuccubus",
+    ["Pit Lord"] = "Interface\\Icons\\Spell_Shadow_UnholyStrength",
+    ["Water Elemental"] = "Interface\\Icons\\Spell_Frost_SummonWaterElemental",
+    ["Treant"] = "Interface\\Icons\\Spell_Nature_ForceOfNature",
+    ["Spirit Wolf"] = "Interface\\Icons\\Spell_Nature_SpiritWolf",
+    ["Wolf"] = "Interface\\Icons\\Ability_Hunter_Pet_Wolf",
+    ["Raptor"] = "Interface\\Icons\\Ability_Hunter_Pet_Raptor",
+    ["Amulet of the Ancients"] = "Interface\\Icons\\INV_Jewelry_Necklace_13",
+    ["Amulet of the Inferno"] = "Interface\\Icons\\INV_Jewelry_Necklace_AhnQiraj_03",
+    ["Arcane Fortitude"] = "Interface\\Icons\\Spell_Arcane_ArcaneResilience",
+    ["Arcane Reach"] = "Interface\\Icons\\Spell_Arcane_StarFire",
+    ["Archimtiros' Ring of Reckoning"] = "Interface\\Icons\\INV_Jewelry_Ring_40",
+    ["Ardent Defender"] = "Interface\\Icons\\Spell_Holy_HolyProtection",
+    ["Band of Accuria"] = "Interface\\Icons\\INV_Jewelry_Ring_15",
+    ["Blackhand's Breadth"] = "Interface\\Icons\\INV_Misc_ArmorKit_09",
+    ["Blessed Life"] = "Interface\\Icons\\Spell_Holy_GreaterBlessingofSanctuary",
+    ["Blooddrinker's Band"] = "Interface\\Icons\\INV_Jewelry_Ring_49Naxxramas",
+    ["Breath of the Black Dragon"] = "Interface\\Icons\\INV_Jewelry_Necklace_27Naxxramas",
+    ["Call of the Elements"] = "Interface\\Icons\\Spell_Totem_WardOfDraining",
+    ["Contagion"] = "Interface\\Icons\\Spell_Shadow_PlagueCloud",
+    ["Dashing Scarlet Cloak"] = "Interface\\Icons\\INV_Misc_Cape_08",
+    ["Daybreak"] = "Interface\\Icons\\Spell_Holy_Excorcism",
+    ["Defias Bandana"] = "Interface\\Icons\\INV_Misc_Bandana_03",
+    ["Demonic Empowerment"] = "Interface\\Icons\\Spell_Nature_RemoveCurse",
+    ["Demonic Supremacy"] = "Interface\\Icons\\Spell_Shadow_CurseOfAchimonde",
+    ["Explosive Ammunition"] = "Interface\\Icons\\Spell_Fire_SelfDestruct",
+    ["Ferocious Inspiration"] = "Interface\\Icons\\Ability_Hunter_BeastCall",
+    ["Fortified"] = "Interface\\Icons\\Ability_Warrior_ShieldWall",
+    ["Gnomish Goggles"] = "Interface\\Icons\\INV_Helmet_47",
+    ["Gnomish Universal Remote"] = "Interface\\Icons\\INV_Misc_PocketWatch_01",
+    ["Gold-sniffer"] = "Interface\\Icons\\INV_Misc_Coin_01",
+    ["Hallowed Ground"] = "Interface\\Icons\\Spell_Holy_SealOfProtection",
+    ["Hammer of the Righteous"] = "Interface\\Icons\\Spell_Holy_BlessingOfProtection",
+    ["Heart of the Earthshaker"] = "Interface\\Icons\\INV_Jewelry_Necklace_AhnQiraj_02",
+    ["Heavy Dark Iron Ring"] = "Interface\\Icons\\INV_Jewelry_Ring_14",
+    ["Heavy Shield"] = "Interface\\Icons\\INV_Shield_05",
+    ["Holy Concentration"] = "Interface\\Icons\\Spell_Holy_SpellWarding",
+    ["Holy Guidance"] = "Interface\\Icons\\Spell_Holy_SealOfSalvation",
+    ["Horde Officer's Tabard"] = "Interface\\Icons\\INV_Misc_TabardPVP_03",
+    ["Horn of the Warchief"] = "Interface\\Icons\\INV_Misc_Horn_01",
+    ["Improved Berserker Stance"] = "Interface\\Icons\\Ability_Racial_Avatar",
+    ["Improved Consecration"] = "Interface\\Icons\\Spell_Holy_InnerFire",
+    ["Improved Ice Barrier"] = "Interface\\Icons\\Spell_Ice_Lament",
+    ["Improved Multi-Shot"] = "Interface\\Icons\\Ability_UpgradeMoonGlaive",
+    ["Improved Shield Slam"] = "Interface\\Icons\\Ability_Warrior_ShieldBash",
+    ["Improved Whirlwind"] = "Interface\\Icons\\Ability_Whirlwind",
+    ["Insignia of the Horde"] = "Interface\\Icons\\INV_Jewelry_TrinketPVP_02",
+    ["Keen Eye"] = "Interface\\Icons\\INV_Misc_Spyglass_02",
+    ["Kill Shot"] = "Interface\\Icons\\INV_Weapon_Rifle_08",
+    ["Killing Spree"] = "Interface\\Icons\\Ability_Rogue_Sprint",
+    ["Lifegiving Gem"] = "Interface\\Icons\\INV_Misc_Gem_Pearl_05",
+    ["Light's Grace"] = "Interface\\Icons\\Spell_Holy_SearingLight",
+    ["Long Leash"] = "Interface\\Icons\\Ability_Hunter_BeastCall",
+    ["Major Soulstone"] = "Interface\\Icons\\INV_Misc_Orb_04",
+    ["Mark of Fordring"] = "Interface\\Icons\\INV_Jewelry_Talisman_07",
+    ["Master Dragonslayer's Ring"] = "Interface\\Icons\\INV_Jewelry_Ring_41",
+    ["Medallion of the Bladestorm"] = "Interface\\Icons\\INV_Jewelry_Necklace_30Naxxramas",
+    ["Mortal Wounds"] = "Interface\\Icons\\Ability_Warrior_SavageBlow",
+    ["Mutilate"] = "Interface\\Icons\\INV_Weapon_ShortBlade_05",
+    ["Onyxia Blood Talisman"] = "Interface\\Icons\\Spell_Shadow_LifeDrain",
+    ["Opening Hand"] = "Interface\\Icons\\INV_Misc_Book_09",
+    ["Pact of the Annihilan"] = "Interface\\Icons\\Spell_Shadow_UnholyStrength",
+    ["Pendant of the Plague"] = "Interface\\Icons\\INV_Jewelry_Necklace_18",
+    ["Piercing Shots"] = "Interface\\Icons\\Ability_PierceDamage",
+    ["Pristine Enchanted South Seas Kelp"] = "Interface\\Icons\\INV_Jewelry_Necklace_26",
+    ["Protection"] = "Interface\\Icons\\Spell_Holy_DevotionAura",
+    ["Purifying Power"] = "Interface\\Icons\\Spell_Holy_Purify",
+    ["Quick Paws"] = "Interface\\Icons\\Ability_Hunter_Pet_Cat",
+    ["Quick Strike Ring"] = "Interface\\Icons\\INV_Jewelry_Ring_07",
+    ["Radiance"] = "Interface\\Icons\\Spell_Holy_HolyNova",
+    ["Rapture"] = "Interface\\Icons\\Spell_Holy_PowerInfusion",
+    ["Ring of Spell Power"] = "Interface\\Icons\\INV_Jewelry_Ring_38",
+    ["Ring of the Devoured"] = "Interface\\Icons\\INV_Jewelry_Ring_AhnQiraj_05",
+    ["Royal Seal of Eldre'Thalas"] = "Interface\\Icons\\INV_Jewelry_Talisman_10",
+    ["Rune-hound"] = "Interface\\Icons\\INV_Misc_Rune_01",
+    ["Sacred Duty"] = "Interface\\Icons\\Spell_Holy_DivineIntervention",
+    ["Sanctified Light"] = "Interface\\Icons\\Spell_Holy_HealingFocus",
+    ["Seal of the Damned"] = "Interface\\Icons\\INV_Jewelry_Ring_51Naxxramas",
+    ["Second Thoughts"] = "Interface\\Icons\\Spell_Nature_TimeStop",
+    ["Shadow Dance"] = "Interface\\Icons\\Spell_Shadow_LifeDrain",
+    ["Shadow Embrace"] = "Interface\\Icons\\Spell_Shadow_AbominationExplosion",
+    ["Shield Mastery"] = "Interface\\Icons\\Ability_Defend",
+    ["Soul Devourer"] = "Interface\\Icons\\Spell_Shadow_SummonFelHunter",
+    ["Spiritual Attunement"] = "Interface\\Icons\\Spell_Holy_BlessedRecovery",
+    ["Star of Mystaria"] = "Interface\\Icons\\INV_Enchant_EssenceMagicLarge",
+    ["Stormcaller's Amulet"] = "Interface\\Icons\\INV_Jewelry_Necklace_16",
+    ["Summon Infernal"] = "Interface\\Icons\\Spell_Shadow_SummonInfernal",
+    ["Tabard of the Horde"] = "Interface\\Icons\\INV_Misc_TabardPVP_01",
+    ["Talisman of the Tempest"] = "Interface\\Icons\\INV_Jewelry_Necklace_AhnQiraj_04",
+    ["Talvash's Enhancing Necklace"] = "Interface\\Icons\\INV_Jewelry_Necklace_02",
+    ["The Art of War"] = "Interface\\Icons\\Spell_Holy_Excorcism_02",
+    ["The Eternal Talisman"] = "Interface\\Icons\\INV_Jewelry_Necklace_19",
+    ["The Reaper's Amulet"] = "Interface\\Icons\\INV_Jewelry_Necklace_28Naxxramas",
+    ["Tiny Gordok"] = "Interface\\Icons\\INV_Crown_01",
+    ["Titan"] = "Interface\\Icons\\Ability_Warrior_DefensiveStance",
+    ["Toxic Bloom"] = "Interface\\Icons\\Spell_Nature_NullifyPoison",
+    ["Trauma"] = "Interface\\Icons\\Ability_Warrior_DecisiveStrike",
+    ["Tree of Life"] = "Interface\\Icons\\Spell_Nature_ResistNature",
+    ["Veteran's Lessons"] = "Interface\\Icons\\INV_Misc_Book_11",
+    ["Warsong Battle Tabard"] = "Interface\\Icons\\INV_Shirt_GuildTabard_01",
+    ["Weighted Hammer"] = "Interface\\Icons\\Spell_Holy_SealOfMight",
+    ["Wisp-herder"] = "Interface\\Icons\\Spell_Nature_WispSplode",
+    ["Zul'Gurub Mask"] = "Interface\\Icons\\INV_Mask_02",
+}
+B.EXTRA_ABILITY_ICONS = EXTRA_ABILITY_ICONS
+
 local LOCALIZED_SPELL_MAP = {
     -- Spanish (esES)
     ["rajar"] = "cleave",
@@ -688,6 +832,87 @@ local function ScanClientSpells()
     end
 end
 
+local PROC_CAST = {
+    ["Pyroclasm"] = { "Blast Wave" },
+    ["Hot Streak"] = { "Pyroblast" },
+    ["Arcane Concentration"] = { "Arcane Explosion" },
+    ["Shadowy Apparitions"] = { "Mind Blast" },
+    ["Maelstrom Weapon"] = { "Chain Lightning" },
+    ["Lightning Overload"] = { "Lightning Bolt", "Chain Lightning" },
+    ["Windfury"] = { "Lightning Bolt", "Earth Shock", "Frost Shock" },
+    ["Elemental Mastery"] = { "Chain Lightning" },
+    ["Rampage"] = { "Whirlwind" },
+    ["Flurry"] = { "Whirlwind", "Bloodthirst" },
+    ["Bladestorm"] = { "Whirlwind" },
+    ["Last Stand"] = { "Shield Slam" },
+    ["Shockwave"] = { "Shield Slam" },
+    ["Daybreak"] = { "Holy Wrath" },
+    ["Hallowed Ground"] = { "Consecration" },
+    ["Divine Intervention"] = { "Consecration" },
+    ["The Art of War"] = { "Exorcism" },
+    ["Frenzy"] = { "Multi-Shot" },
+    ["Rapid Fire"] = { "Aimed Shot" },
+    ["Counterattack"] = { "Explosive Trap" },
+    ["Explosive Ammunition"] = { "Auto Shot", "Multi-Shot" },
+    ["Mutilate"] = { "Sinister Strike", "Backstab" },
+    ["Riposte"] = { "Ghostly Strike" },
+    ["Killing Spree"] = { "Sinister Strike" },
+    ["Blade Flurry"] = { "Sinister Strike", "Eviscerate" },
+    ["Preparation"] = { "Gouge" },
+    ["Shadow Dance"] = { "Backstab", "Eviscerate" },
+    ["Chastise"] = { "Holy Nova" },
+    ["Nightfall"] = { "Shadow Bolt" },
+    ["Shadow Cleave"] = { "Shadow Bolt" },
+    ["Conflagrate"] = { "Shadow Bolt", "Searing Pain" },
+    ["Splitting Ice"] = { "Frostbolt" },
+    ["Omen of Clarity"] = { "Starfire" },
+    ["Starfall"] = { "Starfire" },
+    ["Leader of the Pack"] = { "Swipe" },
+    ["Nature's Grasp"] = { "Entangling Roots" },
+    ["Sweeping Strikes"] = { "Cleave", "Mortal Strike", "Execute" },
+}
+
+local carriedItemIcons = {}
+local lastCarriedScan = 0
+
+local function ScanCarriedItems()
+    local now = (type(GetTime) == "function" and GetTime()) or 0
+    if now - lastCarriedScan < 1 and lastCarriedScan > 0 then return end
+    lastCarriedScan = now
+
+    if type(GetInventoryItemLink) == "function" and type(GetInventoryItemTexture) == "function" then
+        for slot = 1, 19 do
+            local link = GetInventoryItemLink("player", slot)
+            local tex = GetInventoryItemTexture("player", slot)
+            if link and tex and tex ~= "" then
+                local _, _, name = string.find(link, "%[(.+)%]")
+                if name then
+                    carriedItemIcons[name] = tex
+                    local norm = CoreNormalize(name)
+                    if norm ~= "" then carriedItemIcons[norm] = tex end
+                end
+            end
+        end
+    end
+    if type(GetContainerNumSlots) == "function" and type(GetContainerItemLink) == "function" and type(GetContainerItemInfo) == "function" then
+        for bag = 0, 4 do
+            local numSlots = GetContainerNumSlots(bag) or 0
+            for slot = 1, numSlots do
+                local link = GetContainerItemLink(bag, slot)
+                local tex = GetContainerItemInfo(bag, slot)
+                if link and tex and tex ~= "" then
+                    local _, _, name = string.find(link, "%[(.+)%]")
+                    if name then
+                        carriedItemIcons[name] = tex
+                        local norm = CoreNormalize(name)
+                        if norm ~= "" then carriedItemIcons[norm] = tex end
+                    end
+                end
+            end
+        end
+    end
+end
+
 function B:GetAbilityIcon(nameOrId)
     if not nameOrId or nameOrId == "" then
         return "Interface\\Icons\\INV_Misc_QuestionMark"
@@ -725,6 +950,76 @@ function B:GetAbilityIcon(nameOrId)
     -- 1. Direct dictionary match
     if MASTER_ABILITY_ICONS[nameOrId] then return MASTER_ABILITY_ICONS[nameOrId] end
     if MASTER_ABILITY_ICONS[norm] then return MASTER_ABILITY_ICONS[norm] end
+
+    -- 1b. Extra AZS Cards, Pets, Procs & Summons dictionary
+    if EXTRA_ABILITY_ICONS[nameOrId] then return EXTRA_ABILITY_ICONS[nameOrId] end
+    if EXTRA_ABILITY_ICONS[norm] then return EXTRA_ABILITY_ICONS[norm] end
+
+    -- 1c. Carried / Equipped Items Scan
+    ScanCarriedItems()
+    if carriedItemIcons[nameOrId] then return carriedItemIcons[nameOrId] end
+    if carriedItemIcons[norm] then return carriedItemIcons[norm] end
+
+    -- 1d. Live Item Database Query (resolves any item by name or link in WoW database)
+    if type(GetItemInfo) == "function" then
+        local _, _, _, _, _, _, _, _, i9, i10 = GetItemInfo(nameOrId)
+        local itemTex = i10 or i9
+        if itemTex and itemTex ~= "" then
+            return itemTex
+        end
+        if norm ~= nameOrId then
+            local _, _, _, _, _, _, _, _, n9, n10 = GetItemInfo(norm)
+            local nTex = n10 or n9
+            if nTex and nTex ~= "" then
+                return nTex
+            end
+        end
+    end
+
+    -- 1e. Universal Spell Icon lookup (Icons.lua & SpellNames.lua from DBC)
+    if AZSSpellMeterIcon then
+        local rawIc = AZSSpellMeterIcon[nameOrId]
+        if not rawIc and AZSSpellMeterName and AZSSpellMeterName[nameOrId] then
+            rawIc = AZSSpellMeterIcon[AZSSpellMeterName[nameOrId]]
+        end
+        if not rawIc and AZSSpellMeterIcon[norm] then
+            rawIc = AZSSpellMeterIcon[norm]
+        end
+        if rawIc then
+            if string.find(rawIc, "\\", 1, true) then
+                return rawIc
+            end
+            return "Interface\\Icons\\" .. rawIc
+        end
+    end
+
+    -- 1f. Compound spell names (e.g. "Pendant of the Plague: Moonfire")
+    local _, _, left, right = string.find(nameOrId, "^(.-): (.+)$")
+    if left and right and left ~= "" and right ~= "" then
+        local spellTex = self:GetAbilityIcon(right)
+        if spellTex and not string.find(spellTex, "QuestionMark", 1, true) then
+            return spellTex
+        end
+        local itemTex = self:GetAbilityIcon(left)
+        if itemTex and not string.find(itemTex, "QuestionMark", 1, true) then
+            return itemTex
+        end
+    end
+
+    -- 1g. Proc to Cast ability lookup (e.g. Hot Streak -> Pyroblast)
+    local pTargets = PROC_CAST[nameOrId] or PROC_CAST[norm]
+    if pTargets then
+        local nTargets = table.getn(pTargets)
+        for tIdx = 1, nTargets do
+            local cand = pTargets[tIdx]
+            if cand and cand ~= nameOrId then
+                local candTex = self:GetAbilityIcon(cand)
+                if candTex and not string.find(candTex, "QuestionMark", 1, true) then
+                    return candTex
+                end
+            end
+        end
+    end
 
     -- 2. Localized spell translation (Spanish / German)
     local canon = LOCALIZED_SPELL_MAP[norm] or LOCALIZED_SPELL_MAP[nameOrId]
@@ -1177,13 +1472,14 @@ end
 --  Stock run HUD (AZS_SetHudShown). The setting is a CVar the game keeps, so it
 --  is written only when it differs from what we want: never in a loop.
 -------------------------------------------------------------------------------
-B.HUD_PARTS = { "clock", "bosses", "tally", "build", "meter", "banners", "loot" }
+B.HUD_PARTS = { "clock", "bosses", "tally", "build", "meter", "banners", "loot", "flag" }
 B.HUD_REPLACED_BY = {
     clock = "timer",
     bosses = "unitframes",
     tally = "databar",
     build = "build",
     meter = "meter",
+    flag = "pins",
 }
 
 function B:WantStockHud(part)
@@ -1221,6 +1517,10 @@ function B:SyncHud()
         if self:IsEnabled("meter") then
             local ok, val = pcall(GetCVar, "hudMeter")
             if ok and val ~= "0" then pcall(SetCVar, "hudMeter", "0") end
+        end
+        if self:IsEnabled("pins") or self.db.replaceHud then
+            local ok, val = pcall(GetCVar, "hudFlag")
+            if ok and val ~= "0" then pcall(SetCVar, "hudFlag", "0") end
         end
     end
 
@@ -1305,6 +1605,13 @@ local function BuildDemo()
         },
         meterTotal = 1845200,
         meterDps = 3521,
+        healing = {
+            { name = "Flash of Light", dmg = 320000, dps = 610, share = 52, proc = 0 },
+            { name = "Holy Light", dmg = 180000, dps = 343, share = 29, proc = 0 },
+            { name = "Holy Shock", dmg = 115000, dps = 219, share = 19, proc = 0 },
+        },
+        healingTotal = 615000,
+        healingDps = 1172,
         bossMeter = {
             { name = "Mortal Strike", dmg = 185000, dps = 353, share = 45, proc = 0 },
             { name = "Whirlwind", dmg = 120000, dps = 229, share = 29, proc = 0 },
@@ -1313,11 +1620,26 @@ local function BuildDemo()
         },
         bossMeterTotal = 415000,
         bossMeterDps = 792,
+        party = {
+            { name = "Pierre", class = "warrior", dmg = 1845200, dps = 3521, share = 42, top = "Whirlwind", topdps = 1565 },
+            { name = "Valandil", class = "mage", dmg = 1420000, dps = 2710, share = 32, top = "Blizzard", topdps = 1200 },
+            { name = "Eluna", class = "priest", dmg = 620000, dps = 1183, share = 14, top = "Holy Nova", topdps = 650 },
+            { name = "Sylvana", class = "rogue", dmg = 510000, dps = 973, share = 12, top = "Fan of Knives", topdps = 520 },
+        },
+        partyTotal = 4395200,
+        partyDps = 8387,
         taken = {
             { source = "Stitches", dmg = 19400 },
             { source = "Skeletal Fiend", dmg = 12800 },
             { source = "Plague Cloud", dmg = 10600 },
         },
+        lairs = {
+            { index = 1, state = "asleep", name = "Bloodmage Thalnos", left = 0 },
+            { index = 2, state = "awake", name = "Interrogator Vishas", left = 0 },
+            { index = 3, state = "empty", name = "Ironspine", left = 102 },
+            { index = 4, state = "empty", name = "Azshir the Sleepless", left = 255 },
+        },
+        lairsUpdated = GetTime(),
         target = { kind = "boss", name = "Stitches", hp = 142500, hpm = 220000, state = 1 },
     }
 end
@@ -1422,7 +1744,24 @@ function B:GetState()
     s.bossMeter = (type(bossMeter) == "table" and bossMeter) or (type(AZS_BOSSMETER) == "table" and AZS_BOSSMETER) or {}
     s.bossMeterTotal = tonumber(bossTotal) or 0
     s.bossMeterDps = tonumber(bossDps) or 0
+    local healMeter, healTotal, healDps = nil, 0, 0
+    if type(AZS_GetHealing) == "function" then
+        healMeter, healTotal, healDps = AZS_GetHealing()
+    end
+    s.healing = (type(healMeter) == "table" and healMeter) or (type(AZS_HEALING) == "table" and AZS_HEALING) or {}
+    s.healingTotal = tonumber(healTotal) or 0
+    s.healingDps = tonumber(healDps) or 0
+    local partyMeter, partyTotal, partyDps = nil, 0, 0
+    if type(AZS_GetPartyMeter) == "function" then
+        partyMeter, partyTotal, partyDps = AZS_GetPartyMeter()
+    end
+    s.party = (type(partyMeter) == "table" and partyMeter) or (type(AZS_PARTY) == "table" and AZS_PARTY) or {}
+    s.partyTotal = tonumber(partyTotal) or 0
+    s.partyDps = tonumber(partyDps) or 0
     s.taken = AZS_TAKEN or {}
+    s.lairs = (type(AZS_GetLairs) == "function" and AZS_GetLairs()) or (type(AZS_LAIRS) == "table" and AZS_LAIRS) or {}
+    s.lairsUpdated = AZS_LAIRS_UPDATED
+    s.revive = AZS_REVIVE or {}
     s.target = AZS_TARGET or { kind = "none" }
     return s
 end

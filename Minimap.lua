@@ -23,23 +23,143 @@ function mod:HideBlizzardArt()
         MinimapBorder,
         MinimapBorderTop,
         MinimapZoneTextButton,
+        MinimapToggleButton,
         MinimapZoomIn,
         MinimapZoomOut,
         GameTimeFrame,
         MiniMapTrackingFrame,
         MiniMapMeetingStoneFrame,
+        MiniMapBattlefieldFrame,
         MiniMapWorldMapButton,
+        MinimapBackdrop,
+        MinimapCompassTexture,
+        MinimapCompassTextureUnderlay,
+        MinimapCluster,
     }
     for i = 1, table.getn(hideList) do
         local f = hideList[i]
         if f then
             f:Hide()
             f:SetAlpha(0)
+            if f.ClearAllPoints then
+                f:ClearAllPoints()
+                f:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 5000, 5000)
+            end
+            if f.UnregisterAllEvents then
+                pcall(f.UnregisterAllEvents, f)
+            end
+            if f.EnableMouse then
+                f:EnableMouse(false)
+            end
+            f.Show = function() end
+            if f.GetObjectType and f:GetObjectType() == "Texture" then
+                f:SetTexture(nil)
+            end
+        end
+    end
+
+    if MinimapCluster then
+        MinimapCluster:Hide()
+        MinimapCluster:SetAlpha(0)
+        MinimapCluster:ClearAllPoints()
+        MinimapCluster:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 5000, 5000)
+        MinimapCluster.Show = function() end
+        if MinimapCluster.GetRegions then
+            local mcRegions = { MinimapCluster:GetRegions() }
+            for i = 1, table.getn(mcRegions) do
+                local r = mcRegions[i]
+                if r then
+                    if r.SetAlpha then r:SetAlpha(0) end
+                    if r.Hide then r:Hide() end
+                    if r.GetObjectType and r:GetObjectType() == "Texture" then
+                        r:SetTexture(nil)
+                    end
+                end
+            end
+        end
+        if MinimapCluster.GetChildren then
+            local mcChildren = { MinimapCluster:GetChildren() }
+            for i = 1, table.getn(mcChildren) do
+                local child = mcChildren[i]
+                if child and child ~= Minimap and child ~= self.container and child ~= self.frame then
+                    child:Hide()
+                    child:SetAlpha(0)
+                    if child.ClearAllPoints then
+                        child:ClearAllPoints()
+                        child:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 5000, 5000)
+                    end
+                    if child.EnableMouse then
+                        child:EnableMouse(false)
+                    end
+                    child.Show = function() end
+                end
+            end
+        end
+    end
+
+    if MinimapBackdrop and MinimapBackdrop.GetRegions then
+        local bRegions = { MinimapBackdrop:GetRegions() }
+        for i = 1, table.getn(bRegions) do
+            local r = bRegions[i]
+            if r and r.SetAlpha then
+                r:SetAlpha(0)
+                r:Hide()
+            end
+        end
+    end
+
+    if Minimap and Minimap.GetRegions then
+        local mRegions = { Minimap:GetRegions() }
+        for i = 1, table.getn(mRegions) do
+            local r = mRegions[i]
+            if r and r.GetObjectType and r:GetObjectType() == "Texture" then
+                local tex = r:GetTexture()
+                if tex and (string.find(tex, "Compass") or string.find(tex, "Border") or string.find(tex, "Cross") or string.find(tex, "Corner")) then
+                    r:SetAlpha(0)
+                    r:Hide()
+                end
+            end
         end
     end
 
     if MinimapNorthTag then
         MinimapNorthTag:SetAlpha(0)
+    end
+
+    ToggleMinimap = function() end
+end
+
+local function SuppressBuffFrame()
+    if BuffFrame then
+        BuffFrame:Hide()
+        BuffFrame:SetAlpha(0)
+        BuffFrame:ClearAllPoints()
+        BuffFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 5000, 5000)
+        BuffFrame:UnregisterAllEvents()
+        BuffFrame.Show = function() end
+    end
+    if type(BuffFrame_Update) == "function" then
+        BuffFrame_Update = function() end
+    end
+    for i = 0, 23 do
+        local btn = getglobal("BuffButton" .. i)
+        if btn then
+            btn:Hide()
+            btn:SetAlpha(0)
+            btn:ClearAllPoints()
+            btn:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 5000, 5000)
+            btn.Show = function() end
+        end
+    end
+    for i = 1, 2 do
+        local te = getglobal("TempEnchant" .. i)
+        if te then
+            te:Hide()
+            te:SetAlpha(0)
+            te:ClearAllPoints()
+            te:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 5000, 5000)
+            te.Show = function() end
+        end
     end
 end
 
@@ -50,12 +170,14 @@ function mod:Create()
     self.frame = root
 
     self:HideBlizzardArt()
+    SuppressBuffFrame()
 
     ---------------------------------------------------------------------------
     --  Minimap Container (142 x 142)
     ---------------------------------------------------------------------------
     local cont = CreateFrame("Frame", "BUI_Minimap", root)
     EUI_Minimap = cont -- Compatibility alias
+    cont:SetFrameStrata("MEDIUM")
     cont:SetWidth(MAP_SIZE + 2)
     cont:SetHeight(MAP_SIZE + 2)
     B:Backdrop(cont, 0.90)
@@ -72,8 +194,35 @@ function mod:Create()
         Minimap:SetHeight(MAP_SIZE)
 
         -- Mask to 1.12 square if supported
-        if type(Minimap.SetMaskTexture) == "function" then
-            Minimap:SetMaskTexture(B.WHITE)
+        local smt = rawget(Minimap, "SetMaskTexture")
+        if type(smt) == "function" then
+            pcall(smt, Minimap, B.WHITE)
+        end
+
+        -- Explicitly clear static base model (removes static cross/crosshair behind map)
+        local spm = rawget(Minimap, "SetPlayerModel")
+        if type(spm) == "function" then
+            pcall(spm, Minimap, nil)
+        end
+        local cm = rawget(Minimap, "ClearModel")
+        if type(cm) == "function" then
+            pcall(cm, Minimap)
+        end
+
+        -- Explicitly restore Rotating Player Arrow
+        local sam = rawget(Minimap, "SetArrowModel")
+        if type(sam) == "function" then
+            pcall(sam, Minimap, "Interface\\Minimap\\Rotating-MinimapArrow.mdx")
+        end
+
+        -- Elevate any child Model frames (such as player position arrow) above the backdrop
+        local children = { Minimap:GetChildren() }
+        for i = 1, table.getn(children) do
+            local child = children[i]
+            if child and child:IsObjectType("Model") then
+                child:SetFrameLevel(Minimap:GetFrameLevel() + 3)
+                child:Show()
+            end
         end
 
         -- Mousewheel zoom
@@ -148,6 +297,15 @@ function mod:Create()
 end
 
 function mod:Update(state)
+    SuppressBuffFrame()
+    if MinimapToggleButton and MinimapToggleButton:IsShown() then
+        MinimapToggleButton:Hide()
+        MinimapToggleButton:SetAlpha(0)
+    end
+    if MinimapCluster and MinimapCluster:IsShown() then
+        MinimapCluster:Hide()
+        MinimapCluster:SetAlpha(0)
+    end
     -- Update Zone Name
     if self.zoneFs then
         local zText = GetMinimapZoneText()

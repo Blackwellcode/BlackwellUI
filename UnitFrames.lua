@@ -230,6 +230,14 @@ function mod:HideBlizzardFrames()
     SuppressBlizzardFrame(ComboFrame)
     SuppressBlizzardFrame(PetFrame)
     SuppressBlizzardFrame(TargetofTargetFrame)
+    SuppressBlizzardFrame(PartyMemberFrame1)
+    SuppressBlizzardFrame(PartyMemberFrame2)
+    SuppressBlizzardFrame(PartyMemberFrame3)
+    SuppressBlizzardFrame(PartyMemberFrame4)
+    SuppressBlizzardFrame(PartyMemberFrame1PetFrame)
+    SuppressBlizzardFrame(PartyMemberFrame2PetFrame)
+    SuppressBlizzardFrame(PartyMemberFrame3PetFrame)
+    SuppressBlizzardFrame(PartyMemberFrame4PetFrame)
 end
 
 function mod:Create()
@@ -589,6 +597,82 @@ function mod:Create()
     enc:Hide()
     B:RegisterMover(enc, "encounters", "Elites & Bosses", "TOPRIGHT", "TOPRIGHT", -12, -340)
     self.enc = enc
+
+    ---------------------------------------------------------------------------
+    --  6. Party Frames (4 horizontal side-by-side frames: 538 x 30)
+    --  Positioned between Hero Frame (Y=140) and DataBar (Y=24) at Y=68
+    ---------------------------------------------------------------------------
+    local partyRoot = CreateFrame("Frame", "BUI_PartyFrames", root)
+    partyRoot:SetWidth(538)
+    partyRoot:SetHeight(30)
+    self.partyRoot = partyRoot
+
+    local partyFrames = {}
+    for i = 1, 4 do
+        local pf = CreateFrame("Button", "BUI_PartyFrame" .. i, partyRoot)
+        pf:SetWidth(130)
+        pf:SetHeight(30)
+        pf:SetPoint("TOPLEFT", partyRoot, "TOPLEFT", (i - 1) * 136, 0)
+        B:Backdrop(pf, 0.90)
+
+        local hpBar = B:Bar(pf, nil, 0.2, 0.8, 0.2)
+        hpBar:SetPoint("TOPLEFT", pf, "TOPLEFT", 1, -1)
+        hpBar:SetPoint("TOPRIGHT", pf, "TOPRIGHT", -1, -1)
+        hpBar:SetHeight(20)
+        pf.hpBar = hpBar
+
+        local nameFs = B:Font(hpBar, 9, "LEFT")
+        nameFs:SetPoint("LEFT", hpBar, "LEFT", 4, 0)
+        nameFs:SetWidth(72)
+        nameFs:SetHeight(12)
+        nameFs:SetTextColor(1, 1, 1)
+        pf.nameText = nameFs
+
+        local hpFs = B:Font(hpBar, 9, "RIGHT")
+        hpFs:SetPoint("RIGHT", hpBar, "RIGHT", -4, 0)
+        hpFs:SetWidth(48)
+        hpFs:SetHeight(12)
+        hpFs:SetTextColor(1, 1, 1)
+        pf.hpText = hpFs
+
+        local pBar = B:Bar(pf, nil, 0.0, 0.55, 1.0)
+        pBar:SetPoint("TOPLEFT", hpBar, "BOTTOMLEFT", 0, -1)
+        pBar:SetPoint("TOPRIGHT", hpBar, "BOTTOMRIGHT", 0, -1)
+        pBar:SetHeight(5)
+        pf.pBar = pBar
+
+        local hl = pf:CreateTexture(nil, "HIGHLIGHT")
+        B:Solid(hl, 1, 1, 1, 0.15)
+        hl:SetAllPoints(pf)
+
+        pf:EnableMouse(true)
+        if pf.RegisterForClicks then
+            pf:RegisterForClicks("LeftButtonUp")
+        end
+        pf.unitId = "party" .. i
+        pf:SetScript("OnClick", function()
+            local unit = this.unitId
+            if unit and UnitExists(unit) then
+                TargetUnit(unit)
+            end
+        end)
+        pf:SetScript("OnEnter", function()
+            local unit = this.unitId
+            if unit and UnitExists(unit) then
+                GameTooltip:SetOwner(this, "ANCHOR_TOP")
+                GameTooltip:SetUnit(unit)
+                GameTooltip:Show()
+            end
+        end)
+        pf:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+        pf:Hide()
+        partyFrames[i] = pf
+    end
+    self.partyFrames = partyFrames
+
+    partyRoot:Hide()
+    B:RegisterMover(partyRoot, "party", "Party Frames", "BOTTOM", "BOTTOM", 0, 68)
 
     local ufWatcher = CreateFrame("Frame")
     ufWatcher:RegisterEvent("PLAYER_TARGET_CHANGED")
@@ -1066,6 +1150,119 @@ function mod:Update(state)
             else
                 r:Hide()
             end
+        end
+    end
+
+    ---------------------------------------------------------------------------
+    --  5. Update Party Frames
+    ---------------------------------------------------------------------------
+    self:UpdateParty(state)
+end
+
+function mod:UpdateParty(state)
+    local root = self.partyRoot
+    if not root then return end
+
+    local isDemo = (state and state.demo) or B.unlocked
+    local nParty = (type(GetNumPartyMembers) == "function" and GetNumPartyMembers()) or 0
+
+    if isDemo then
+        root:Show()
+        local demoParty = {
+            { name = "Valandil", class = "MAGE", hp = 1420, hpm = 1420, mp = 2200, mpm = 2200, pType = 0 },
+            { name = "Thorin", class = "WARRIOR", hp = 3100, hpm = 3100, mp = 65, mpm = 100, pType = 1 },
+            { name = "Eluna", class = "PRIEST", hp = 1650, hpm = 1800, mp = 1950, mpm = 2400, pType = 0 },
+            { name = "Sylvana", class = "ROGUE", hp = 1900, hpm = 2100, mp = 100, mpm = 100, pType = 3 },
+        }
+        for i = 1, 4 do
+            local f = self.partyFrames[i]
+            local d = demoParty[i]
+            f.nameText:SetText(d.name)
+            local hpPct = d.hp / d.hpm
+            f.hpBar:SetValue(hpPct)
+            local col = B.CLASS_COLORS[d.class] or { r = 0.2, g = 0.8, b = 0.2 }
+            B:SetBarColor(f.hpBar, col.r, col.g, col.b)
+            local pctInt = math.floor(hpPct * 100 + 0.5)
+            f.hpText:SetText(tostring(pctInt) .. "%")
+            local pCol = POWER_COLORS[d.pType] or POWER_COLORS[0]
+            f.pBar:SetValue(d.mp / d.mpm)
+            B:SetBarColor(f.pBar, pCol.r, pCol.g, pCol.b)
+            f:Show()
+        end
+        return
+    end
+
+    if nParty == 0 then
+        -- Check if AZS_PARTY has members without standard WoW party frames
+        local azsParty = state and state.party
+        local nAzs = (type(azsParty) == "table" and table.getn(azsParty)) or 0
+        if nAzs <= 1 then
+            root:Hide()
+            return
+        end
+    end
+
+    root:Show()
+    for i = 1, 4 do
+        local f = self.partyFrames[i]
+        local unit = "party" .. i
+        if i <= nParty and UnitExists(unit) then
+            local uName = UnitName(unit) or ("Party " .. i)
+            f.nameText:SetText(uName)
+
+            local _, uClass = UnitClass(unit)
+            local cColor = (uClass and B.CLASS_COLORS[uClass]) or { r = 0.2, g = 0.8, b = 0.2 }
+            B:SetBarColor(f.hpBar, cColor.r, cColor.g, cColor.b)
+
+            local isConn = (type(UnitIsConnected) == "function" and UnitIsConnected(unit))
+            local isDead = (type(UnitIsDead) == "function" and UnitIsDead(unit))
+            local isGhost = (type(UnitIsGhost) == "function" and UnitIsGhost(unit))
+
+            if not isConn then
+                f.hpBar:SetValue(0)
+                f.hpText:SetText("|cff888888OFFLINE|r")
+                B:SetBarColor(f.hpBar, 0.4, 0.4, 0.4)
+            elseif isDead then
+                f.hpBar:SetValue(0)
+                f.hpText:SetText("|cffff2222DEAD|r")
+                B:SetBarColor(f.hpBar, 0.5, 0.15, 0.15)
+            elseif isGhost then
+                f.hpBar:SetValue(0)
+                f.hpText:SetText("|cffaaaaaaGHOST|r")
+                B:SetBarColor(f.hpBar, 0.3, 0.3, 0.3)
+            else
+                local curHp = UnitHealth(unit) or 0
+                local maxHp = UnitHealthMax(unit) or 1
+                if maxHp <= 0 then maxHp = 1 end
+                local pct = B:Percent(curHp, maxHp)
+                f.hpBar:SetValue(pct)
+                local pctInt = math.floor(pct * 100 + 0.5)
+                f.hpText:SetText(tostring(pctInt) .. "%")
+            end
+
+            local pType = UnitPowerType(unit) or 0
+            local curP = UnitMana(unit) or 0
+            local maxP = UnitManaMax(unit) or 1
+            if maxP <= 0 then maxP = 1 end
+            f.pBar:SetValue(B:Percent(curP, maxP))
+            local pColor = POWER_COLORS[pType] or POWER_COLORS[0]
+            B:SetBarColor(f.pBar, pColor.r, pColor.g, pColor.b)
+
+            f:Show()
+        elseif state and state.party and state.party[i + 1] then
+            -- Fallback if server provides AZS_PARTY entries
+            local pData = state.party[i + 1]
+            f.nameText:SetText(pData.name or ("Party " .. i))
+            local cls = pData.class and string.upper(pData.class)
+            local cColor = (cls and B.CLASS_COLORS[cls]) or { r = 0.2, g = 0.8, b = 0.2 }
+            B:SetBarColor(f.hpBar, cColor.r, cColor.g, cColor.b)
+            f.hpBar:SetValue(1.0)
+            f.hpText:SetText(B:Short(pData.dmg or 0))
+            f.pBar:SetValue(1.0)
+            B:SetBarColor(f.pBar, 0, 0.55, 1)
+            f:Show()
+        else
+            f:Hide()
         end
     end
 end
