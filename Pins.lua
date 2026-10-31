@@ -392,4 +392,8 @@ function mod:Create()
     self.frame = watcher
 end
 
+function mod:Update(state)
+    mod:UpdateRadar()
+end
+
 B:RegisterModule("pins", mod)

@@ -15,7 +15,7 @@ BlackwallUI = BlackwellUI -- Backwards compatibility alias
 EllesmereUI = BlackwellUI -- Backwards compatibility alias
 local E = BlackwellUI
 
-B.version = "2.6.6-azs"
+B.version = "2.6.7-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -2066,7 +2066,9 @@ function B:Tick()
             local shouldShow = self:IsEnabled(mod.key) and (s.active or mod.alwaysActive)
             if shouldShow then
                 if not mod.frame:IsShown() then mod.frame:Show() end
-                mod:Update(s)
+                if type(mod.Update) == "function" then
+                    mod:Update(s)
+                end
             elseif mod.frame:IsShown() then
                 mod.frame:Hide()
             end
