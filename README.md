@@ -3,6 +3,7 @@
 [![WoW Version](https://img.shields.io/badge/WoW-1.12.1%20Vanilla-blue.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI)
 [![Game Mode](https://img.shields.io/badge/Mode-Azeroth%20Survivors-red.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI)
 [![Release](https://img.shields.io/badge/Release-v2.6.7--azs-00e5ff.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI/releases)
+[![Support](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-FFDD00.svg?style=flat-square&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/blackwellcode)
 [![Lua Engine](https://img.shields.io/badge/Engine-Strict%20Lua%205.0-brightgreen.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI)
 [![License](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI/blob/main/LICENSE)
 
@@ -96,6 +97,15 @@ When filing a bug, please include:
 * **Releases & Downloads (`BlackwellUI.zip`):** [github.com/Blackwellcode/BlackwellUI/releases](https://github.com/Blackwellcode/BlackwellUI/releases)
 * **Game Mode:** Azeroth Survivors (Custom Vanilla 1.12.1 Client)
 * **Issue Tracker & Feature Requests:** [github.com/Blackwellcode/BlackwellUI/issues](https://github.com/Blackwellcode/BlackwellUI/issues)
+* **Support / Buy Me a Coffee:** [buymeacoffee.com/blackwellcode](https://buymeacoffee.com/blackwellcode)
+
+---
+
+## ☕ Support the Project
+
+BlackwellUI is completely free and open-source. If the add-on enhances your Azeroth Survivors experience and you'd like to support the ongoing development, maintenance, and new features, you're welcome to buy me a coffee!
+
+<a href="https://buymeacoffee.com/blackwellcode" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 48px !important;width: 174px !important;" height="48" width="174"></a>
 
 ---
 
