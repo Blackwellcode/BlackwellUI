@@ -136,16 +136,6 @@ function mod:Create()
             pcall(smt, Minimap, B.WHITE)
         end
 
-        -- Explicitly clear static base model (removes static cross/crosshair behind map)
-        local spm = rawget(Minimap, "SetPlayerModel")
-        if type(spm) == "function" then
-            pcall(spm, Minimap, nil)
-        end
-        local cm = rawget(Minimap, "ClearModel")
-        if type(cm) == "function" then
-            pcall(cm, Minimap)
-        end
-
         -- Explicitly restore Rotating Player Arrow
         local sam = rawget(Minimap, "SetArrowModel")
         if type(sam) == "function" then

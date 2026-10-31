@@ -15,7 +15,7 @@ BlackwallUI = BlackwellUI -- Backwards compatibility alias
 EllesmereUI = BlackwellUI -- Backwards compatibility alias
 local E = BlackwellUI
 
-B.version = "2.6.5-azs"
+B.version = "2.6.6-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -144,6 +144,9 @@ local DEFAULTS = {
     meterMode = "done",
     mergeItemProcs = false,
     colorHealthByClass = true,
+    showBuffBars = true,
+    showGrid = true,
+    sctAlerts = true,
     pinCaches = true,
     pinLairs = true,
     pinEdge = "clamp",
@@ -1362,6 +1365,112 @@ function B:RegisterMover(frame, key, label, point, relPoint, x, y)
     table.insert(self.moverOrder, key)
 end
 
+-------------------------------------------------------------------------------
+--  Edit Mode Alignment Grid
+-------------------------------------------------------------------------------
+local gridFrame = nil
+local gridLines = {}
+
+function B:GetAlignmentGrid()
+    if gridFrame then return gridFrame end
+
+    local f = CreateFrame("Frame", "BUI_AlignmentGrid", UIParent)
+    f:SetAllPoints(UIParent)
+    f:SetFrameStrata("BACKGROUND")
+    f:Hide()
+    gridFrame = f
+    return f
+end
+
+function B:UpdateAlignmentGrid()
+    local f = self:GetAlignmentGrid()
+    local w = (UIParent and UIParent:GetWidth()) or 1920
+    local h = (UIParent and UIParent:GetHeight()) or 1080
+    if w <= 0 then w = 1920 end
+    if h <= 0 then h = 1080 end
+
+    local midX = math.floor(w / 2)
+    local midY = math.floor(h / 2)
+    local step = 32
+    local lineIdx = 0
+
+    local function DrawLine(startX, startY, endX, endY, r, g, b, a, width, height)
+        lineIdx = lineIdx + 1
+        local tex = gridLines[lineIdx]
+        if not tex then
+            tex = f:CreateTexture(nil, "BACKGROUND")
+            tex:SetTexture(B.WHITE)
+            gridLines[lineIdx] = tex
+        end
+        tex:ClearAllPoints()
+        tex:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", startX, startY)
+        tex:SetWidth(width)
+        tex:SetHeight(height)
+        tex:SetVertexColor(r, g, b, a)
+        tex:Show()
+    end
+
+    -- Center cross lines (Cyan Accent)
+    DrawLine(midX - 1, 0, midX - 1, h, 0.0, 0.90, 1.0, 0.60, 2, h)
+    DrawLine(0, midY - 1, w, midY - 1, 0.0, 0.90, 1.0, 0.60, w, 2)
+
+    -- Vertical lines outward from center
+    local countX = 0
+    local x = midX + step
+    while x < w do
+        countX = countX + 1
+        local isMajor = (math.mod(countX, 4) == 0)
+        local a = isMajor and 0.20 or 0.08
+        DrawLine(x, 0, x, h, 1.0, 1.0, 1.0, a, 1, h)
+        x = x + step
+    end
+    countX = 0
+    x = midX - step
+    while x > 0 do
+        countX = countX + 1
+        local isMajor = (math.mod(countX, 4) == 0)
+        local a = isMajor and 0.20 or 0.08
+        DrawLine(x, 0, x, h, 1.0, 1.0, 1.0, a, 1, h)
+        x = x - step
+    end
+
+    -- Horizontal lines outward from center
+    local countY = 0
+    local y = midY + step
+    while y < h do
+        countY = countY + 1
+        local isMajor = (math.mod(countY, 4) == 0)
+        local a = isMajor and 0.20 or 0.08
+        DrawLine(0, y, w, y, 1.0, 1.0, 1.0, a, w, 1)
+        y = y + step
+    end
+    countY = 0
+    y = midY - step
+    while y > 0 do
+        countY = countY + 1
+        local isMajor = (math.mod(countY, 4) == 0)
+        local a = isMajor and 0.20 or 0.08
+        DrawLine(0, y, w, y, 1.0, 1.0, 1.0, a, w, 1)
+        y = y - step
+    end
+
+    -- Hide remaining lines if any
+    local nLines = table.getn(gridLines)
+    for i = lineIdx + 1, nLines do
+        gridLines[i]:Hide()
+    end
+end
+
+function B:SetAlignmentGridShown(shown)
+    local f = self:GetAlignmentGrid()
+    if shown and (self.db and self.db.showGrid ~= false) then
+        self:UpdateAlignmentGrid()
+        f:Show()
+    else
+        f:Hide()
+    end
+end
+
 function B:SetUnlocked(flag)
     self.unlocked = flag and true or false
     for i = 1, table.getn(self.moverOrder) do
@@ -1371,6 +1480,7 @@ function B:SetUnlocked(flag)
             if self.unlocked then ov:Show() else ov:Hide() end
         end
     end
+    self:SetAlignmentGridShown(self.unlocked)
     self:Tick()
 end
 
@@ -1451,7 +1561,7 @@ function B:ApplyScale()
 end
 
 -------------------------------------------------------------------------------
---  Stock Combat Text & Floating Numbers Suppression
+--  Stock Combat Text & Floating Numbers Management
 -------------------------------------------------------------------------------
 B.STOCK_COMBAT_CVARS = {
     "CombatDamage",
@@ -1461,31 +1571,44 @@ B.STOCK_COMBAT_CVARS = {
 }
 
 function B:SuppressStockCombatText()
+    -- Cache original functions first before silencing
+    if not self.origCombatText_AddMessage and type(CombatText_AddMessage) == "function" then
+        self.origCombatText_AddMessage = CombatText_AddMessage
+    end
+    if not self.origCombatText_OnUpdate and type(CombatText_OnUpdate) == "function" then
+        self.origCombatText_OnUpdate = CombatText_OnUpdate
+    end
+    if not self.origCombatText_OnEvent and type(CombatText_OnEvent) == "function" then
+        self.origCombatText_OnEvent = CombatText_OnEvent
+    end
+    if not self.origCombatText_UpdateDisplayedMessages and type(CombatText_UpdateDisplayedMessages) == "function" then
+        self.origCombatText_UpdateDisplayedMessages = CombatText_UpdateDisplayedMessages
+    end
+
+    if not self.dummyCombatText_AddMessage then
+        self.dummyCombatText_AddMessage = function() end
+        self.dummyCombatText_OnUpdate = function() end
+        self.dummyCombatText_OnEvent = function() end
+        self.dummyCombatText_UpdateDisplayedMessages = function() end
+    end
+
     -- 1. Silence Blizzard CombatText frame
     if CombatText then
         if type(CombatText.UnregisterAllEvents) == "function" then
-            CombatText:UnregisterAllEvents()
+            pcall(CombatText.UnregisterAllEvents, CombatText)
         end
         if type(CombatText.Hide) == "function" then
-            CombatText:Hide()
+            pcall(CombatText.Hide, CombatText)
         end
         if type(CombatText.SetScript) == "function" then
             CombatText:SetScript("OnUpdate", nil)
             CombatText:SetScript("OnEvent", nil)
         end
     end
-    if type(CombatText_AddMessage) == "function" then
-        CombatText_AddMessage = function() end
-    end
-    if type(CombatText_OnUpdate) == "function" then
-        CombatText_OnUpdate = function() end
-    end
-    if type(CombatText_OnEvent) == "function" then
-        CombatText_OnEvent = function() end
-    end
-    if type(CombatText_UpdateDisplayedMessages) == "function" then
-        CombatText_UpdateDisplayedMessages = function() end
-    end
+    CombatText_AddMessage = self.dummyCombatText_AddMessage
+    CombatText_OnUpdate = self.dummyCombatText_OnUpdate
+    CombatText_OnEvent = self.dummyCombatText_OnEvent
+    CombatText_UpdateDisplayedMessages = self.dummyCombatText_UpdateDisplayedMessages
 
     -- 2. Clear stock Lua option globals
     if _G then
@@ -1518,6 +1641,80 @@ function B:SuppressStockCombatText()
     end
 end
 
+function B:RestoreStockCombatText()
+    -- 1. Restore Blizzard CombatText hooks
+    if self.origCombatText_AddMessage and CombatText_AddMessage == self.dummyCombatText_AddMessage then
+        CombatText_AddMessage = self.origCombatText_AddMessage
+    end
+    if self.origCombatText_OnUpdate and CombatText_OnUpdate == self.dummyCombatText_OnUpdate then
+        CombatText_OnUpdate = self.origCombatText_OnUpdate
+    end
+    if self.origCombatText_OnEvent and CombatText_OnEvent == self.dummyCombatText_OnEvent then
+        CombatText_OnEvent = self.origCombatText_OnEvent
+    end
+    if self.origCombatText_UpdateDisplayedMessages and CombatText_UpdateDisplayedMessages == self.dummyCombatText_UpdateDisplayedMessages then
+        CombatText_UpdateDisplayedMessages = self.origCombatText_UpdateDisplayedMessages
+    end
+
+    -- 2. Restore CombatText frame and events
+    if CombatText then
+        if self.origCombatText_OnEvent and type(CombatText.SetScript) == "function" then
+            CombatText:SetScript("OnEvent", self.origCombatText_OnEvent)
+            CombatText:SetScript("OnUpdate", self.origCombatText_OnUpdate)
+        end
+        if type(CombatText.RegisterEvent) == "function" then
+            pcall(CombatText.RegisterEvent, CombatText, "COMBAT_TEXT_UPDATE")
+            pcall(CombatText.RegisterEvent, CombatText, "UNIT_HEALTH")
+            pcall(CombatText.RegisterEvent, CombatText, "UNIT_MANA")
+            pcall(CombatText.RegisterEvent, CombatText, "PLAYER_REGEN_DISABLED")
+            pcall(CombatText.RegisterEvent, CombatText, "PLAYER_REGEN_ENABLED")
+            pcall(CombatText.RegisterEvent, CombatText, "PLAYER_ENTERING_WORLD")
+        end
+        if type(CombatText.Show) == "function" then
+            pcall(CombatText.Show, CombatText)
+        end
+    end
+
+    -- 3. Restore stock Lua option globals
+    if _G then
+        _G.SHOW_COMBAT_TEXT = "1"
+        _G.SHOW_COMBAT_STATE = "1"
+        _G.COMBAT_TEXT_SHOW_LOW_HEALTH_MANA = "1"
+        _G.COMBAT_TEXT_SHOW_AURAS = "1"
+        _G.COMBAT_TEXT_SHOW_AURA_FADE = "1"
+        _G.COMBAT_TEXT_SHOW_COMBAT_STATE = "1"
+        _G.COMBAT_TEXT_SHOW_DODGE_PARRY_MISS = "1"
+        _G.COMBAT_TEXT_SHOW_RESISTANCES = "1"
+        _G.COMBAT_TEXT_SHOW_REPUTATION = "1"
+        _G.COMBAT_TEXT_SHOW_REACTIVES = "1"
+        _G.COMBAT_TEXT_SHOW_FRIENDLY_NAMES = "1"
+        _G.COMBAT_TEXT_SHOW_COMBO_POINTS = "1"
+        _G.COMBAT_TEXT_SHOW_MANA = "1"
+        _G.COMBAT_TEXT_SHOW_HONOR_GAINED = "1"
+    end
+
+    -- 4. Enable stock CVars
+    if type(GetCVar) == "function" and type(SetCVar) == "function" then
+        local n = table.getn(self.STOCK_COMBAT_CVARS)
+        for i = 1, n do
+            local cv = self.STOCK_COMBAT_CVARS[i]
+            local ok, val = pcall(GetCVar, cv)
+            if ok and val and val ~= "1" then
+                pcall(SetCVar, cv, "1")
+            end
+        end
+        pcall(SetCVar, "SHOW_COMBAT_TEXT", "1")
+    end
+end
+
+function B:SyncCombatText()
+    if self:IsEnabled("combattext") then
+        self:SuppressStockCombatText()
+    else
+        self:RestoreStockCombatText()
+    end
+end
+
 -------------------------------------------------------------------------------
 --  Stock run HUD (AZS_SetHudShown). The setting is a CVar the game keeps, so it
 --  is written only when it differs from what we want: never in a loop.
@@ -1545,7 +1742,7 @@ end
 
 function B:SyncHud()
     if not self.db then return end
-    self:SuppressStockCombatText()
+    self:SyncCombatText()
 
     -- Direct CVar enforcement for the stock AZS HUD parts
     if self.db.replaceHud then
@@ -1736,7 +1933,13 @@ local function Age(stamp, phase)
 end
 
 function B:HasApi()
-    return (type(AZS_GetPhase) == "function" or type(AZS_PHASE) == "string" or (type(AZS_RUN) == "table" and AZS_RUN.phase ~= nil)) and type(AZS_RUN) == "table"
+    if type(AZS_GetPhase) == "function" or type(AZS_PHASE) == "string" then
+        return true
+    end
+    if type(AZS_RUN) == "table" and (AZS_RUN.phase ~= nil or AZS_RUN.ph ~= nil) then
+        return true
+    end
+    return false
 end
 
 function B:GetState()
@@ -1754,8 +1957,8 @@ function B:GetState()
         phase = AZS_GetPhase()
     elseif type(AZS_PHASE) == "string" then
         phase = AZS_PHASE
-    elseif AZS_RUN and AZS_RUN.phase then
-        phase = AZS_RUN.phase
+    elseif AZS_RUN then
+        phase = AZS_RUN.phase or AZS_RUN.ph
     end
     s.phase = phase
     s.active = (phase ~= nil)
@@ -2041,11 +2244,11 @@ boot:SetScript("OnEvent", function()
         if arg1 == "BlackwellUI" or arg1 == "BlackwallUI" or arg1 == "EllesmereUI" then B:InitDB() end
     elseif event == "VARIABLES_LOADED" then
         B:InitDB()
-        B:SuppressStockCombatText()
+        B:SyncCombatText()
         B:SyncHud()
     elseif event == "PLAYER_ENTERING_WORLD" then
         Build()
-        B:SuppressStockCombatText()
+        B:SyncCombatText()
         B:SyncHud()
     elseif event == "DISPLAY_SIZE_CHANGED" or event == "UI_SCALE_CHANGED" then
         B:CheckResolution()
