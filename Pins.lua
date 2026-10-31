@@ -27,10 +27,14 @@ local breathTime = 0
 local elapsedTimer = 0
 
 local function Playing()
-    if not (AZS_GetPhase and AZS_CHESTS) then
+    if B.unlocked or (B.db and B.db.demo) then
+        return true
+    end
+    local s = B:GetState()
+    if not s or not s.active then
         return false
     end
-    local phase = AZS_GetPhase()
+    local phase = s.phase
     return phase == "playing" or phase == "choosing" or phase == "paused"
 end
 
@@ -47,17 +51,15 @@ end
 
 local function GetPlaces()
     local list = {}
-    local chests = AZS_CHESTS or {}
-    local nChests = table.getn(chests)
+    local chests = AZS_CHESTS or (type(AZS_GetChests) == "function" and AZS_GetChests()) or {}
+    local nChests = (type(chests) == "table") and table.getn(chests) or 0
     for i = 1, nChests do
         table.insert(list, chests[i])
     end
-    if AZS_GetLairs then
-        local lairs = AZS_GetLairs() or {}
-        local nLairs = table.getn(lairs)
-        for i = 1, nLairs do
-            table.insert(list, lairs[i])
-        end
+    local lairs = (type(AZS_GetLairs) == "function" and AZS_GetLairs()) or (type(AZS_LAIRS) == "table" and AZS_LAIRS) or {}
+    local nLairs = (type(lairs) == "table") and table.getn(lairs) or 0
+    for i = 1, nLairs do
+        table.insert(list, lairs[i])
     end
     return list
 end
@@ -161,7 +163,8 @@ local function CreateOrGetPin(index)
     if pin then return pin end
 
     pin = CreateFrame("Frame", nil, Minimap)
-    pin:SetFrameLevel(Minimap:GetFrameLevel() + 5)
+    pin:SetFrameStrata("HIGH")
+    pin:SetFrameLevel(25)
     pin:SetWidth(PIN_SIZE)
     pin:SetHeight(PIN_SIZE)
 
@@ -207,7 +210,8 @@ end
 
 local function PlacePin(pin, east, south, yardsAcross, baseSize)
     local half = Minimap:GetWidth() / 2
-    local perYard = (2 * half) / yardsAcross
+    local ya = (yardsAcross and yardsAcross > 0) and yardsAcross or 300
+    local perYard = (2 * half) / ya
     pin.yards = math.sqrt(east * east + south * south)
 
     local px = east * perYard
@@ -224,8 +228,10 @@ local function PlacePin(pin, east, south, yardsAcross, baseSize)
             pin:Hide()
             return
         end
-        px = px * limit / reach
-        py = py * limit / reach
+        if reach > 0 then
+            px = px * limit / reach
+            py = py * limit / reach
+        end
         size = edgeSize
         pin:SetAlpha(0.75)
     else
@@ -258,15 +264,28 @@ function mod:UpdateRadar()
         span = heroX and CalculateSpan()
     end
 
-    if px or span then
+    local isDemo = B.unlocked or (B.db and B.db.demo)
+
+    if px or span or isDemo then
         local yardsAcross = GetMinimapYards()
 
         -- 1. Field Caches (Chests)
-        local chests = (B.db and B.db.pinCaches ~= false) and AZS_CHESTS or {}
-        local nChests = table.getn(chests)
+        local chests = (B.db and B.db.pinCaches ~= false) and (AZS_CHESTS or (type(AZS_GetChests) == "function" and AZS_GetChests()) or {}) or {}
+        if isDemo and (type(chests) ~= "table" or table.getn(chests) == 0) then
+            chests = {
+                { id = 1, x = 60, y = -50, mx = 0.52, my = 0.48 },
+                { id = 2, x = -80, y = 90, mx = 0.46, my = 0.55 },
+            }
+        end
+        local nChests = (type(chests) == "table") and table.getn(chests) or 0
         for i = 1, nChests do
             local chest = chests[i]
-            local east, south = WayTo(chest, px, py, heroX, heroY, span)
+            local east, south
+            if isDemo and not px and not span then
+                east, south = tonumber(chest.x) or 0, tonumber(chest.y) or 0
+            else
+                east, south = WayTo(chest, px, py, heroX, heroY, span)
+            end
             if east and south then
                 shown = shown + 1
                 local pin = CreateOrGetPin(shown)
@@ -280,24 +299,47 @@ function mod:UpdateRadar()
             end
         end
 
-        -- 2. Guardian Lairs (Shrines)
-        local lairs = (B.db and B.db.pinLairs ~= false) and (AZS_GetLairs and AZS_GetLairs() or {}) or {}
-        local nLairs = table.getn(lairs)
+        -- 2. Guardian Lairs & Bosses (Shrines)
+        local lairs = (B.db and B.db.pinLairs ~= false) and ((type(AZS_GetLairs) == "function" and AZS_GetLairs()) or (type(AZS_LAIRS) == "table" and AZS_LAIRS) or {}) or {}
+        if isDemo and (type(lairs) ~= "table" or table.getn(lairs) == 0) then
+            lairs = {
+                { name = "Garr (Guardian)", id = 101, x = -110, y = -90, mx = 0.44, my = 0.45, state = "awake", flag = 1 },
+                { name = "Baron Geddon", id = 102, x = 120, y = 130, mx = 0.56, my = 0.56, state = "empty", left = 45 },
+            }
+        end
+        local nLairs = (type(lairs) == "table") and table.getn(lairs) or 0
         for i = 1, nLairs do
             local lair = lairs[i]
-            local east, south = WayTo(lair, px, py, heroX, heroY, span)
-            local isActive = lair.active or (lair.awake and tonumber(lair.awake) > 0)
+            local east, south
+            if isDemo and not px and not span then
+                east, south = tonumber(lair.x) or 0, tonumber(lair.y) or 0
+            else
+                east, south = WayTo(lair, px, py, heroX, heroY, span)
+            end
+
+            local sState = lair.state
+            local isActive = (sState == "awake") or (sState == "asleep") or (lair.active == true) or (tonumber(lair.awake) and tonumber(lair.awake) > 0)
+            local isAsleep = (sState == "asleep")
+
             if east and south and (isActive or (B.db and B.db.pinEmpty ~= "hide")) then
                 shown = shown + 1
                 local pin = CreateOrGetPin(shown)
                 pin.art:SetTexture(ART_PATH .. "PinLair.tga")
 
+                local markName = lair.name or ("Guardian Lair " .. tostring(lair.index or i))
+                pin.title = markName
+
                 if isActive then
-                    pin.art:SetVertexColor(0.0, 0.90, 1.0) -- Neon Cyan
-                    pin.note = "Guardian active: " .. (lair.name and lair.name ~= "" and lair.name or "Lair Guardian")
+                    if isAsleep then
+                        pin.art:SetVertexColor(0.20, 0.70, 1.0) -- Soft Ice Cyan
+                        pin.note = "Dormant Guardian: " .. markName .. " (Approach to awaken)"
+                    else
+                        pin.art:SetVertexColor(1.0, 0.25, 0.25) -- Neon Crimson / Red (Active Boss!)
+                        pin.note = "BOSS / GUARDIAN ACTIVE: " .. markName
+                    end
                 else
                     pin.art:SetVertexColor(0.40, 0.40, 0.45) -- Dimmed Slate
-                    local respawnLeft = tonumber(lair.respawn) or 0
+                    local respawnLeft = tonumber(lair.left) or tonumber(lair.respawn) or 0
                     if respawnLeft > 0 then
                         pin.note = string.format("Empty lair (Respawns in %s)", B:Clock(respawnLeft))
                     else
@@ -305,8 +347,6 @@ function mod:UpdateRadar()
                     end
                 end
 
-                local markName = lair.name or "Guardian Lair"
-                pin.title = markName
                 pin.flagged = (tonumber(lair.flag) == 1)
 
                 if pin.flagged then
@@ -349,6 +389,7 @@ function mod:Create()
         end
     end)
     self.watcher = watcher
+    self.frame = watcher
 end
 
 B:RegisterModule("pins", mod)

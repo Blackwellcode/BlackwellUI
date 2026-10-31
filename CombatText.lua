@@ -235,7 +235,7 @@ function mod:AddAura(name, isDebuff, isFade)
 end
 
 function mod:AddAlert(spellName, alertType)
-    if not B:IsEnabled("combattext") then return end
+    if not B:IsEnabled("combattext") or (B.db and B.db.sctAlerts == false) then return end
     spellName = spellName or "Ability"
     local f = GetFreeFrame(poolAlerts)
     f.inUse = true
@@ -518,9 +518,9 @@ end
 --  Module Setup & Event Registration
 -------------------------------------------------------------------------------
 function mod:Create()
-    -- 1. Suppress Blizzard stock CombatText & Floating Combat Damage
-    if B.SuppressStockCombatText then
-        B:SuppressStockCombatText()
+    -- 1. Synchronize Blizzard stock CombatText & Floating Combat Damage
+    if B.SyncCombatText then
+        B:SyncCombatText()
     end
 
     -- 2. Create Zone Anchors (Movers)
@@ -585,8 +585,8 @@ function mod:Create()
 
     driver:SetScript("OnEvent", function()
         if event == "PLAYER_ENTERING_WORLD" then
-            if B.SuppressStockCombatText then
-                B:SuppressStockCombatText()
+            if B.SyncCombatText then
+                B:SyncCombatText()
             end
             return
         end
@@ -709,8 +709,8 @@ function mod:Create()
 end
 
 function mod:Update(state)
-    if B.SuppressStockCombatText then
-        B:SuppressStockCombatText()
+    if B.SyncCombatText then
+        B:SyncCombatText()
     end
     if not B:IsEnabled("combattext") then
         local hidePool = function(pool)

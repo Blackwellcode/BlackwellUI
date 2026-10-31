@@ -110,7 +110,7 @@ local function BuildOptionsFrame()
     BlackwallUIOptionsFrame = f -- Compatibility alias
     EllesmereUIOptionsFrame = f -- Compatibility alias
     f:SetWidth(540)
-    f:SetHeight(575)
+    f:SetHeight(585)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
     f:SetFrameStrata("DIALOG")
     f:SetMovable(true)
@@ -370,6 +370,9 @@ local function BuildOptionsFrame()
             function(val)
                 B.db.modules[def.key] = val
                 B:OnModulesChanged()
+                if def.key == "combattext" and B.SyncCombatText then
+                    B:SyncCombatText()
+                end
             end
         )
         table.insert(checkList, cb)
@@ -459,13 +462,41 @@ local function BuildOptionsFrame()
     )
     table.insert(checkList, cbMergeProcs)
 
+    local cbBuffBars = CreateCheckbox(f, 280, -324, "Build: Show Buff & Alert Bars",
+        function() return B.db.showBuffBars ~= false end,
+        function(val)
+            B.db.showBuffBars = val
+            B:Tick()
+        end
+    )
+    table.insert(checkList, cbBuffBars)
+
+    local cbGrid = CreateCheckbox(f, 280, -346, "Edit Mode: Alignment Grid",
+        function() return B.db.showGrid ~= false end,
+        function(val)
+            B.db.showGrid = val
+            if B.SetAlignmentGridShown then
+                B:SetAlignmentGridShown(B.unlocked)
+            end
+        end
+    )
+    table.insert(checkList, cbGrid)
+
+    local cbSctAlerts = CreateCheckbox(f, 280, -368, "Combat Text: Ability Alerts",
+        function() return B.db.sctAlerts ~= false end,
+        function(val)
+            B.db.sctAlerts = val
+        end
+    )
+    table.insert(checkList, cbSctAlerts)
+
     -- Warning note about CVars
     local noteFs = B:Font(f, 9, "LEFT")
     noteFs:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -446)
     noteFs:SetWidth(508)
     noteFs:SetHeight(28)
     noteFs:SetTextColor(0.55, 0.55, 0.55)
-    noteFs:SetText("Note: Stock HUD toggles are persistent game CVars. To restore original interface before disabling BlackwellUI, uncheck 'Replace Stock Run HUD' or use the in-game options.")
+    noteFs:SetText("Note: Stock HUD toggles are persistent game CVars. Disabling Combat Text immediately restores standard Blizzard flying damage numbers.")
 
     -- Action Buttons (Bottom)
     local unlockBtn = CreateSimpleButton(f, 160, 24, "Unlock / Move UI", function()
@@ -590,7 +621,16 @@ local function HandleSlashCmd(msg)
         local cur = B:IsEnabled("combattext")
         B.db.modules["combattext"] = not cur
         B:OnModulesChanged()
-        B:Print("Scrolling Combat Text: " .. (B:IsEnabled("combattext") and "ON" or "OFF"))
+        if B.SyncCombatText then B:SyncCombatText() end
+        B:Print("Scrolling Combat Text: " .. (B:IsEnabled("combattext") and "ON (Blizzard Numbers suppressed)" or "OFF (Blizzard Numbers restored)"))
+    elseif cmd == "grid" or cmd == "raster" then
+        B.db.showGrid = not (B.db.showGrid ~= false)
+        if B.SetAlignmentGridShown then B:SetAlignmentGridShown(B.unlocked) end
+        B:Print("Edit Mode Alignment Grid: " .. (B.db.showGrid and "ON" or "OFF"))
+    elseif cmd == "buffs" or cmd == "alerts" then
+        B.db.showBuffBars = not (B.db.showBuffBars ~= false)
+        B:Tick()
+        B:Print("Build Buff & Alert Bars: " .. (B.db.showBuffBars and "ON" or "OFF"))
     elseif cmd == "autoscale" or cmd == "auto" then
         B.db.autoScale = not B.db.autoScale
         if B.db.autoScale then
@@ -610,7 +650,7 @@ local function HandleSlashCmd(msg)
             B:Print("Usage: /bw scale 0.80  (or /bw autoscale)")
         end
     elseif cmd == "help" then
-        B:Print("Commands: /bw (options), /bw unlock, /bw lock, /bw reset, /bw autoscale, /bw scale <val>, /bw demo, /bw hud, /bw pins, /bw loot, /bw plates, /bw sct")
+        B:Print("Commands: /bw (options), /bw unlock, /bw lock, /bw reset, /bw grid, /bw buffs, /bw autoscale, /bw scale <val>, /bw demo, /bw hud, /bw pins, /bw loot, /bw plates, /bw sct")
     else
         B:ToggleOptions()
     end

@@ -2636,6 +2636,7 @@ function mod:Update(state)
     ---------------------------------------------------------------------------
     --  Buff Bars Update (Square Icons, Resolved Spell Names & Matching Colors)
     ---------------------------------------------------------------------------
+    local showBuffs = (B.db and B.db.showBuffBars ~= false)
     local buffs = state.buffs or {}
     local nBuffs = table.getn(buffs)
     local buffsAge = state.buffsAge or 0
@@ -2643,50 +2644,59 @@ function mod:Update(state)
     local maxRows = MAX_BUFFS
     if nBuffs < maxRows then maxRows = nBuffs end
 
-    for i = 1, MAX_BUFFS do
-        local r = f.buffBars[i]
-        local b = (i <= maxRows) and buffs[i]
-        if b and type(b) == "table" then
-            local rawSpell = b.spell or "Buff"
-            local left = (tonumber(b.left) or 0) - buffsAge
-            if left < 0 then left = 0 end
+    if not showBuffs then
+        if f.buffContainer then f.buffContainer:Hide() end
+        for i = 1, MAX_BUFFS do
+            local r = f.buffBars[i]
+            if r then r:Hide() end
+        end
+    else
+        if f.buffContainer then f.buffContainer:Show() end
+        for i = 1, MAX_BUFFS do
+            local r = f.buffBars[i]
+            local b = (i <= maxRows) and buffs[i]
+            if b and type(b) == "table" then
+                local rawSpell = b.spell or "Buff"
+                local left = (tonumber(b.left) or 0) - buffsAge
+                if left < 0 then left = 0 end
 
-            local spName, iconTex, color = ResolveBuffInfo(rawSpell, left)
+                local spName, iconTex, color = ResolveBuffInfo(rawSpell, left)
 
-            if not buffMax[spName] or buffMax[spName] < left then
-                buffMax[spName] = left
-            end
-            local bMax = buffMax[spName]
-            if bMax <= 0 then bMax = 1 end
+                if not buffMax[spName] or buffMax[spName] < left then
+                    buffMax[spName] = left
+                end
+                local bMax = buffMax[spName]
+                if bMax <= 0 then bMax = 1 end
 
-            local pct = left / bMax
-            if pct > 1 then pct = 1 end
-            r.bar:SetValue(pct)
+                local pct = left / bMax
+                if pct > 1 then pct = 1 end
+                r.bar:SetValue(pct)
 
-            -- Set the matching color of the spell on the whole bar and dark tint on background
-            B:SetBarColor(r.bar, color.r, color.g, color.b)
-            local bg = r.bar.buiBg or r.bar.euiBg
-            if bg then
-                bg:SetVertexColor(color.r * 0.25, color.g * 0.25, color.b * 0.25)
-                bg:SetAlpha(0.85)
-            end
+                -- Set the matching color of the spell on the whole bar and dark tint on background
+                B:SetBarColor(r.bar, color.r, color.g, color.b)
+                local bg = r.bar.buiBg or r.bar.euiBg
+                if bg then
+                    bg:SetVertexColor(color.r * 0.25, color.g * 0.25, color.b * 0.25)
+                    bg:SetAlpha(0.85)
+                end
 
-            -- Set icon texture
-            r.icon:SetTexture(iconTex)
+                -- Set icon texture
+                r.icon:SetTexture(iconTex)
 
-            -- Set clean spell name and duration text
-            r.nameFs:SetText(spName)
-            if left >= 60 then
-                local m = math.floor(left / 60)
-                local s = math.floor(math.mod(left, 60))
-                r.timeFs:SetText(string.format("%d:%02d", m, s))
+                -- Set clean spell name and duration text
+                r.nameFs:SetText(spName)
+                if left >= 60 then
+                    local m = math.floor(left / 60)
+                    local s = math.floor(math.mod(left, 60))
+                    r.timeFs:SetText(string.format("%d:%02d", m, s))
+                else
+                    r.timeFs:SetText(string.format("%.1fs", left))
+                end
+
+                r:Show()
             else
-                r.timeFs:SetText(string.format("%.1fs", left))
+                r:Hide()
             end
-
-            r:Show()
-        else
-            r:Hide()
         end
     end
 
@@ -2695,7 +2705,7 @@ function mod:Update(state)
         local stored = (AZS_GetStoredLevels and tonumber(AZS_GetStoredLevels())) or 0
         if stored > 0 then
             f.lvlUpBtn.fs:SetText(string.format("LEVEL UP READY (%d) [Y]", stored))
-            if maxRows > 0 and f.buffBars[1] and f.buffBars[1]:IsShown() then
+            if showBuffs and maxRows > 0 and f.buffBars[1] and f.buffBars[1]:IsShown() then
                 f.lvlUpBtn:ClearAllPoints()
                 f.lvlUpBtn:SetPoint("BOTTOM", f.buffContainer, "TOP", 0, 4)
             else
