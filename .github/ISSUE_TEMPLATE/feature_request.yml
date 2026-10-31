@@ -1,0 +1,30 @@
+name: Feature Request / Improvement
+description: Suggest an idea, enhancement, or new feature for BlackwellUI.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea to make BlackwellUI better? Let us know!
+  - type: textarea
+    id: feature
+    attributes:
+      label: Feature Description
+      description: Clear and concise description of the proposed feature.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: What problem does this solve or what gameplay workflow does it improve?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any alternative solutions or workarounds you've thought about.
+    validations:
+      required: false
