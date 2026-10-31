@@ -2,7 +2,7 @@
 
 [![WoW Version](https://img.shields.io/badge/WoW-1.12.1%20Vanilla-blue.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI)
 [![Game Mode](https://img.shields.io/badge/Mode-Azeroth%20Survivors-red.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI)
-[![Release](https://img.shields.io/badge/Release-v2.6.5--azs-00e5ff.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI/releases)
+[![Release](https://img.shields.io/badge/Release-v2.6.7--azs-00e5ff.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI/releases)
 [![Lua Engine](https://img.shields.io/badge/Engine-Strict%20Lua%205.0-brightgreen.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI)
 [![License](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI/blob/main/LICENSE)
 
@@ -74,6 +74,19 @@ Stock World of Warcraft UI (action bars, bag slots, micro menus, standard unitfr
 | `/bw hud` | Toggle replacement of the stock Azeroth Survivors run HUD |
 | `/bw pins` | Toggle Minimap Radar Pins (Caches & Guardian Lairs) |
 | `/bw loot` | Toggle the real-time Loot Drop Telemetry Log |
+
+---
+
+## 🐞 Bug Reporting & Ticketing System
+
+Please report all bugs, Lua errors, visual glitches, or feature suggestions directly to our **GitHub Issues Ticketing System**:
+👉 **[Open a Ticket on GitHub](https://github.com/Blackwellcode/BlackwellUI/issues/new/choose)**
+
+When filing a bug, please include:
+1. Your BlackwellUI version (`/bw`)
+2. Client type (Windows `.exe` vs Browser / WebGPU WASM)
+3. Exact Lua error message / stacktrace
+4. Steps to reproduce and screenshots (if applicable)
 
 ---
 
