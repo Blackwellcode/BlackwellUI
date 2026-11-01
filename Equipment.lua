@@ -4,7 +4,8 @@
 --  Picked Equipment & Items HUD:
 --  - Positioned between Chat Panel and Hero Unit Frame
 --  - Displays picked equipment items (Trinkets, Rings, Weapons, Armor, Cards)
---  - Dynamic Rarity Borders matching item quality (Poor, Common, Uncommon, Rare, Epic, Legendary)
+--  - Rounded quality rings (round style) or 1px rarity borders (sharp style)
+--    matching item quality (Poor, Common, Uncommon, Rare, Epic, Legendary)
 --  - Interactive Mouseover tooltips displaying complete item stats & bonuses
 --  - Demo mode preview with full sample inventory
 --  - Movable HUD frame via /bui unlock
@@ -12,11 +13,14 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
+local L = B.L
 local mod = {}
 mod.label = "Equipment"
+mod.hint = "Equipped and carried items as a grid with quality colours."
 
 local TILE_SIZE = 28
 local TILE_GAP = 4
+-- Defaults; the grid size comes from the module options.
 local COLS = 7
 local ROWS = 3 -- 21 tiles: all 17 equipment slots fit, weapons included
 local MAX_SLOTS = COLS * ROWS
@@ -64,129 +68,316 @@ local DEMO_ITEMS = {
     { name = "Cracked Stone Amulet", quality = 0, icon = "Interface\\Icons\\INV_Jewelry_Necklace_07", type = "Neck", stats = { "+1 Stamina" }, equip = "" },
 }
 
+mod.options = {
+    { type = "section", label = "Layout" },
+    { type = "range", key = "tileSize", label = "Slot size", min = 20, max = 44, step = 2, default = 28, format = "%d px" },
+    { type = "range", key = "columns", label = "Columns", min = 3, max = 12, step = 1, default = 7, format = "%d" },
+    { type = "range", key = "rows", label = "Rows", min = 1, max = 6, step = 1, default = 3, format = "%d" },
+    { type = "range", key = "spacing", label = "Spacing", min = 0, max = 10, step = 1, default = 4, format = "%d px" },
+    { type = "range", key = "fontSize", label = "Font size", hint = "Added to the global font size.", min = -3, max = 6, step = 1, default = 0, format = "%d" },
+    { type = "section", label = "Elements" },
+    { type = "toggle", key = "showHeader", label = "Show header", default = true },
+    { type = "toggle", key = "showCounter", label = "Show counter", default = true, depends = "showHeader" },
+    { type = "toggle", key = "qualityRing", label = "Quality colour ring", hint = "Frames each slot in its item quality colour.", default = true },
+    { type = "toggle", key = "showEmpty", label = "Show empty slots", hint = "Off shrinks the panel to the filled rows.", default = true },
+    { type = "toggle", key = "showBags", label = "Include bag items", default = true },
+    { type = "toggle", key = "showStacks", label = "Show stack counts", default = true },
+}
+
+local function Opt(key, default)
+    return B:ModOpt("equipment", key, default)
+end
+
+local function SlotCount()
+    return Opt("columns", COLS) * Opt("rows", ROWS)
+end
+
+local EMPTY_SHARP = { r = 0.20, g = 0.20, b = 0.20, a = 0.60 }
+local EMPTY_ROUND = { r = 0.16, g = 0.17, b = 0.20, a = 0.90 }
+local NEUTRAL_ROUND = { r = 0.12, g = 0.13, b = 0.16, a = 0.95 }
+
+-- Rounded shape in its own colour (not a panel, so the theme refresh leaves
+-- its colour alone): four disc quarters, two edge strips and a centre.
+local function RoundShape(f, rad, layer)
+    local shape = { parts = {} }
+    local function Part(round, l, rr, t, bb)
+        local tex = f:CreateTexture(nil, layer or "BACKGROUND")
+        tex:SetTexture(round and B.ROUND or B.WHITE)
+        if round then tex:SetTexCoord(l, rr, t, bb) end
+        table.insert(shape.parts, tex)
+        return tex
+    end
+    local tl = Part(true, 0, 0.5, 0, 0.5)
+    tl:SetWidth(rad); tl:SetHeight(rad)
+    tl:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
+    local tr = Part(true, 0.5, 1, 0, 0.5)
+    tr:SetWidth(rad); tr:SetHeight(rad)
+    tr:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
+    local bl = Part(true, 0, 0.5, 0.5, 1)
+    bl:SetWidth(rad); bl:SetHeight(rad)
+    bl:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
+    local br = Part(true, 0.5, 1, 0.5, 1)
+    br:SetWidth(rad); br:SetHeight(rad)
+    br:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+    local top = Part(false)
+    top:SetPoint("TOPLEFT", tl, "TOPRIGHT", 0, 0)
+    top:SetPoint("BOTTOMRIGHT", tr, "BOTTOMLEFT", 0, 0)
+    local bottom = Part(false)
+    bottom:SetPoint("TOPLEFT", bl, "TOPRIGHT", 0, 0)
+    bottom:SetPoint("BOTTOMRIGHT", br, "BOTTOMLEFT", 0, 0)
+    local centre = Part(false)
+    centre:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -rad)
+    centre:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, rad)
+    function shape:SetColor(r, g, b, a)
+        for i = 1, table.getn(self.parts) do
+            self.parts[i]:SetVertexColor(r, g, b)
+            self.parts[i]:SetAlpha(a or 1)
+        end
+    end
+    return shape
+end
+
+-- Slot frame colour: rounded ring in the round style, 1px border in sharp.
+local function SetSlotColor(slot, r, g, b, a)
+    if slot.ring then
+        slot.ring:SetColor(r, g, b, a)
+    else
+        B:SetBorderColor(slot, r, g, b, a)
+    end
+end
+
+local function SetSlotEmpty(slot)
+    local c = (slot.ring and EMPTY_ROUND) or EMPTY_SHARP
+    SetSlotColor(slot, c.r, c.g, c.b, c.a)
+end
+
+local function CreateSlot(f, i)
+    -- Named frames only for the 21 slots the panel always had.
+    local slotName = nil
+    if i <= MAX_SLOTS then slotName = "BUI_EquipSlot" .. i end
+    local slot = CreateFrame("Button", slotName, f)
+    slot:SetWidth(TILE_SIZE)
+    slot:SetHeight(TILE_SIZE)
+
+    local icon = slot:CreateTexture(nil, "ARTWORK")
+    if B:IsRound() then
+        -- Rounded quality ring: the icon sits 2px inside a rounded shape.
+        slot.ring = RoundShape(slot, 5, "BACKGROUND")
+        icon:SetPoint("TOPLEFT", slot, "TOPLEFT", 2, -2)
+        icon:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -2, 2)
+    else
+        B:Backdrop(slot, 0.90)
+        B:Border(slot, 0.20, 0.20, 0.20, 0.60)
+        icon:SetPoint("TOPLEFT", slot, "TOPLEFT", 1, -1)
+        icon:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -1, 1)
+    end
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    slot.icon = icon
+    SetSlotEmpty(slot)
+
+    local count = B:Font(slot, 9, "RIGHT")
+    count:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -2, 2)
+    count:SetTextColor(1, 1, 1)
+    count:Hide()
+    slot.countFs = count
+
+    -- Hover tint, shown from OnEnter: this engine draws the HIGHLIGHT layer
+    -- all the time, not only under the mouse.
+    local hl = slot:CreateTexture(nil, "OVERLAY")
+    B:Solid(hl, 1, 1, 1, 0.15)
+    hl:SetAllPoints(icon)
+    hl:Hide()
+    slot.hl = hl
+
+    slot:EnableMouse(true)
+    slot:SetScript("OnEnter", function()
+        if this.hl then this.hl:Show() end
+        GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+        GameTooltip:ClearLines()
+
+        if this.itemKind == "inv" and this.invSlot then
+            local hasItem = GameTooltip:SetInventoryItem("player", this.invSlot)
+            if not hasItem and this.itemLink then
+                GameTooltip:SetHyperlink(this.itemLink)
+            end
+        elseif this.itemKind == "bag" and this.bag and this.bagSlot then
+            GameTooltip:SetBagItem(this.bag, this.bagSlot)
+        elseif this.itemKind == "demo" and this.demoData then
+            local d = this.demoData
+            local qCol = QUALITY_COLORS[d.quality or 1] or QUALITY_COLORS[1]
+            GameTooltip:AddLine(d.name, qCol.r, qCol.g, qCol.b)
+            if d.type and d.type ~= "" then
+                GameTooltip:AddLine(d.type, 0.90, 0.90, 0.90)
+            end
+            if d.stats then
+                local nStats = table.getn(d.stats)
+                for sIdx = 1, nStats do
+                    GameTooltip:AddLine(d.stats[sIdx], 1, 1, 1)
+                end
+            end
+            if d.equip and d.equip ~= "" then
+                GameTooltip:AddLine(d.equip, 0, 1, 0, 1)
+            end
+        end
+
+        GameTooltip:Show()
+    end)
+
+    slot:SetScript("OnLeave", function()
+        if this.hl then this.hl:Hide() end
+        GameTooltip:Hide()
+    end)
+
+    return slot
+end
+
+-- Panel size for a number of grid rows (header and padding included).
+local function PanelSize(f, nRows)
+    local size = Opt("tileSize", TILE_SIZE)
+    local gap = Opt("spacing", TILE_GAP)
+    local cols = Opt("columns", COLS)
+    local top = f.pad
+    if Opt("showHeader", true) then top = f.headerPad end
+    local w = 2 * f.pad + cols * size + (cols - 1) * gap
+    local h = top + nRows * size + (nRows - 1) * gap + f.pad
+    return w, h, top
+end
+
+local function LayoutSlots(f)
+    local size = Opt("tileSize", TILE_SIZE)
+    local gap = Opt("spacing", TILE_GAP)
+    local cols = Opt("columns", COLS)
+    local nRows = Opt("rows", ROWS)
+    local total = cols * nRows
+    local w, h, top = PanelSize(f, nRows)
+    f:SetWidth(w)
+    f:SetHeight(h)
+
+    for i = 1, total do
+        if not f.slots[i] then
+            f.slots[i] = CreateSlot(f, i)
+        end
+    end
+    for i = 1, table.getn(f.slots) do
+        local slot = f.slots[i]
+        if i <= total then
+            local col = math.mod(i - 1, cols)
+            local row = math.floor((i - 1) / cols)
+            slot:SetWidth(size)
+            slot:SetHeight(size)
+            slot:ClearAllPoints()
+            slot:SetPoint("TOPLEFT", f, "TOPLEFT", f.pad + col * (size + gap), -top - row * (size + gap))
+        else
+            slot:Hide()
+        end
+    end
+end
+
 local function CreateEquipmentFrame()
     local fW = 6 + COLS * TILE_SIZE + (COLS - 1) * TILE_GAP + 6
     local fH = 24 + ROWS * TILE_SIZE + (ROWS - 1) * TILE_GAP + 6
 
+    local round = B:IsRound()
     local f = CreateFrame("Frame", "BUI_Equipment", UIParent)
     f:SetWidth(fW)
     f:SetHeight(fH)
     f:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 400, 28)
     f:SetFrameStrata("MEDIUM")
-    B:Backdrop(f, 0.85)
+    if round then
+        B:Panel(f)
+        f.pad = 8
+        f.headerPad = 28
+    else
+        B:Backdrop(f, 0.85)
+        f.pad = 6
+        f.headerPad = 24
+    end
 
     -- Header
     local hdr = CreateFrame("Frame", nil, f)
     hdr:SetHeight(20)
-    hdr:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -1)
-    hdr:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -1)
+    if round then
+        hdr:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -3)
+        hdr:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -3)
+    else
+        hdr:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -1)
+        hdr:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -1)
+    end
     f.header = hdr
 
-    local hdrBg = hdr:CreateTexture(nil, "BACKGROUND")
-    B:Solid(hdrBg, 0.04, 0.04, 0.04, 0.95)
-    hdrBg:SetAllPoints(hdr)
+    local inset = (round and 8) or 4
+    if not round then
+        local hdrBg = hdr:CreateTexture(nil, "BACKGROUND")
+        B:Solid(hdrBg, 0.04, 0.04, 0.04, 0.95)
+        hdrBg:SetAllPoints(hdr)
+    end
 
     local brandIcon = hdr:CreateTexture(nil, "ARTWORK")
     brandIcon:SetWidth(14)
     brandIcon:SetHeight(14)
-    brandIcon:SetPoint("LEFT", hdr, "LEFT", 4, 0)
+    brandIcon:SetPoint("LEFT", hdr, "LEFT", inset, 0)
     brandIcon:SetTexture("Interface\\Icons\\INV_Chest_Cloth_17")
     brandIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     local titleFs = B:Font(hdr, 9, "LEFT")
     titleFs:SetPoint("LEFT", brandIcon, "RIGHT", 5, 0)
-    titleFs:SetText("EQUIPMENT")
+    titleFs:SetText(L["EQUIPMENT"])
     titleFs:SetTextColor(1.0, 0.90, 0.62)
+    hdr.title = titleFs
 
     local countFs = B:Font(hdr, 9, "RIGHT")
-    countFs:SetPoint("RIGHT", hdr, "RIGHT", -6, 0)
+    countFs:SetPoint("RIGHT", hdr, "RIGHT", -(inset + 2), 0)
     countFs:SetTextColor(0.85, 0.75, 0.45)
     countFs:SetText("(0/14)")
     hdr.count = countFs
 
-    local rule = hdr:CreateTexture(nil, "ARTWORK")
-    rule:SetPoint("BOTTOMLEFT", hdr, "BOTTOMLEFT", 0, 0)
-    rule:SetPoint("BOTTOMRIGHT", hdr, "BOTTOMRIGHT", 0, 0)
-    rule:SetHeight(1)
-    rule:SetTexture(B.WHITE)
-    B:Accent(rule, "tex", 0.90)
-
-    -- 14 Grid Slots (2 rows of 7 slots)
-    local slots = {}
-    for i = 1, MAX_SLOTS do
-        local col = math.mod(i - 1, COLS)
-        local row = math.floor((i - 1) / COLS)
-
-        local slot = CreateFrame("Button", "BUI_EquipSlot" .. i, f)
-        slot:SetWidth(TILE_SIZE)
-        slot:SetHeight(TILE_SIZE)
-        slot:SetPoint("TOPLEFT", f, "TOPLEFT", 6 + col * (TILE_SIZE + TILE_GAP), -24 - row * (TILE_SIZE + TILE_GAP))
-        B:Backdrop(slot, 0.90)
-        B:Border(slot, 0.20, 0.20, 0.20, 0.60)
-
-        local icon = slot:CreateTexture(nil, "ARTWORK")
-        icon:SetPoint("TOPLEFT", slot, "TOPLEFT", 1, -1)
-        icon:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -1, 1)
-        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        slot.icon = icon
-
-        local count = B:Font(slot, 9, "RIGHT")
-        count:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -2, 2)
-        count:SetTextColor(1, 1, 1)
-        count:Hide()
-        slot.countFs = count
-
-        local hl = slot:CreateTexture(nil, "HIGHLIGHT")
-        B:Solid(hl, 1, 1, 1, 0.15)
-        hl:SetAllPoints(slot)
-
-        slot:EnableMouse(true)
-        slot:SetScript("OnEnter", function()
-            GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
-            GameTooltip:ClearLines()
-
-            if this.itemKind == "inv" and this.invSlot then
-                local hasItem = GameTooltip:SetInventoryItem("player", this.invSlot)
-                if not hasItem and this.itemLink then
-                    GameTooltip:SetHyperlink(this.itemLink)
-                end
-            elseif this.itemKind == "bag" and this.bag and this.bagSlot then
-                GameTooltip:SetBagItem(this.bag, this.bagSlot)
-            elseif this.itemKind == "demo" and this.demoData then
-                local d = this.demoData
-                local qCol = QUALITY_COLORS[d.quality or 1] or QUALITY_COLORS[1]
-                GameTooltip:AddLine(d.name, qCol.r, qCol.g, qCol.b)
-                if d.type and d.type ~= "" then
-                    GameTooltip:AddLine(d.type, 0.90, 0.90, 0.90)
-                end
-                if d.stats then
-                    local nStats = table.getn(d.stats)
-                    for sIdx = 1, nStats do
-                        GameTooltip:AddLine(d.stats[sIdx], 1, 1, 1)
-                    end
-                end
-                if d.equip and d.equip ~= "" then
-                    GameTooltip:AddLine(d.equip, 0, 1, 0, 1)
-                end
-            end
-
-            GameTooltip:Show()
-        end)
-
-        slot:SetScript("OnLeave", function()
-            GameTooltip:Hide()
-        end)
-
-        slots[i] = slot
+    if not round then
+        local rule = hdr:CreateTexture(nil, "ARTWORK")
+        rule:SetPoint("BOTTOMLEFT", hdr, "BOTTOMLEFT", 0, 0)
+        rule:SetPoint("BOTTOMRIGHT", hdr, "BOTTOMRIGHT", 0, 0)
+        rule:SetHeight(1)
+        rule:SetTexture(B.WHITE)
+        B:Accent(rule, "tex", 0.90)
     end
-    f.slots = slots
 
-    B:RegisterMover(f, "equipment", "Equipment / Items", "BOTTOMLEFT", "BOTTOMLEFT", 400, 28)
+    -- Grid slots, built for the default 7 x 3 grid; more are added on demand.
+    f.slots = {}
+    LayoutSlots(f)
+
+    B:RegisterMover(f, "equipment", L["Equipment / Items"], "BOTTOMLEFT", "BOTTOMLEFT", 400, 28)
     return f
 end
 
 function mod:Create()
     self.frame = CreateEquipmentFrame()
+end
+
+-- Grid size, slot size, fonts and header visibility.
+function mod:ApplyOptions()
+    local f = self.frame
+    if not f then return end
+    LayoutSlots(f)
+
+    local off = Opt("fontSize", 0)
+    f.header.title.buiSize = 9 + off
+    B:ApplyFont(f.header.title)
+    f.header.count.buiSize = 9 + off
+    B:ApplyFont(f.header.count)
+    for i = 1, table.getn(f.slots) do
+        f.slots[i].countFs.buiSize = 9 + off
+        B:ApplyFont(f.slots[i].countFs)
+    end
+
+    if Opt("showHeader", true) then
+        f.header:Show()
+    else
+        f.header:Hide()
+    end
+    if Opt("showCounter", true) then
+        f.header.count:Show()
+    else
+        f.header.count:Hide()
+    end
 end
 
 function mod:Update(state)
@@ -198,6 +389,7 @@ function mod:Update(state)
         return
     end
 
+    local maxSlots = SlotCount()
     local items = {}
     local nItems = 0
 
@@ -205,7 +397,7 @@ function mod:Update(state)
     if type(GetInventoryItemTexture) == "function" then
         local nSlots = table.getn(INVENTORY_SLOTS)
         for i = 1, nSlots do
-            if nItems >= MAX_SLOTS then break end
+            if nItems >= maxSlots then break end
             local slotId = INVENTORY_SLOTS[i]
             local tex = GetInventoryItemTexture("player", slotId)
             if tex and tex ~= "" then
@@ -237,11 +429,11 @@ function mod:Update(state)
     end
 
     -- 2. Scan bags if slots remain
-    if nItems < MAX_SLOTS and type(GetContainerNumSlots) == "function" and type(GetContainerItemInfo) == "function" then
+    if Opt("showBags", true) and nItems < maxSlots and type(GetContainerNumSlots) == "function" and type(GetContainerItemInfo) == "function" then
         for bag = 0, 4 do
             local numSlots = GetContainerNumSlots(bag) or 0
             for bSlot = 1, numSlots do
-                if nItems >= MAX_SLOTS then break end
+                if nItems >= maxSlots then break end
                 local tex, count = GetContainerItemInfo(bag, bSlot)
                 if tex and tex ~= "" then
                     local link = (type(GetContainerItemLink) == "function" and GetContainerItemLink(bag, bSlot)) or nil
@@ -271,7 +463,7 @@ function mod:Update(state)
                     }
                 end
             end
-            if nItems >= MAX_SLOTS then break end
+            if nItems >= maxSlots then break end
         end
     end
 
@@ -279,6 +471,7 @@ function mod:Update(state)
     if nItems == 0 and (B.demo or B.unlocked) then
         local nDemo = table.getn(DEMO_ITEMS)
         for dIdx = 1, nDemo do
+            if nItems >= maxSlots then break end
             nItems = nItems + 1
             local d = DEMO_ITEMS[dIdx]
             items[nItems] = {
@@ -291,52 +484,80 @@ function mod:Update(state)
     end
 
     -- Update Header Count Badge
-    f.header.count:SetText(string.format("(%d/%d)", nItems, MAX_SLOTS))
+    f.header.count:SetText(string.format("(%d/%d)", nItems, maxSlots))
+
+    local showEmpty = Opt("showEmpty", true)
+    local qualityRing = Opt("qualityRing", true)
+    local showStacks = Opt("showStacks", true)
+
+    -- Without empty slots the panel shrinks to the filled rows.
+    if not showEmpty then
+        local cols = Opt("columns", COLS)
+        local used = math.floor((nItems + cols - 1) / cols)
+        if used < 1 then used = 1 end
+        local _, h = PanelSize(f, used)
+        f:SetHeight(h)
+    else
+        local _, h = PanelSize(f, Opt("rows", ROWS))
+        f:SetHeight(h)
+    end
 
     -- Render Slots
-    for i = 1, MAX_SLOTS do
+    for i = 1, maxSlots do
         local slot = f.slots[i]
-        if i <= nItems then
-            local itm = items[i]
-            slot.itemKind = itm.kind
-            slot.invSlot = itm.slotId
-            slot.bag = itm.bag
-            slot.bagSlot = itm.bagSlot
-            slot.itemLink = itm.link
-            slot.demoData = itm.demoData
+        if slot then
+            if i <= nItems then
+                local itm = items[i]
+                slot.itemKind = itm.kind
+                slot.invSlot = itm.slotId
+                slot.bag = itm.bag
+                slot.bagSlot = itm.bagSlot
+                slot.itemLink = itm.link
+                slot.demoData = itm.demoData
 
-            slot.icon:SetTexture(itm.texture)
-            slot.icon:Show()
+                slot.icon:SetTexture(itm.texture)
+                slot.icon:Show()
 
-            local q = itm.quality or 1
-            local qCol = QUALITY_COLORS[q] or QUALITY_COLORS[1]
-            if type(GetItemQualityColor) == "function" then
-                local qr, qg, qb = GetItemQualityColor(q)
-                if qr and qg and qb then
-                    qCol = { r = qr, g = qg, b = qb }
+                if qualityRing then
+                    local q = itm.quality or 1
+                    local qCol = QUALITY_COLORS[q] or QUALITY_COLORS[1]
+                    if type(GetItemQualityColor) == "function" then
+                        local qr, qg, qb = GetItemQualityColor(q)
+                        if qr and qg and qb then
+                            qCol = { r = qr, g = qg, b = qb }
+                        end
+                    end
+                    SetSlotColor(slot, qCol.r, qCol.g, qCol.b, 1)
+                elseif slot.ring then
+                    SetSlotColor(slot, NEUTRAL_ROUND.r, NEUTRAL_ROUND.g, NEUTRAL_ROUND.b, NEUTRAL_ROUND.a)
+                else
+                    SetSlotEmpty(slot)
+                end
+
+                if showStacks and itm.count and itm.count > 1 then
+                    slot.countFs:SetText(tostring(itm.count))
+                    slot.countFs:Show()
+                else
+                    slot.countFs:Hide()
+                end
+                slot:Show()
+            else
+                slot.itemKind = nil
+                slot.invSlot = nil
+                slot.bag = nil
+                slot.bagSlot = nil
+                slot.itemLink = nil
+                slot.demoData = nil
+
+                slot.icon:Hide()
+                slot.countFs:Hide()
+                SetSlotEmpty(slot)
+                if showEmpty then
+                    slot:Show()
+                else
+                    slot:Hide()
                 end
             end
-            B:SetBorderColor(slot, qCol.r, qCol.g, qCol.b, 1)
-
-            if itm.count and itm.count > 1 then
-                slot.countFs:SetText(tostring(itm.count))
-                slot.countFs:Show()
-            else
-                slot.countFs:Hide()
-            end
-            slot:Show()
-        else
-            slot.itemKind = nil
-            slot.invSlot = nil
-            slot.bag = nil
-            slot.bagSlot = nil
-            slot.itemLink = nil
-            slot.demoData = nil
-
-            slot.icon:Hide()
-            slot.countFs:Hide()
-            B:SetBorderColor(slot, 0.20, 0.20, 0.20, 0.60)
-            slot:Show()
         end
     end
 

@@ -10,9 +10,13 @@
 local B = BlackwellUI
 local mod = {}
 mod.label = "Action Bars"
+mod.toggleLabel = "Hide action bars and bags"
+mod.hint = "Spells cast themselves in Azeroth Survivors. Needs /reload to bring them back."
 mod.alwaysActive = false
 -- Reparents Blizzard frames to a hidden sink; turning it off takes a /reload.
 mod.reloadOnToggle = true
+-- Hides Blizzard frames only: no own frame for scale / opacity / visibility.
+mod.noLook = true
 
 -- Hidden sink frame: anything parented here is permanently invisible
 local hiddenSink = CreateFrame("Frame", "BUI_HiddenSink", UIParent)

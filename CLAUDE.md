@@ -5,7 +5,7 @@ BlackwellUI ist eine modulare Cyberpunk/Sci-Fi HUD- und Analytics-Engine für **
 
 * **Repository:** `c:\Git\wenilla\benilla-config\AddOns\BlackwellUI`
 * **Sync-Pfad Client:** `C:\Users\Pierre\Documents\AzerothSurvivors\benilla-config\AddOns\BlackwellUI`
-* **Aktuelle Version:** 2.7.2-azs
+* **Aktuelle Version:** 2.8.0-azs
 * **TOC:** `BlackwellUI.toc` (Interface 11200, SavedVariables `BlackwellUIDB`)
 * **Global Namespace:** `B` bzw. `BlackwellUI`
 
@@ -55,6 +55,14 @@ Die Daten werden via `AZSApiFrame` oder Events bereitgestellt:
 
 ## Modul-Architektur
 * `Core.lua`: Core-Namespace `B`, Datenbank `B.db`, Modul-Registrierung (`B:RegisterModule`), Mover & Alignment-Grid (`BUI_AlignmentGrid`), HUD & Combat-Text Sync (`B:SyncHud`, `B:RestoreStockCombatText`, `B:SyncCombatText`), Ticker (`Core:Tick` ruft `mod:Update(state)` defensiv auf).
+* `Locale.lua`: Spracherkennung über die CVar `azsLanguage` (14 Spielsprachen; `GetLocale()` ist in benilla immer `enUS` und nur Fallback), Tabelle `B.L` (`L["English"]`, englischer Fallback), Override `B.db.language`, Font-Fallback auf Fira Sans für ru/uk (Barlow hat kein Kyrillisch). Übersetzungen in `Locales\<code>.lua` (`B:RegisterLocale`). UI-Texte nur zur Anzeigezeit mit `L[...]` übersetzen, nie in Tabellen auf Dateiebene.
+* `AbilityNames.lua` / `GameStrings.lua` / `SpellIcons.lua`: generiert aus den Spieldaten (Spiel-JSON in der Exe via `tools/gen_abilitynames.py` / `tools/gen_gamestrings.py`, bzw. `Spell.dbc` via `tools/gen_spellicons.py`), nicht von Hand ändern.
+* Stil: `B.db.uiStyle` = `"round"` (Standard) oder `"sharp"` (alter kantiger Stil), Umschalten erst nach `/reload`. Alle Hintergründe laufen über `B:Panel(f)` bzw. `B:Backdrop` (stilabhängig); `B:IsRound()` beim Bauen abfragen. Eckenradius `B.db.cornerRadius`, Panelfarbe `B.db.panelColor` (`false` = Stilfarbe), Schriftkontur `B.db.fontOutline`.
+* Moduloptionen: Jedes Modul deklariert `mod.hint` und `mod.options` (Typen `section`, `note`, `toggle`, `range`, `choice`, `color`; Felder `key`/`db`, `default`, `depends`, `reload`, `format`) und setzt sie in `mod:ApplyOptions()` um. Werte in `B.db.mod[<modul>][<key>]`, lesen mit `B:ModOpt(key, opt, default)`. Skalierung/Deckkraft/Sichtbarkeit (immer, Kampf, außerhalb Kampf, Mouse-over) kommen automatisch aus Core für `mod.frame` bzw. `mod.lookFrames`; `mod.noLook` schaltet das ab. `Options.lua` erzeugt daraus pro Modul eine scrollbare Seite.
+* Runde Optik (Konzept C): `B:RoundPanel`, `B:RoundBar`, `B:DotRing`, `B:RoundButton` in `Core.lua`, alle auf `media/textures/round.tga` (eigene Textur, erzeugt von `tools/gen_textures.py`). Die Engine kennt keinen Eckenradius; Ecken sind Kreisviertel. Meter, Timer und RareTimers nutzen sie.
+* `GetWidth()`/`GetHeight()` liefern bei Frames mit zwei Ankerpunkten (`SetAllPoints`, TOPLEFT+TOPRIGHT) in benilla teils veraltete Werte (gemessen 220 statt 244). Für Layout-Berechnungen `B:FrameSize(f)` nutzen (aus `GetLeft/GetRight/GetTop/GetBottom`).
+* Texturen im Layer `"HIGHLIGHT"` zeichnet benilla **dauerhaft**, nicht nur bei Mouse-over. Hover-Effekte deshalb als normale Textur bauen und in `OnEnter`/`OnLeave` zeigen/verstecken.
+* Spell-Tooltips schreibt die Engine in der **Spielsprache** (`B.GAME_LANG`), nicht in der Addon-Sprache (`B.LANG`, ggf. Override). `Build.lua` erkennt Tooltip-Marker deshalb über `B:GameMatch`/`B:GameString` in Spielsprache plus Englisch (`B:TooltipLanguages()`), nie über fest verdrahtetes Englisch.
 * `Pins.lua`: Radar-Pins auf der Minimap (Bosse, Guardians, Truhen). Strata `HIGH`.
 * `CombatText.lua`: Scrolling Combat Text mit Toggle (`B.db.sctAlerts` / Blizzard-Zahlen-Wiederherstellung).
 * `Build.lua`: Spells, Ränge, Cooldowns, Buff-Bars (schaltbar mit `showBuffBars`), Level-Up Button.
