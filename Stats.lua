@@ -86,6 +86,39 @@ function mod:Create()
     B:RegisterMover(f, "stats", "Run Multipliers", "TOPLEFT", "TOPLEFT", 12, -140)
 end
 
+-- Growth direction: the edge the panel is anchored by stays put while rows are
+-- added. Growing up anchors the bottom-left corner, growing down the top-left.
+-- The converted anchor is saved as the panel's position, so it survives /reload.
+function mod:ApplyGrowth()
+    local f = self.frame
+    if not f then return end
+    local want = (B.db.statsGrowUp and "BOTTOMLEFT") or "TOPLEFT"
+    local cur = f:GetPoint(1)
+    if cur == want then return end
+    local left = f:GetLeft()
+    local edge = (want == "BOTTOMLEFT" and f:GetBottom()) or f:GetTop()
+    if not left or not edge then return end
+    -- GetLeft/GetTop/GetBottom and SetPoint offsets share the panel's own
+    -- coordinate space; UIParent's top edge is converted into that space.
+    local y = edge
+    if want == "TOPLEFT" then
+        local ratio = 1
+        if type(f.GetEffectiveScale) == "function" and type(UIParent.GetEffectiveScale) == "function" then
+            ratio = UIParent:GetEffectiveScale() / f:GetEffectiveScale()
+        end
+        y = edge - (UIParent:GetTop() or UIParent:GetHeight()) * ratio
+    end
+    local pos = {
+        point = want,
+        relPoint = want,
+        x = math.floor(left + 0.5),
+        y = math.floor(y + 0.5),
+    }
+    B.db.positions[f.buiKey or "stats"] = pos
+    f:ClearAllPoints()
+    f:SetPoint(pos.point, UIParent, pos.relPoint, pos.x, pos.y)
+end
+
 function mod:Update(state)
     local f = self.frame
     if CharacterFrame and CharacterFrame:IsShown() then
@@ -143,6 +176,9 @@ function mod:Update(state)
         f.header.value:SetText(tostring(nActive))
         local shown = nActive
         if shown > MAX_STAT_ROWS then shown = MAX_STAT_ROWS end
+        -- Re-anchor before resizing so the chosen edge stays fixed. Not while
+        -- unlocked: the mover is dragging the frame then.
+        if not B.unlocked then self:ApplyGrowth() end
         f:SetHeight(22 + shown * ROW_HEIGHT + 4)
 
         for i = 1, MAX_STAT_ROWS do

@@ -4,6 +4,8 @@
 ## Author: Pierre & Ellesmere, Blackwell Edition for Azeroth Survivors
 ## Version: 2.6.7-azs
 ## SavedVariables: BlackwellUIDB
+## URL: https://github.com/Blackwellcode/BlackwellUI
+## X-Website: https://github.com/Blackwellcode/BlackwellUI
 
 Icons.lua
 SpellNames.lua

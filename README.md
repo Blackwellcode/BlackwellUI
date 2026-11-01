@@ -1,116 +1,217 @@
-# BlackwellUI (BUI) // CYBERPUNK TACTICAL HUD FOR AZEROTH SURVIVORS
+<div align="center">
 
-[![WoW Version](https://img.shields.io/badge/WoW-1.12.1%20Vanilla-blue.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI)
-[![Game Mode](https://img.shields.io/badge/Mode-Azeroth%20Survivors-red.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI)
-[![Release](https://img.shields.io/badge/Release-v2.6.7--azs-00e5ff.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI/releases)
-[![Support](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-FFDD00.svg?style=flat-square&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/blackwellcode)
-[![Lua Engine](https://img.shields.io/badge/Engine-Strict%20Lua%205.0-brightgreen.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI)
-[![License](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](https://github.com/Blackwellcode/BlackwellUI/blob/main/LICENSE)
+<img src="media/screenshots/hero-elwynn-horde.jpg" alt="BlackwellUI in a horde fight: damage meter, run clock, boss schedule, radar and floating combat text" width="100%">
 
-> **BlackwellUI** is a lightweight, high-performance tactical HUD overhaul engineered from scratch specifically for the **Azeroth Survivors** game mode on World of Warcraft (Vanilla 1.12.1).
+# BlackwellUI
 
----
+**The tactical HUD and run-analytics suite for Azeroth Survivors.**<br>
+See every number that decides a run: who deals the damage, when the next boss spawns, where the caches are.
 
-## ⚡ What is Azeroth Survivors & BlackwellUI?
+[![Latest release](https://img.shields.io/github/v/release/Blackwellcode/BlackwellUI?style=for-the-badge&color=00e5ff&labelColor=0d1117&label=release)](https://github.com/Blackwellcode/BlackwellUI/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Blackwellcode/BlackwellUI/total?style=for-the-badge&color=00e5ff&labelColor=0d1117)](https://github.com/Blackwellcode/BlackwellUI/releases)
+[![Client](https://img.shields.io/badge/client-Windows%20%7C%20Browser-00e5ff?style=for-the-badge&labelColor=0d1117)](#installation)
+[![WoW 1.12.1](https://img.shields.io/badge/WoW-1.12.1-00e5ff?style=for-the-badge&labelColor=0d1117)](#compatibility)
 
-**Azeroth Survivors** transforms World of Warcraft 1.12.1 into an adrenaline-fueled reverse bullet-hell / survival roguelite (*Vampire Survivors* style). Abilities trigger automatically, hordes of thousands of enemies swarm the arena, and millisecond build optimization decides victory or death.
+<a href="https://github.com/Blackwellcode/BlackwellUI/releases/latest/download/BlackwellUI.zip"><img src="https://img.shields.io/badge/Download-BlackwellUI.zip-00e5ff?style=for-the-badge&logo=github&logoColor=0d1117&labelColor=00e5ff&color=0d1117" alt="Download BlackwellUI.zip" height="44"></a>
+&nbsp;
+<a href="https://buymeacoffee.com/blackwellcode"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=0d1117" alt="Buy me a coffee" height="44"></a>
 
-Stock World of Warcraft UI (action bars, bag slots, micro menus, standard unitframes) is cluttered and counter-productive for this game mode. **BlackwellUI** completely purges all Blizzard UI overhead and replaces it with a razor-sharp tactical Cyberpunk HUD featuring 1px borders, dark translucent backdrops, Expressway typography, and real-time combat telemetry.
+[Features](#features) · [Screenshots](#screenshots) · [Installation](#installation) · [Commands](#commands) · [FAQ](#faq) · [Report a bug](https://github.com/Blackwellcode/BlackwellUI/issues/new/choose)
 
----
-
-## 📸 In-Game Screenshots
-
-### 1. Tactical Combat HUD (Naxxramas: The Scourge Invasion)
-![BlackwellUI Combat HUD](media/screenshots/blackwell-hud-naxxramas.png)
-*Full in-game combat HUD during a Naxxramas run. Centered Hero & Target frames with ability cooldown matrix, streamlined chat panel, economy telemetry DataBar, encounter radar and damage meter on the right, and the overhauled character sheet on the left.*
-
-<br/>
-
-### 2. Character Matrix & Run Stats Panel ('C' Key)
-![Character Info & Run Stats](media/screenshots/blackwell-character-matrix.png)
-*Redesigned Character Info window: Crisp 3D model frame, item quality border highlights, zero redundant bottom tabs, and the Azeroth Survivors Run Stats panel cleanly docked to the right edge.*
-
-<br/>
-
-### 3. Run Clock, Boss Schedule & Live Damage Meter
-![Run Timer & Damage Meter](media/screenshots/blackwell-timer-meter.png)
-*Live 20-minute run clock with boss spawn countdowns (Gates of Ahn'Qiraj: Kurinnaxx, General Rajaxx, Princess Huhuran, C'Thun) stacked directly above the Damage Meter featuring ability icons, dynamic equipped weapon textures, DPS rates, and the interactive `[R]` session reset button.*
+</div>
 
 ---
 
-## 🚀 Key Features & Telemetry Modules
+## Why BlackwellUI
 
-* **Zero-Clutter Philosophy:** Blizzard action bars, bags, and micro buttons are permanently hidden and suppressed. 100% of your screen is dedicated to combat visibility and threat tracking.
-* **Consolidated Combat Meter & Multiplayer Drilldown (`Meter.lua`):** 5 selectable modes (**Damage Done**, **Boss Damage**, **Healing Done**, **Damage Taken**, **Party Damage**) with instant header tab switching.
-  * **Legendary Neck & Proc Merging `[M]`:** Quick header toggle button and GUI option to aggregate compound item procs (e.g. `Amulet of the Inferno: Consecration`) directly into their parent spell totals. Hovering reveals a complete breakdown of Direct Casts vs Procs + source items.
-  * **Accurate Damage Share % & Relative Bar Scaling:** Displays true calculated damage share percentages (e.g. 34%, 24%, 4.2%) with statusbars filled proportionally relative to the top #1 ability (`d / maxVal`).
-  * **Party Drilldown:** In Party mode, click any party member to view their individual abilities, hit counts, crits, and DPS.
-  * **Session Reset `[R]`:** Left-Click resets session numbers & crits to 0; Right-Click restores full run totals.
-* **Top Buff & Upgrade Telemetry Bar (`Build.lua`):** Sleek, non-intrusive buff and passive upgrade row docked directly above your abilities. Features an 8-stage spell resolution engine resolving missing spell names, racials (Perception, Blood Fury, Will of the Forsaken, Berserking), and tier bonuses with full tooltips.
-* **Tactical Minimap & Radar Pins (`Pins.lua` / `Minimap.lua`):** Clean square minimap with dark 1px border. Background red cross texture and redundant stock buff icons permanently suppressed. Real-time Chebyshev edge-clamped spatial tracking for Caches (`AZS_CHESTS`) and Guardian Lairs (`AZS_GetLairs`) with distance in yards and breathing beacon animations.
-* **Centered Cooldown Manager & Real-time DoT Counter (`Build.lua`):** 36×36px spell tiles with dark cooldown swipe overlays, active rank badges, full ability tooltips, and **live DoT/Debuff counters** displaying active targets for bleeds (Rend, Deep Wounds), demoralizing shouts, fears, and totems.
-* **Stored Level-Up Quick Button & Auto-Suppression:** When *Store Level-Ups* is active, a glowing Cyberpunk `[ LEVEL UP READY (N) - PRESS Y ]` button surfaces right above your ability tiles for instant 1-click access (`AZS_OpenStoredLevels`). Stock default level-up icon is automatically suppressed to prevent duplicate on-screen elements.
-* **Streamlined Character & Inspect Matrix (`Character.lua`):** Redesigned Character and Inspect windows featuring a crisp 3D model frame, item quality border highlights, zero redundant bottom tabs, and the Azeroth Survivors Run Stats panel cleanly docked to the right edge. Redundant base attributes and item level clutter are stripped for an unobstructed view.
-* **Guardian 8:00 Speedrun Tracker (`Timer.lua`):** Integrated live goal tracker inside the run timer monitoring the *"Slay 4 Guardians before 8:00"* speedrun achievement with status (`ACHIEVED`, countdown timer, or `EXPIRED`).
-* **Kill Pace Telemetry (`DataBar.lua`):** 20-second rolling kill rate indicator in the bottom telemetry bar (`[85/m]`), dynamically color-coded by performance tier (Blazing Green, Fast Cyan, Steady Amber, Muted Red).
-* **Loot Drop Telemetry Log (`Loot.lua`):** Compact, draggable feed capturing item drops from `CHAT_MSG_LOOT` with WoW quality colors (Gray to Legendary), run timestamps (`[04:12]`), and interactive hyperlink inspection.
-* **Chat Spam Filter (`Chat.lua`):** Silently suppresses repetitive `Congratulations, you have reached level X!` and subsequent `+X% stat` spam floods to keep your communication pristine.
-* **Target Debuff Aura Bars:** Stacks debuff bars directly above your target frame with square spell icons, spell names, remaining durations, and centered ticking damage values.
-* **Cyberpunk Nameplates:** 120×10px statusbars, 1px contrast borders, neon reaction coloring (Hostile Red, Neutral Gold, Friendly Green), and dynamic accent borders for your active target.
-* **Elites & Bosses Radar:** Tracks bosses, guardians, and elites in real-time with remaining HP and percentages. Supports **click-targeting** directly from the tracker row.
-* **Live Stat Multipliers:** Displays active player multipliers (Damage, Cooldown Reduction, Crit, Area, Echo, Speed) parsed directly from `AZS_STATS`. Automatically hides when the Character Frame is opened to avoid screen overlap.
+Azeroth Survivors turns the 1.12.1 client into a horde-survival roguelite: spells fire on their own, the screen fills with enemies, and a run is won or lost on build decisions. The stock interface was made for a different game.
+
+BlackwellUI replaces it with one dark, 1px-bordered HUD that puts the run in front of you:
+
+| | |
+|---|---|
+| **Know your damage** | A five-tab meter (Damage, Healing, Boss, Taken, Party) with share, DPS, biggest crit and item-proc merging. |
+| **Know the clock** | Run timer, next boss, the full boss schedule and the "4 Guardians before 8:00" goal in one panel. |
+| **Know the map** | Minimap radar pins for caches and guardian lairs, rare spawn timers and a live elites & bosses tracker. |
+| **Make it yours** | Drag every frame on a 32px alignment grid, pick one of five accent themes or your own colour, scale for any resolution. |
 
 ---
 
-## ⌨️ Quick Controls & Commands
+## Screenshots
+
+<div align="center">
+
+<img src="media/screenshots/meter-tooltip.jpg" alt="Damage meter with per-spell tooltip" height="300">
+<img src="media/screenshots/radar-timer-stack.jpg" alt="Rare timers, minimap radar, run clock and elites tracker" height="300">
+
+<sub>**Left:** damage meter with per-spell breakdown on hover. **Right:** rare timers, radar minimap, run clock with boss schedule, elites & bosses tracker.</sub>
+
+<br><br>
+
+<img src="media/screenshots/build-tooltip.jpg" alt="Spell tiles with cooldown and upgrade tooltip" width="88%">
+
+<sub>Spell tiles with live cooldowns, rank badges and tooltips that list every upgrade on the spell.</sub>
+
+<br><br>
+
+<img src="media/screenshots/theme-strip.jpg" alt="The run clock in the five accent themes" width="100%">
+
+<sub>Five accent themes plus a custom RGB colour; every bar, header and accent line follows it.</sub>
+
+<br><br>
+
+<img src="media/screenshots/edit-mode-grid.jpg" alt="Edit mode with alignment grid and labelled frame movers" width="100%">
+
+<sub>Edit mode (`/bw unlock`): every frame is labelled and snaps to a 32px grid with centre axes.</sub>
+
+<br><br>
+
+<img src="media/screenshots/control-center-general.jpg" alt="BlackwellUI control center, General page" width="49%">
+<img src="media/screenshots/control-center.jpg" alt="BlackwellUI control center, HUD page" width="49%">
+
+<sub>The control center (`/bw`): five pages, a plain-language hint under every setting, and options that only matter for a module stay greyed out while it is off.</sub>
+
+</div>
+
+---
+
+## Features
+
+<details open>
+<summary><b>Combat analytics</b></summary>
+
+- **Damage meter** with five tabs: Damage, Healing, Boss, Taken, Party. Click the header to cycle, or a tab to jump.
+- **Hover breakdown** per spell: damage, DPS, share of the total and biggest crit.
+- **Proc merging** (`M` button): folds item procs such as `Amulet of the Inferno: Consecration` into the spell they belong to.
+- **Session reset** (`R` button): left-click starts a fresh session, right-click returns to run totals.
+- **Party drilldown**: in the Party tab, click a player to see their spells, hits and crits.
+- **Floating combat text** in its own style: outgoing and incoming numbers, multi-hit merging (`223 (9 Hits)`), ability alerts. Blizzard's numbers are hidden while it is on and come back when you turn it off.
+
+</details>
+
+<details open>
+<summary><b>Run intelligence</b></summary>
+
+- **Run clock** with run length, zone and difficulty, the next boss and the full boss schedule.
+- **Guardian goal**: tracks the "4 Guardians before 8:00" objective right in the timer.
+- **Elites & bosses tracker** with HP and percent; click a row to target it.
+- **Rare spawn timers** for every lair: alive, fighting, or the time until respawn.
+- **Data bar** along the bottom: level, XP, kills with a rolling kill pace (`[57/m]`), gold, lives, total damage and FPS at a glance.
+- **Loot log** with quality colours and run timestamps.
+
+</details>
+
+<details open>
+<summary><b>Radar & map</b></summary>
+
+- **Minimap pins** for caches and guardian lairs; pins outside the map range stick to its edge so nothing is lost.
+- **Square minimap** with a 1px border and player coordinates.
+
+</details>
+
+<details open>
+<summary><b>Your build</b></summary>
+
+- **Spell tiles** with cooldown overlays, rank badges and full tooltips including all upgrades.
+- **Buff bars** above the tiles for shrines, racials and procs (toggle with `/bw buffs`).
+- **Level-up button**: with stored level-ups, a `LEVEL UP READY (N)` button appears above your spells.
+- **Equipment panel** with every equipped item, quality-coloured.
+- **Stat multipliers** panel: damage, cooldown, crit, area, speed, echo and more, read live from the game. It can grow upwards, so it fits above the chat as well as below the minimap.
+
+</details>
+
+<details open>
+<summary><b>Layout & style</b></summary>
+
+- **Edit mode** with labelled movers, a 32px alignment grid and centre axes.
+- **Auto scaling** that fits the layout to your resolution (ultrawide included; the screenshots are 3440x1440), or a fixed scale (`/bw scale 0.9`).
+- **Themes**: Blackwell, Crimson, Amber, Emerald, Violet, Monolith, class colour or any custom RGB colour.
+- **Fonts and bar textures** switchable in the control center; all textures are power-of-two for the WebGPU client.
+- **Nameplates** in the same style, coloured by reaction and unit kind.
+- **Chat cleanup**: optional filter for level-up spam.
+- **Control center** (`/bw`) with five pages: General, Appearance, HUD, Combat, Map & Run. Every one of the 17 modules can be turned off on its own.
+
+</details>
+
+---
+
+## Installation
+
+### Windows client (`AzerothSurvivors.exe`)
+
+1. [Download `BlackwellUI.zip`](https://github.com/Blackwellcode/BlackwellUI/releases/latest/download/BlackwellUI.zip).
+2. Extract it so that the folder sits at `AzerothSurvivors\benilla-config\AddOns\BlackwellUI\` (the `.toc` file must be directly inside `BlackwellUI`).
+3. Start the game and enter a zone. Type `/bw` for the control center.
+
+### Browser client (WebGPU)
+
+Install `BlackwellUI.zip` through the game's in-game **AddOns** dialog, then reload.
+
+### Updating
+
+Download the new zip and replace the `BlackwellUI` folder. Your settings live in `benilla-config\saved\BlackwellUI.lua` and are kept.
+
+### Uninstalling cleanly
+
+BlackwellUI hides the stock run HUD and Blizzard's floating damage numbers. Those are game settings, and the client only saves them while you play. **Before you delete the addon**, open `/bw`, untick **Combat text** (Combat page) and **Replace the stock run HUD** (General page); the game gets its own settings back straight away. Then remove the folder.
+
+---
+
+## Commands
 
 | Command | Action |
 |---|---|
-| `/bw` or `/bui` | Toggle the BlackwellUI Control Center (Themes, Accent Colors, Font Scale) |
-| `/bw unlock` or `/bw move` | Unlock all HUD frames for drag-and-drop repositioning |
-| `/bw lock` | Lock all HUD frames in place |
-| `/bw reset` | Reset all frames to default screen layout |
-| `/bw demo` | Toggle demo/preview mode with simulated combat data |
-| `/bw hud` | Toggle replacement of the stock Azeroth Survivors run HUD |
-| `/bw pins` | Toggle Minimap Radar Pins (Caches & Guardian Lairs) |
-| `/bw loot` | Toggle the real-time Loot Drop Telemetry Log |
+| `/bw` | Open the control center (also `/bui`, `/blackwell`) |
+| `/bw unlock` · `/bw lock` | Enter / leave edit mode |
+| `/bw reset` | Reset all frame positions |
+| `/bw grid` | Toggle the alignment grid in edit mode |
+| `/bw demo` | Preview mode with sample data, useful for building a layout |
+| `/bw hud` | Toggle replacing the stock run HUD |
+| `/bw sct` | Toggle floating combat text |
+| `/bw pins` · `/bw loot` · `/bw rares` · `/bw gear` · `/bw plates` | Toggle radar pins, loot log, rare timers, equipment panel, nameplates |
+| `/bw buffs` | Toggle the buff bars above the spell tiles |
+| `/bw autoscale` · `/bw scale 0.9` | Automatic or fixed UI scale (0.5 to 2.0) |
+| `/bw help` | List all commands in chat |
 
 ---
 
-## 🐞 Bug Reporting & Ticketing System
+## Compatibility
 
-Please report all bugs, Lua errors, visual glitches, or feature suggestions directly to our **GitHub Issues Ticketing System**:
-👉 **[Open a Ticket on GitHub](https://github.com/Blackwellcode/BlackwellUI/issues/new/choose)**
-
-When filing a bug, please include:
-1. Your BlackwellUI version (`/bw`)
-2. Client type (Windows `.exe` vs Browser / WebGPU WASM)
-3. Exact Lua error message / stacktrace
-4. Steps to reproduce and screenshots (if applicable)
+| | |
+|---|---|
+| Game | Azeroth Survivors (benilla engine, WoW 1.12.1 interface `11200`) |
+| Windows client | Tested in-game on the 2026-11-01 client build |
+| Browser client | Built for it: Lua 5.0 only, power-of-two textures, numeric and string class IDs. Reports welcome. |
+| Other addons | Works next to `!BugGrabber` / `BugSack`. Turn off a BlackwellUI module if another addon draws the same element. |
 
 ---
 
-## 🔗 Links & Resources
+## FAQ
 
-* **GitHub Repository:** [github.com/Blackwellcode/BlackwellUI](https://github.com/Blackwellcode/BlackwellUI)
-* **Releases & Downloads (`BlackwellUI.zip`):** [github.com/Blackwellcode/BlackwellUI/releases](https://github.com/Blackwellcode/BlackwellUI/releases)
-* **Game Mode:** Azeroth Survivors (Custom Vanilla 1.12.1 Client)
-* **Issue Tracker & Feature Requests:** [github.com/Blackwellcode/BlackwellUI/issues](https://github.com/Blackwellcode/BlackwellUI/issues)
-* **Support / Buy Me a Coffee:** [buymeacoffee.com/blackwellcode](https://buymeacoffee.com/blackwellcode)
+**My floating damage numbers or the stock HUD are gone.**<br>
+That is BlackwellUI replacing them. Untick *Combat text* (Combat page) or *Replace the stock run HUD* (General page) in `/bw` and they return immediately.
 
----
+**I turned off the Chat, Minimap, Unit Frames, Character or Action Bars module and nothing changed.**<br>
+These modules take over Blizzard frames, so switching them off needs a `/reload`. BlackwellUI asks you when you untick them.
 
-## ☕ Support the Project
+**A frame is off-screen or in the wrong place.**<br>
+`/bw unlock` to drag it back, or `/bw reset` to restore the default layout.
 
-BlackwellUI is completely free and open-source. If the add-on enhances your Azeroth Survivors experience and you'd like to support the ongoing development, maintenance, and new features, you're welcome to buy me a coffee!
-
-<a href="https://buymeacoffee.com/blackwellcode" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 48px !important;width: 174px !important;" height="48" width="174"></a>
+**I found a bug.**<br>
+Please [open an issue](https://github.com/Blackwellcode/BlackwellUI/issues/new/choose) with your BlackwellUI version (shown in `/bw`), Windows or browser client, and the Lua error text if there is one (`/err` opens the script log).
 
 ---
 
-## 🛡️ Engineering Standard
+## Support the project
 
-* **100% Strict Lua 5.0:** Engineered specifically for the WoW 1.12.1 client core (no `#` length operators, no `%` modulo operators, no string method calls).
-* **Zero Texture Leaks:** Idempotent border and backdrop management (`buiEdges` caching), eliminating texture duplication and memory bloat.
-* **Zero Hallucination Defensive Architecture:** Safe function-type checks across all Azeroth Survivors globals (`AZS_*`), guarded spellbook scanners, and plain-string substring matching to prevent regex pattern crashes.
+BlackwellUI is free. If it makes your runs better, a coffee keeps the updates coming.
+
+<a href="https://buymeacoffee.com/blackwellcode"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="48" width="174"></a>
+
+Stars help other players find the addon, too.
+
+---
+
+<div align="center">
+<sub>Made for <a href="https://wow.aethus.pl/">Azeroth Survivors</a>. Not affiliated with Blizzard Entertainment or the Azeroth Survivors developers. · <a href="https://github.com/Blackwellcode/BlackwellUI/releases">Changelog</a></sub>
+</div>

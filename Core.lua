@@ -146,7 +146,10 @@ local DEFAULTS = {
     colorHealthByClass = true,
     showBuffBars = true,
     showGrid = true,
-    sctAlerts = true,
+    -- Off by default: the alerts are class-agnostic (Overpower/Execute) and
+    -- fire "ready" for spells the game casts automatically.
+    sctAlerts = false,
+    statsGrowUp = false,
     pinCaches = true,
     pinLairs = true,
     pinEdge = "clamp",
