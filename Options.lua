@@ -7,7 +7,6 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
-local E = BlackwellUI
 local optionsFrame = nil
 
 local FRAME_W, FRAME_H = 640, 500
@@ -510,7 +509,6 @@ local function BuildOptionsFrame()
 
     local f = CreateFrame("Frame", "BlackwellUIOptionsFrame", UIParent)
     BlackwallUIOptionsFrame = f -- Compatibility alias
-    EllesmereUIOptionsFrame = f -- Compatibility alias
     f:SetWidth(FRAME_W)
     f:SetHeight(FRAME_H)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
@@ -679,9 +677,7 @@ SLASH_BLACKWELLUI2 = "/blackwell"
 SLASH_BLACKWELLUI3 = "/blackwellui"
 SLASH_BLACKWELLUI4 = "/blackwall"
 SLASH_BLACKWELLUI5 = "/blackwallui"
-SLASH_BLACKWELLUI6 = "/eui"
-SLASH_BLACKWELLUI7 = "/ellesmere"
-SLASH_BLACKWELLUI8 = "/bw"
+SLASH_BLACKWELLUI6 = "/bw"
 
 local function HandleSlashCmd(msg)
     local cmd = string.lower((string.gsub(msg or "", "^%s*(.-)%s*$", "%1")))
@@ -767,7 +763,6 @@ end
 
 SlashCmdList["BLACKWELLUI"] = HandleSlashCmd
 SlashCmdList["BLACKWALLUI"] = HandleSlashCmd
-SlashCmdList["ELLESMEREUI"] = HandleSlashCmd
 
 SLASH_MSBT1 = "/msbt"
 SlashCmdList["MSBT"] = function(msg)

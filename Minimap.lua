@@ -10,7 +10,6 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
-local E = BlackwellUI
 local mod = {}
 mod.label = "Minimap"
 mod.alwaysActive = true
@@ -105,7 +104,6 @@ end
 
 function mod:Create()
     local root = CreateFrame("Frame", "BUI_MinimapModule", UIParent)
-    EUI_MinimapModule = root -- Compatibility alias
     root:SetAllPoints(UIParent)
     self.frame = root
 
@@ -116,7 +114,6 @@ function mod:Create()
     --  Minimap Container (142 x 142)
     ---------------------------------------------------------------------------
     local cont = CreateFrame("Frame", "BUI_Minimap", root)
-    EUI_Minimap = cont -- Compatibility alias
     cont:SetWidth(MAP_SIZE + 2)
     cont:SetHeight(MAP_SIZE + 2)
     B:Backdrop(cont, 0.90)

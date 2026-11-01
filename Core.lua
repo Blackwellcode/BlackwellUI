@@ -12,10 +12,8 @@ end
 BlackwellUI = {}
 local B = BlackwellUI
 BlackwallUI = BlackwellUI -- Backwards compatibility alias
-EllesmereUI = BlackwellUI -- Backwards compatibility alias
-local E = BlackwellUI
 
-B.version = "2.7.0-azs"
+B.version = "2.7.1-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -48,7 +46,6 @@ B.THEMES = {
     ["Custom"]        = { custom = true },
 
     -- Legacy aliases
-    ["EllesmereUI"]   = { r = 12/255,  g = 210/255, b = 157/255 },
     ["Forever"]       = { r = 220/255, g = 167/255, b = 127/255 },
     ["Horde"]         = { r = 255/255, g = 90/255,  b = 31/255  },
     ["Alliance"]      = { r = 63/255,  g = 167/255, b = 255/255 },
@@ -197,8 +194,6 @@ function B:InitDB()
     if not BlackwellUIDB then
         if BlackwallUIDB then
             BlackwellUIDB = BlackwallUIDB
-        elseif EllesmereUIDB then
-            BlackwellUIDB = EllesmereUIDB
         end
     end
     local isUpgrade = (BlackwellUIDB ~= nil)
@@ -1171,7 +1166,7 @@ end
 
 -- 1px edge just outside the frame, so the frame's own size stays exact.
 function B:Border(f, r, g, b, a)
-    local edges = f.buiEdges or f.euiEdges
+    local edges = f.buiEdges
     if edges then
         self:SetBorderColor(f, r, g, b, a)
         return
@@ -1199,12 +1194,11 @@ function B:Border(f, r, g, b, a)
     edges[3] = left
     edges[4] = right
     f.buiEdges = edges
-    f.euiEdges = edges
     self:SetBorderColor(f, cr, cg, cb, ca)
 end
 
 function B:SetBorderColor(f, r, g, b, a)
-    local edges = f.buiEdges or f.euiEdges
+    local edges = f.buiEdges
     if not edges then return end
     for i = 1, 4 do
         self:Solid(edges[i], r, g, b, a or 1)
@@ -1212,7 +1206,7 @@ function B:SetBorderColor(f, r, g, b, a)
 end
 
 function B:Backdrop(f, alpha)
-    local bg = f.buiBg or f.euiBg
+    local bg = f.buiBg
     local a = (self.db and self.db.backdropAlpha) or alpha or 0.85
     if bg then
         self:Solid(bg, 0.055, 0.050, 0.045, a)
@@ -1223,30 +1217,27 @@ function B:Backdrop(f, alpha)
     self:Solid(bg, 0.055, 0.050, 0.045, a)
     bg:SetAllPoints(f)
     f.buiBg = bg
-    f.euiBg = bg
     self:Border(f, 0, 0, 0, 1)
     table.insert(self.backdrops, { frame = f, bg = bg, baseAlpha = alpha or 0.85 })
     return bg
 end
 
 function B:ApplyFont(fs)
-    local baseSize = fs.buiSize or fs.euiSize or 11
+    local baseSize = fs.buiSize or 11
     local fontMod = (self.db and self.db.fontScaleMod) or 0
     local size = baseSize + fontMod
     if size < 7 then size = 7 end
     if size > 24 then size = 24 end
-    fs:SetFont(self:GetFontPath(), size, fs.buiFlags or fs.euiFlags or "OUTLINE")
+    fs:SetFont(self:GetFontPath(), size, fs.buiFlags or "OUTLINE")
     if not fs:GetFont() then
-        fs:SetFont(self.FALLBACK_FONT, size, fs.buiFlags or fs.euiFlags or "OUTLINE")
+        fs:SetFont(self.FALLBACK_FONT, size, fs.buiFlags or "OUTLINE")
     end
 end
 
 function B:Font(parent, size, justify, layer)
     local fs = parent:CreateFontString(nil, layer or "OVERLAY", "GameFontHighlightSmall")
     fs.buiSize = size or 11
-    fs.euiSize = fs.buiSize
     fs.buiFlags = "OUTLINE"
-    fs.euiFlags = fs.buiFlags
     self:ApplyFont(fs)
     fs:SetJustifyH(justify or "LEFT")
     fs:SetTextColor(1, 1, 1)
@@ -1256,7 +1247,6 @@ end
 
 function B:SetBarColor(sb, r, g, b)
     sb.buiR, sb.buiG, sb.buiB = r, g, b
-    sb.euiR, sb.euiG, sb.euiB = r, g, b
     sb:SetStatusBarColor(r, g, b)
 end
 
@@ -1270,13 +1260,11 @@ function B:Bar(parent, name, r, g, b)
     self:Solid(bg, 0, 0, 0, 0.55)
     bg:SetAllPoints(sb)
     sb.buiBg = bg
-    sb.euiBg = bg
     self:Border(sb, 0, 0, 0, 1)
     if r then
         self:SetBarColor(sb, r, g, b)
     else
         sb.buiAccent = true
-        sb.euiAccent = true
         local ar, ag, ab = self:GetAccent()
         self:SetBarColor(sb, ar, ag, ab)
     end
@@ -1329,9 +1317,9 @@ end
 --  Movers (/bui unlock)
 -------------------------------------------------------------------------------
 function B:ApplyPosition(frame)
-    local key = frame.buiKey or frame.euiKey
+    local key = frame.buiKey
     local pos = self.db and self.db.positions[key]
-    local d = frame.buiDefault or frame.euiDefault
+    local d = frame.buiDefault
     frame:ClearAllPoints()
     if pos and pos.point then
         frame:SetPoint(pos.point, UIParent, pos.relPoint or pos.point, pos.x or 0, pos.y or 0)
@@ -1342,9 +1330,7 @@ end
 
 function B:RegisterMover(frame, key, label, point, relPoint, x, y)
     frame.buiKey = key
-    frame.euiKey = key
     frame.buiDefault = { point = point, relPoint = relPoint, x = x, y = y }
-    frame.euiDefault = frame.buiDefault
     frame:SetMovable(true)
     frame:SetClampedToScreen(true)
     frame:SetScale(self.db.scale)
@@ -1370,7 +1356,7 @@ function B:RegisterMover(frame, key, label, point, relPoint, x, y)
         f:StopMovingOrSizing()
         local p, _, rp, px, py = f:GetPoint(1)
         if p then
-            local k = f.buiKey or f.euiKey
+            local k = f.buiKey
             B.db.positions[k] = {
                 point = p,
                 relPoint = rp or p,
@@ -1381,7 +1367,6 @@ function B:RegisterMover(frame, key, label, point, relPoint, x, y)
     end)
     ov:Hide()
     frame.buiMover = ov
-    frame.euiMover = ov
     self.movers[key] = frame
     table.insert(self.moverOrder, key)
 end
@@ -1496,7 +1481,7 @@ function B:SetUnlocked(flag)
     self.unlocked = flag and true or false
     for i = 1, table.getn(self.moverOrder) do
         local f = self.movers[self.moverOrder[i]]
-        local ov = f.buiMover or f.euiMover
+        local ov = f.buiMover
         if ov then
             if self.unlocked then ov:Show() else ov:Hide() end
         end
@@ -2341,10 +2326,10 @@ function B:RefreshTheme()
     for i = 1, table.getn(self.bars) do
         local sb = self.bars[i]
         sb:SetStatusBarTexture(tex)
-        if sb.buiAccent or sb.euiAccent then
+        if sb.buiAccent then
             self:SetBarColor(sb, ar, ag, ab)
         else
-            sb:SetStatusBarColor(sb.buiR or sb.euiR, sb.buiG or sb.euiG, sb.buiB or sb.euiB)
+            sb:SetStatusBarColor(sb.buiR, sb.buiG, sb.buiB)
         end
     end
     for i = 1, table.getn(self.fontStrings) do
@@ -2403,10 +2388,6 @@ function B:InitTooltip()
                     anchorFrame = BUI_EncounterFrame
                 elseif BUI_TimerFrame and BUI_TimerFrame:IsShown() then
                     anchorFrame = BUI_TimerFrame
-                elseif EUI_EncounterFrame and EUI_EncounterFrame:IsShown() then
-                    anchorFrame = EUI_EncounterFrame
-                elseif EUI_TimerFrame and EUI_TimerFrame:IsShown() then
-                    anchorFrame = EUI_TimerFrame
                 end
 
                 if anchorFrame then
@@ -2455,7 +2436,6 @@ end
 -------------------------------------------------------------------------------
 local boot = CreateFrame("Frame", "BlackwellUIBoot", UIParent)
 BlackwallUIBoot = BlackwellUIBoot -- Compatibility alias
-EllesmereUIBoot = BlackwellUIBoot -- Compatibility alias
 boot:RegisterEvent("ADDON_LOADED")
 boot:RegisterEvent("VARIABLES_LOADED")
 boot:RegisterEvent("PLAYER_ENTERING_WORLD")
@@ -2479,7 +2459,7 @@ end
 
 boot:SetScript("OnEvent", function()
     if event == "ADDON_LOADED" then
-        if arg1 == "BlackwellUI" or arg1 == "BlackwallUI" or arg1 == "EllesmereUI" then B:InitDB() end
+        if arg1 == "BlackwellUI" or arg1 == "BlackwallUI" then B:InitDB() end
     elseif event == "VARIABLES_LOADED" then
         B:InitDB()
         B:SyncCombatText()

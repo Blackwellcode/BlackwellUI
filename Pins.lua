@@ -9,7 +9,6 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
-local E = BlackwellUI
 local mod = {}
 mod.label = "Minimap Radar Pins"
 

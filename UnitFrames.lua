@@ -12,7 +12,6 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
-local E = BlackwellUI
 local mod = {}
 mod.label = "Unit Frames"
 mod.alwaysActive = true
@@ -244,7 +243,6 @@ end
 
 function mod:Create()
     local root = CreateFrame("Frame", "BUI_UnitFrames", UIParent)
-    EUI_UnitFrames = root -- Compatibility alias
     root:SetAllPoints(UIParent)
     self.frame = root
 
@@ -254,9 +252,7 @@ function mod:Create()
     --  1. Hero Frame (210 x 46)
     ---------------------------------------------------------------------------
     local hero = CreateFrame("Frame", "BUI_HeroFrame", root)
-    EUI_HeroFrame = hero -- Compatibility alias
     BUI_PlayerFrame = hero
-    EUI_PlayerFrame = hero
     hero:SetWidth(210)
     hero:SetHeight(46)
     B:Backdrop(hero, 0.90)
@@ -325,7 +321,6 @@ function mod:Create()
     --  2. Target Frame (210 x 46)
     ---------------------------------------------------------------------------
     local tgt = CreateFrame("Frame", "BUI_TargetFrame", root)
-    EUI_TargetFrame = tgt -- Compatibility alias
     tgt:SetWidth(210)
     tgt:SetHeight(46)
     B:Backdrop(tgt, 0.90)
@@ -446,7 +441,6 @@ function mod:Create()
     --  3. Target of Target Frame (110 x 24)
     ---------------------------------------------------------------------------
     local tot = CreateFrame("Frame", "BUI_TargetTargetFrame", tgt)
-    EUI_TargetTargetFrame = tot -- Compatibility alias
     tot:SetWidth(110)
     tot:SetHeight(24)
     tot:SetPoint("TOPLEFT", tgt, "TOPRIGHT", 6, 0)
@@ -483,7 +477,6 @@ function mod:Create()
     --  4. Pet Frame (110 x 24)
     ---------------------------------------------------------------------------
     local pet = CreateFrame("Frame", "BUI_PetFrame", hero)
-    EUI_PetFrame = pet -- Compatibility alias
     pet:SetWidth(110)
     pet:SetHeight(24)
     pet:SetPoint("TOPRIGHT", hero, "BOTTOMRIGHT", 0, -8)
@@ -520,7 +513,6 @@ function mod:Create()
     --  5. Encounter / Elite & Boss Frame (ENC_WIDTH x dynamic)
     ---------------------------------------------------------------------------
     local enc = CreateFrame("Frame", "BUI_EncounterFrame", root)
-    EUI_EncounterFrame = enc -- Compatibility alias
     enc:SetWidth(ENC_WIDTH)
     enc:SetHeight(130)
     B:Backdrop(enc, 0.88)
@@ -924,7 +916,7 @@ function mod:Update(state)
                         if pct > 1 then pct = 1 elseif pct < 0 then pct = 0 end
                         r.bar:SetValue(pct)
                         B:SetBarColor(r.bar, d.color.r, d.color.g, d.color.b)
-                        local bg = r.bar.buiBg or r.bar.euiBg
+                        local bg = r.bar.buiBg
                         if bg then
                             bg:SetVertexColor(d.color.r * 0.25, d.color.g * 0.25, d.color.b * 0.25)
                             bg:SetAlpha(0.85)
@@ -971,7 +963,7 @@ function mod:Update(state)
                         -- Color
                         local col = GetDebuffBarColor(debuffType, dName)
                         B:SetBarColor(r.bar, col.r, col.g, col.b)
-                        local bg = r.bar.buiBg or r.bar.euiBg
+                        local bg = r.bar.buiBg
                         if bg then
                             bg:SetVertexColor(col.r * 0.25, col.g * 0.25, col.b * 0.25)
                             bg:SetAlpha(0.85)
@@ -1099,7 +1091,7 @@ function mod:Update(state)
         -- Dynamic anchor below TimerFrame if not custom moved by user
         if not (B.db and B.db.positions and B.db.positions["encounters"]) then
             enc:ClearAllPoints()
-            local timerF = BUI_TimerFrame or EUI_TimerFrame
+            local timerF = BUI_TimerFrame
             if timerF and (timerF:IsShown() or B:IsEnabled("timer")) then
                 enc:SetPoint("TOPRIGHT", timerF, "BOTTOMRIGHT", 0, -6)
             else

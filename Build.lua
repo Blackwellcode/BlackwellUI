@@ -12,7 +12,6 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
-local E = BlackwellUI
 local mod = {}
 mod.label = "Build & Cooldowns"
 
@@ -2289,7 +2288,6 @@ end
 
 function mod:Create()
     local f = CreateFrame("Frame", "BUI_BuildFrame", UIParent)
-    EUI_BuildFrame = f -- Compatibility alias
     f:SetWidth(TILE_SIZE * 5 + TILE_GAP * 4)
     f:SetHeight(TILE_SIZE)
     self.frame = f
@@ -2675,7 +2673,7 @@ function mod:Update(state)
 
                 -- Set the matching color of the spell on the whole bar and dark tint on background
                 B:SetBarColor(r.bar, color.r, color.g, color.b)
-                local bg = r.bar.buiBg or r.bar.euiBg
+                local bg = r.bar.buiBg
                 if bg then
                     bg:SetVertexColor(color.r * 0.25, color.g * 0.25, color.b * 0.25)
                     bg:SetAlpha(0.85)

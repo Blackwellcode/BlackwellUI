@@ -7,7 +7,6 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
-local E = BlackwellUI
 local mod = {}
 mod.label = "Action Bars"
 mod.alwaysActive = false
@@ -16,7 +15,6 @@ mod.reloadOnToggle = true
 
 -- Hidden sink frame: anything parented here is permanently invisible
 local hiddenSink = CreateFrame("Frame", "BUI_HiddenSink", UIParent)
-EUI_HiddenSink = hiddenSink -- Compatibility alias
 hiddenSink:Hide()
 
 function mod:HideBlizzardArt()

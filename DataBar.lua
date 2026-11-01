@@ -5,7 +5,6 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
-local E = BlackwellUI
 local mod = {}
 mod.label = "Data Bar"
 
@@ -54,7 +53,6 @@ local SEGMENT_DEFS = {
 
 function mod:Create()
     local f = CreateFrame("Frame", "BUI_DataBar", UIParent)
-    EUI_DataBar = f -- Compatibility alias
     f:SetWidth(BAR_WIDTH)
     f:SetHeight(BAR_HEIGHT)
     B:Backdrop(f, 0.88)

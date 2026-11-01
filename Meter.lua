@@ -13,7 +13,6 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
-local E = BlackwellUI
 local mod = {}
 mod.label = "Damage Meter"
 
@@ -240,7 +239,6 @@ end
 -------------------------------------------------------------------------------
 function mod:Create()
     local f = CreateFrame("Frame", "BUI_MeterFrame", UIParent)
-    EUI_MeterFrame = f
     BUI_Meter = f
     BUI_BossMeterFrame = f -- Compatibility alias
     self.frame = f

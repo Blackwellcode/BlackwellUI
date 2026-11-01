@@ -5,7 +5,6 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
-local E = BlackwellUI
 local mod = {}
 mod.label = "Chat"
 mod.alwaysActive = true
@@ -61,7 +60,6 @@ function mod:SkinEditBox(panel)
     if not ChatFrameEditBox.buiBackdrop then
         B:Backdrop(ChatFrameEditBox, 0.85)
         ChatFrameEditBox.buiBackdrop = true
-        ChatFrameEditBox.euiBackdrop = true
     end
 end
 
@@ -106,7 +104,6 @@ end
 
 function mod:Create()
     local root = CreateFrame("Frame", "BUI_ChatModule", UIParent)
-    EUI_ChatModule = root -- Compatibility alias
     root:SetAllPoints(UIParent)
     self.frame = root
 
@@ -116,7 +113,6 @@ function mod:Create()
     --  Chat Panel (380 x 140)
     ---------------------------------------------------------------------------
     local panel = CreateFrame("Frame", "BUI_ChatPanel", root)
-    EUI_ChatPanel = panel -- Compatibility alias
     panel:SetWidth(CHAT_WIDTH)
     panel:SetHeight(CHAT_HEIGHT)
     B:Backdrop(panel, 0.65)
