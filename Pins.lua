@@ -10,12 +10,54 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
+local L = B.L
 local mod = {}
-mod.label = "Minimap Radar Pins"
+mod.label = "Radar pins"
+mod.hint = "Pins stay on the minimap edge when the target is out of range."
+-- Pins sit on the minimap and follow its scale; size and opacity are own options.
+mod.noLook = true
 
 local ART_PATH = "Interface\\AddOns\\BlackwellUI\\media\\pins\\"
 local PIN_SIZE = 14
 local EDGE_SIZE = 10
+local NEW_PULSE_TIME = 3
+
+mod.options = {
+    { type = "section", label = "Pins" },
+    { type = "toggle", db = "pinCaches", label = "Caches", default = true },
+    { type = "toggle", db = "pinLairs", label = "Guardian lairs", default = true },
+    { type = "toggle", key = "showDormant", label = "Dormant guardians", default = true },
+    { type = "choice", db = "pinEmpty", label = "Empty lairs", default = "show",
+      values = { { value = "show", label = "Show" }, { value = "hide", label = "Hide" } } },
+    { type = "section", label = "Look" },
+    { type = "range", key = "pinSize", label = "Pin size", min = 8, max = 24, step = 1, default = PIN_SIZE, format = "%d px" },
+    { type = "range", key = "pinAlpha", label = "Pin opacity", min = 0.3, max = 1, step = 0.05, default = 1, format = "pct" },
+    { type = "color", key = "cacheColor", label = "Cache colour", default = { r = 1.0, g = 0.82, b = 0.15 } },
+    { type = "color", key = "activeColor", label = "Active guardian colour", default = { r = 1.0, g = 0.25, b = 0.25 } },
+    { type = "color", key = "dormantColor", label = "Dormant guardian colour", default = { r = 0.20, g = 0.70, b = 1.0 } },
+    { type = "section", label = "Behaviour" },
+    { type = "choice", db = "pinEdge", label = "Out of range", default = "clamp",
+      values = { { value = "clamp", label = "Keep on the edge" }, { value = "hide", label = "Hide" } } },
+    { type = "range", key = "edgeAlpha", label = "Edge pin opacity", min = 0.2, max = 1, step = 0.05, default = 0.75, format = "pct" },
+    { type = "toggle", key = "pulseFlagged", label = "Pulse the objective lair", default = true },
+    { type = "toggle", key = "pulseNew", label = "Pulse new pins", default = false },
+    { type = "toggle", key = "showTooltip", label = "Tooltip on hover", default = true },
+}
+
+local function Opt(key, default)
+    return B:ModOpt("pins", key, default)
+end
+
+local function OptColor(key, r, g, b)
+    local c = Opt(key, nil)
+    if type(c) == "table" and c.r then
+        return c.r, c.g, c.b
+    end
+    return r, g, b
+end
+
+-- When each cache / lair was first seen this run (for "Pulse new pins").
+local seen = {}
 
 local MINIMAP_YARDS = { [0] = 466.67, [1] = 400.00, [2] = 333.33, [3] = 266.67, [4] = 200.00, [5] = 133.33 }
 local INSIDE_YARDS  = { [0] = 300.00, [1] = 240.00, [2] = 180.00, [3] = 120.00, [4] = 80.00,  [5] = 50.00 }
@@ -162,7 +204,8 @@ local function CreateOrGetPin(index)
     local pin = pins[index]
     if pin then return pin end
 
-    pin = CreateFrame("Frame", nil, Minimap)
+    -- Parented to the watcher so the pins hide with the module outside a run.
+    pin = CreateFrame("Frame", nil, mod.watcher or Minimap)
     pin:SetFrameStrata("HIGH")
     pin:SetFrameLevel(25)
     pin:SetWidth(PIN_SIZE)
@@ -184,19 +227,20 @@ local function CreateOrGetPin(index)
 
     pin:EnableMouse(true)
     pin:SetScript("OnEnter", function()
+        if not Opt("showTooltip", true) then return end
         GameTooltip:SetOwner(this, "ANCHOR_LEFT")
         GameTooltip:ClearLines()
-        local title = this.title or "Target"
+        local title = this.title or L["Target"]
         GameTooltip:AddLine(title, 0.0, 0.90, 1.0)
         if this.note and this.note ~= "" then
             GameTooltip:AddLine(this.note, 0.85, 0.85, 0.85)
         end
         if this.flagged then
-            GameTooltip:AddLine("Primary Objective", 1.0, 0.82, 0.10)
+            GameTooltip:AddLine(L["Primary Objective"], 1.0, 0.82, 0.10)
         end
         if this.yards then
             local dist = math.floor(this.yards + 0.5)
-            GameTooltip:AddLine(string.format("%d yards away", dist), 0.60, 0.60, 0.60)
+            GameTooltip:AddLine(string.format(L["%d yards away"], dist), 0.60, 0.60, 0.60)
         end
         GameTooltip:Show()
     end)
@@ -218,6 +262,7 @@ local function PlacePin(pin, east, south, yardsAcross, baseSize)
     local py = -south * perYard
     local size = baseSize or PIN_SIZE
     local edgeSize = math.floor(size * EDGE_SIZE / PIN_SIZE + 0.5)
+    local alpha = Opt("pinAlpha", 1)
 
     -- Square minimap Chebyshev boundary
     local reach = math.max(math.abs(px), math.abs(py))
@@ -233,9 +278,9 @@ local function PlacePin(pin, east, south, yardsAcross, baseSize)
             py = py * limit / reach
         end
         size = edgeSize
-        pin:SetAlpha(0.75)
+        pin:SetAlpha(Opt("edgeAlpha", 0.75) * alpha)
     else
-        pin:SetAlpha(1.0)
+        pin:SetAlpha(alpha)
     end
 
     pin:SetWidth(size)
@@ -245,9 +290,23 @@ local function PlacePin(pin, east, south, yardsAcross, baseSize)
     pin:Show()
 end
 
+-- Marks a place the first time it shows up; returns the end of its pulse.
+local function NewUntil(key)
+    local now = (type(GetTime) == "function" and GetTime()) or 0
+    if not seen[key] then
+        seen[key] = now + NEW_PULSE_TIME
+    end
+    return seen[key]
+end
+
 function mod:UpdateRadar()
     local shown = 0
     flaggedPin = nil
+    local baseSize = Opt("pinSize", PIN_SIZE)
+    local cr, cg, cb = OptColor("cacheColor", 1.0, 0.82, 0.15)
+    local ar, ag, ab = OptColor("activeColor", 1.0, 0.25, 0.25)
+    local sr, sg, sb = OptColor("dormantColor", 0.20, 0.70, 1.0)
+    local pulseFlagged = Opt("pulseFlagged", true)
 
     if not Playing() or not B:IsEnabled("pins") then
         local nPins = table.getn(pins)
@@ -290,12 +349,14 @@ function mod:UpdateRadar()
                 shown = shown + 1
                 local pin = CreateOrGetPin(shown)
                 pin.art:SetTexture(ART_PATH .. "PinCache.tga")
-                pin.art:SetVertexColor(1.0, 0.82, 0.15) -- Cyber Amber / Gold
+                pin.art:SetVertexColor(cr, cg, cb) -- Cyber Amber / Gold by default
                 pin.glow:Hide()
-                pin.title = "Cache of Wealth"
-                pin.note = "Break open for gold, stats & card upgrades."
+                pin.title = L["Cache of Wealth"]
+                pin.note = L["Break open for gold, stats & card upgrades."]
                 pin.flagged = nil
-                PlacePin(pin, east, south, yardsAcross, PIN_SIZE)
+                pin.glowR, pin.glowG, pin.glowB = cr, cg, cb
+                pin.newUntil = NewUntil("c" .. tostring(chest.id or i))
+                PlacePin(pin, east, south, yardsAcross, baseSize)
             end
         end
 
@@ -321,35 +382,41 @@ function mod:UpdateRadar()
             local isActive = (sState == "awake") or (sState == "asleep") or (lair.active == true) or (tonumber(lair.awake) and tonumber(lair.awake) > 0)
             local isAsleep = (sState == "asleep")
 
-            if east and south and (isActive or (B.db and B.db.pinEmpty ~= "hide")) then
+            local wanted = isActive or (B.db and B.db.pinEmpty ~= "hide")
+            if isAsleep and not Opt("showDormant", true) then wanted = false end
+            if east and south and wanted then
                 shown = shown + 1
                 local pin = CreateOrGetPin(shown)
                 pin.art:SetTexture(ART_PATH .. "PinLair.tga")
 
-                local markName = lair.name or ("Guardian Lair " .. tostring(lair.index or i))
+                local markName = lair.name or string.format(L["Guardian Lair %s"], tostring(lair.index or i))
                 pin.title = markName
 
                 if isActive then
                     if isAsleep then
-                        pin.art:SetVertexColor(0.20, 0.70, 1.0) -- Soft Ice Cyan
-                        pin.note = "Dormant Guardian: " .. markName .. " (Approach to awaken)"
+                        pin.art:SetVertexColor(sr, sg, sb) -- Soft Ice Cyan by default
+                        pin.glowR, pin.glowG, pin.glowB = sr, sg, sb
+                        pin.note = string.format(L["Dormant Guardian: %s (Approach to awaken)"], markName)
                     else
-                        pin.art:SetVertexColor(1.0, 0.25, 0.25) -- Neon Crimson / Red (Active Boss!)
-                        pin.note = "BOSS / GUARDIAN ACTIVE: " .. markName
+                        pin.art:SetVertexColor(ar, ag, ab) -- Neon Crimson / Red by default (Active Boss!)
+                        pin.glowR, pin.glowG, pin.glowB = ar, ag, ab
+                        pin.note = string.format(L["BOSS / GUARDIAN ACTIVE: %s"], markName)
                     end
                 else
                     pin.art:SetVertexColor(0.40, 0.40, 0.45) -- Dimmed Slate
+                    pin.glowR, pin.glowG, pin.glowB = 0.40, 0.40, 0.45
                     local respawnLeft = tonumber(lair.left) or tonumber(lair.respawn) or 0
                     if respawnLeft > 0 then
-                        pin.note = string.format("Empty lair (Respawns in %s)", B:Clock(respawnLeft))
+                        pin.note = string.format(L["Empty lair (Respawns in %s)"], B:Clock(respawnLeft))
                     else
-                        pin.note = "Empty lair"
+                        pin.note = L["Empty lair"]
                     end
                 end
 
                 pin.flagged = (tonumber(lair.flag) == 1)
+                pin.newUntil = NewUntil("l" .. tostring(lair.id or lair.name or i))
 
-                if pin.flagged then
+                if pin.flagged and pulseFlagged then
                     flaggedPin = pin
                     pin.glow:SetVertexColor(1.0, 0.82, 0.10)
                     pin.glow:Show()
@@ -357,7 +424,7 @@ function mod:UpdateRadar()
                     pin.glow:Hide()
                 end
 
-                PlacePin(pin, east, south, yardsAcross, PIN_SIZE + 2)
+                PlacePin(pin, east, south, yardsAcross, baseSize + 2)
             end
         end
     end
@@ -370,6 +437,9 @@ end
 
 function mod:Create()
     local watcher = CreateFrame("Frame", "BUI_RadarWatcher", Minimap)
+    watcher:SetAllPoints(Minimap)
+    watcher:EnableMouse(false)
+    self.watcher = watcher
     watcher:SetScript("OnUpdate", function()
         local dt = arg1 or 0.05
         elapsedTimer = elapsedTimer + dt
@@ -387,9 +457,40 @@ function mod:Create()
             flaggedPin.glow:SetAlpha(0.60 + 0.30 * math.sin(breathTime * 4))
             flaggedPin.glow:Show()
         end
+
+        -- Short pulse on pins that just appeared
+        if Opt("pulseNew", false) then
+            local now = (type(GetTime) == "function" and GetTime()) or 0
+            local nPins = table.getn(pins)
+            for i = 1, nPins do
+                local p = pins[i]
+                if p ~= flaggedPin and p:IsShown() then
+                    if p.newUntil and p.newUntil > now then
+                        local left = (p.newUntil - now) / NEW_PULSE_TIME
+                        local wave = math.sin(breathTime * 8)
+                        local gSize = p:GetWidth() * (1.8 + 0.4 * wave)
+                        p.glow:SetVertexColor(p.glowR or 1, p.glowG or 1, p.glowB or 1)
+                        p.glow:SetWidth(gSize)
+                        p.glow:SetHeight(gSize)
+                        p.glow:SetAlpha((0.45 + 0.35 * wave) * left)
+                        p.glow:Show()
+                    elseif p.glow:IsShown() then
+                        p.glow:Hide()
+                    end
+                end
+            end
+        end
     end)
-    self.watcher = watcher
     self.frame = watcher
+end
+
+-- A new run starts with every place unseen.
+function mod:OnRunStart()
+    for k in pairs(seen) do seen[k] = nil end
+end
+
+function mod:ApplyOptions()
+    self:UpdateRadar()
 end
 
 function mod:Update(state)

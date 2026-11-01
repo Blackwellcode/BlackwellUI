@@ -14,7 +14,7 @@ BlackwellUI = {}
 local B = BlackwellUI
 BlackwallUI = BlackwellUI -- Backwards compatibility alias
 
-B.version = "2.7.2-azs"
+B.version = "2.8.0-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -107,14 +107,22 @@ for alias, target in pairs(CLASS_ALIASES) do
 end
 
 -- Unit kinds as AZS_UNITS / AZS_TARGET name them.
+-- One colour per unit kind for target frame, elites & bosses list and
+-- nameplates: boss red, rare guardian yellow, elite blue, normal mobs violet.
+-- The Unit Frames page can change them (written in here by its ApplyOptions).
 B.KIND_COLORS = {
-    final    = { r = 0.80, g = 0.25, b = 1.00, label = "FINAL BOSS" },
-    boss     = { r = 0.90, g = 0.20, b = 0.20, label = "BOSS" },
-    elite    = { r = 1.00, g = 0.76, b = 0.20, label = "ELITE" },
-    guardian = { r = 0.30, g = 0.60, b = 1.00, label = "GUARDIAN" },
-    normal   = { r = 0.70, g = 0.70, b = 0.70, label = "" },
+    final    = { r = 0.86, g = 0.16, b = 0.42, label = "FINAL BOSS" },
+    boss     = { r = 0.86, g = 0.20, b = 0.20, label = "BOSS" },
+    elite    = { r = 0.25, g = 0.60, b = 1.00, label = "ELITE" },
+    guardian = { r = 1.00, g = 0.78, b = 0.15, label = "GUARDIAN" },
+    normal   = { r = 0.58, g = 0.42, b = 0.92, label = "" },
     dead     = { r = 0.40, g = 0.40, b = 0.40, label = "DEAD" },
 }
+
+function B:KindColor(kind)
+    local c = self.KIND_COLORS[kind] or self.KIND_COLORS.normal
+    return c.r, c.g, c.b
+end
 
 B.PHASE_COLORS = {
     ready    = { r = 0.70, g = 0.70, b = 0.70, label = "READY" },
@@ -151,10 +159,27 @@ local DEFAULTS = {
     -- fire "ready" for spells the game casts automatically.
     sctAlerts = false,
     statsGrowUp = false,
+    -- "auto" follows the game language (CVar azsLanguage); otherwise a code
+    -- from B.LANGUAGES.
+    language = "auto",
     pinCaches = true,
     pinLairs = true,
     pinEdge = "clamp",
     filterChatSpam = true,
+    -- Look: "round" (default) or "sharp" (the angular style up to 2.7);
+    -- frames are built in one style, so switching needs a /reload.
+    uiStyle = "round",
+    cornerRadius = 10,
+    -- nil = the style's own panel colour; { r, g, b } once the player picks one.
+    panelColor = false,
+    fontOutline = "OUTLINE",
+    tooltipScale = 0.82,
+    tooltipAnchor = "hud",
+    tooltipHideInCombat = false,
+    tooltipReactionColor = true,
+    welcomeMessage = true,
+    -- Per-module settings: mod[moduleKey][optionKey] (see B:ModOpt).
+    mod = {},
     modules = {
         actionbars = true,
         minimap = true,
@@ -255,6 +280,27 @@ function B:InitDB()
     end
     if type(self.db.chatFontSize) ~= "number" then
         self.db.chatFontSize = 12
+    end
+    if self.db.uiStyle ~= "round" and self.db.uiStyle ~= "sharp" then
+        self.db.uiStyle = "round"
+    end
+    if type(self.db.cornerRadius) ~= "number" or self.db.cornerRadius < 2 or self.db.cornerRadius > 16 then
+        self.db.cornerRadius = 10
+    end
+    if self.db.fontOutline ~= "OUTLINE" and self.db.fontOutline ~= "THICKOUTLINE" and self.db.fontOutline ~= "NONE" then
+        self.db.fontOutline = "OUTLINE"
+    end
+    if type(self.db.tooltipScale) ~= "number" or self.db.tooltipScale < 0.5 or self.db.tooltipScale > 1.5 then
+        self.db.tooltipScale = 0.82
+    end
+    if type(self.db.mod) ~= "table" then
+        self.db.mod = {}
+    end
+    if type(self.db.language) ~= "string" or (self.db.language ~= "auto" and type(self.IsKnownLanguage) == "function" and not self:IsKnownLanguage(self.db.language)) then
+        self.db.language = "auto"
+    end
+    if type(self.ApplyLocale) == "function" then
+        self:ApplyLocale()
     end
     self.initialized = true
 end
@@ -1040,8 +1086,13 @@ function B:GetAbilityIcon(nameOrId)
         end
     end
 
-    -- 1e. Spell icon table generated from the client's Spell.dbc (SpellIcons.lua)
+    -- 1e. Spell icon table generated from the client's Spell.dbc (SpellIcons.lua).
+    --     Names the game shows in another language go through their English name.
     local dbIcon = self:SpellIconPath(nameOrId) or self:SpellIconPath(norm)
+    if not dbIcon and type(self.EnglishAbilityName) == "function" then
+        local english = self:EnglishAbilityName(nameOrId)
+        if english then dbIcon = self:SpellIconPath(english) end
+    end
     if dbIcon then
         return dbIcon
     end
@@ -1168,9 +1219,24 @@ function B:GetBarTexture()
 end
 
 function B:GetFontPath()
-    return self.FONTS[(self.db and self.db.font) or "Barlow"] or self.FALLBACK_FONT
+    local name = (self.db and self.db.font) or "Barlow"
+    local path = self.FONTS[name] or self.FALLBACK_FONT
+    if type(self.FontForLanguage) == "function" then
+        path = self:FontForLanguage(path, name)
+    end
+    return path
 end
 B.GetFont = B.GetFontPath
+
+-- Bold variant for emphasis text (combat text, alerts), with the same
+-- per-language glyph fallback as GetFontPath.
+function B:GetBoldFontPath()
+    local path = self.FONTS["Barlow Bold"] or self:GetFontPath()
+    if type(self.FontForLanguage) == "function" then
+        path = self:FontForLanguage(path, "Barlow Bold")
+    end
+    return path
+end
 
 -------------------------------------------------------------------------------
 --  Widget factory (1.12 API only)
@@ -1222,16 +1288,50 @@ function B:SetBorderColor(f, r, g, b, a)
     end
 end
 
+-- Style switch: "round" (default) or "sharp". Read when frames are built.
+function B:IsRound()
+    return not (self.db and self.db.uiStyle == "sharp")
+end
+
+-- Panel colour: the player's choice, else the style's own colour.
+function B:GetPanelColor()
+    local c = self.db and self.db.panelColor
+    if type(c) == "table" and c.r then
+        return c.r, c.g, c.b
+    end
+    if self:IsRound() then
+        return self.PANEL_COLOR.r, self.PANEL_COLOR.g, self.PANEL_COLOR.b
+    end
+    return 0.055, 0.050, 0.045
+end
+
+-- Panel background in the active style. Every frame background goes through
+-- here (B:Backdrop as well), so the style switch reaches the whole UI.
+function B:Panel(f, radius)
+    if self:IsRound() then
+        return self:RoundPanel(f, radius)
+    end
+    return self:SharpBackdrop(f)
+end
+
 function B:Backdrop(f, alpha)
+    if self:IsRound() then
+        return self:RoundPanel(f)
+    end
+    return self:SharpBackdrop(f, alpha)
+end
+
+function B:SharpBackdrop(f, alpha)
     local bg = f.buiBg
     local a = (self.db and self.db.backdropAlpha) or alpha or 0.85
+    local pr, pg, pb = self:GetPanelColor()
     if bg then
-        self:Solid(bg, 0.055, 0.050, 0.045, a)
+        self:Solid(bg, pr, pg, pb, a)
         self:Border(f, 0, 0, 0, 1)
         return bg
     end
     bg = f:CreateTexture(nil, "BACKGROUND")
-    self:Solid(bg, 0.055, 0.050, 0.045, a)
+    self:Solid(bg, pr, pg, pb, a)
     bg:SetAllPoints(f)
     f.buiBg = bg
     self:Border(f, 0, 0, 0, 1)
@@ -1245,9 +1345,20 @@ function B:ApplyFont(fs)
     local size = baseSize + fontMod
     if size < 7 then size = 7 end
     if size > 24 then size = 24 end
-    fs:SetFont(self:GetFontPath(), size, fs.buiFlags or "OUTLINE")
+    -- Text made with the default "OUTLINE" follows the global outline setting.
+    local flags = fs.buiFlags or "OUTLINE"
+    if flags == "OUTLINE" and self.db and self.db.fontOutline then
+        flags = self.db.fontOutline
+        if flags == "NONE" then flags = "" end
+    end
+    fs:SetFont(self:GetFontPath(), size, flags)
     if not fs:GetFont() then
-        fs:SetFont(self.FALLBACK_FONT, size, fs.buiFlags or "OUTLINE")
+        fs:SetFont(self.FALLBACK_FONT, size, flags)
+    end
+    -- Without an outline a soft shadow keeps text readable over the world.
+    if flags == "" and type(fs.SetShadowOffset) == "function" then
+        fs:SetShadowColor(0, 0, 0, 0.9)
+        fs:SetShadowOffset(1, -1)
     end
 end
 
@@ -1267,6 +1378,149 @@ function B:SetBarColor(sb, r, g, b)
     sb:SetStatusBarColor(r, g, b)
 end
 
+-- Laid-out size of a frame. For frames anchored by two points this engine's
+-- GetWidth / GetHeight can report a stale value (measured: 220 for a bar
+-- that spans 244 px), so the size comes from the edges once they are known.
+function B:FrameSize(f)
+    local w, h
+    local l, r = f:GetLeft(), f:GetRight()
+    if l and r then w = r - l else w = f:GetWidth() end
+    local t, b = f:GetTop(), f:GetBottom()
+    if t and b then h = t - b else h = f:GetHeight() end
+    return w, h
+end
+
+-- Round style for a StatusBar: the engine's square fill is kept but drawn
+-- fully transparent; a track and a fill drawn as rounded rectangles (made of
+-- textures on the bar itself, so text on the bar stays on top) follow its
+-- value, range and colour. The corner radius is half the bar height (round
+-- caps) unless B:SetBarRadius gave the bar a smaller one, e.g. a health bar
+-- that fills a whole unit frame. Sizes are read on every change.
+function B:RoundifyStatusBar(sb)
+    if sb.buiRoundFill then return end
+    local roundTex = self.ROUND
+    local white = self.WHITE
+    -- Rounded rectangle: four disc quarters, two side strips and a middle.
+    local function Shape(layer)
+        local s = {}
+        local function Part(tex, l, r, t, b)
+            local p = sb:CreateTexture(nil, layer)
+            p:SetTexture(tex)
+            if l then p:SetTexCoord(l, r, t, b) end
+            return p
+        end
+        s.tl = Part(roundTex, 0, 0.5, 0, 0.5)
+        s.bl = Part(roundTex, 0, 0.5, 0.5, 1)
+        s.tr = Part(roundTex, 0.5, 1, 0, 0.5)
+        s.br = Part(roundTex, 0.5, 1, 0.5, 1)
+        s.ls = Part(white)
+        s.rs = Part(white)
+        s.mid = Part(white)
+        s.parts = { s.tl, s.bl, s.tr, s.br, s.ls, s.rs, s.mid }
+        function s:SetColor(r, g, b, a)
+            for i = 1, 7 do
+                self.parts[i]:SetVertexColor(r, g, b)
+                self.parts[i]:SetAlpha(a or 1)
+            end
+        end
+        local function Put(p, x, y, w, h)
+            if w < 0.5 or h < 0.5 then
+                p:Hide()
+                return
+            end
+            p:ClearAllPoints()
+            p:SetPoint("TOPLEFT", sb, "TOPLEFT", x, -y)
+            p:SetWidth(w)
+            p:SetHeight(h)
+            p:Show()
+        end
+        function s:Place(w, h, radius)
+            local r = radius
+            if r > h / 2 then r = h / 2 end
+            if r > w / 2 then r = w / 2 end
+            if r < 0 then r = 0 end
+            local side = h - 2 * r
+            Put(self.tl, 0, 0, r, r)
+            Put(self.bl, 0, h - r, r, r)
+            Put(self.ls, 0, r, r, side)
+            Put(self.mid, r, 0, w - 2 * r, h)
+            Put(self.tr, w - r, 0, r, r)
+            Put(self.br, w - r, h - r, r, r)
+            Put(self.rs, w - r, r, r, side)
+        end
+        function s:Hide()
+            for i = 1, 7 do self.parts[i]:Hide() end
+        end
+        return s
+    end
+
+    if sb.buiBg then sb.buiBg:Hide() end
+    local track = Shape("BACKGROUND")
+    track:SetColor(1, 1, 1, 0.07)
+    local fill = Shape("ARTWORK")
+    fill:Hide()
+    sb.buiRoundTrack = track
+    sb.buiRoundFill = fill
+
+    function sb:BuiLayoutRound()
+        local w, h = B:FrameSize(self)
+        if not w or not h or w <= 0 or h <= 0 then return end
+        local r = self.buiRadius or (h / 2)
+        self.buiRoundTrack:Place(w, h, r)
+        local lo, hi = self:GetMinMaxValues()
+        local v = self:GetValue() or 0
+        local frac = 0
+        if hi and lo and hi > lo then frac = (v - lo) / (hi - lo) end
+        if frac <= 0 then
+            self.buiRoundFill:Hide()
+            return
+        end
+        if frac > 1 then frac = 1 end
+        local fw = frac * w
+        local minW = 2 * r
+        if minW > h then minW = h end
+        if fw < minW then fw = minW end
+        self.buiRoundFill:Place(fw, h, r)
+    end
+
+    local origSetValue = sb.SetValue
+    sb.SetValue = function(bar, v)
+        origSetValue(bar, v)
+        bar:BuiLayoutRound()
+    end
+    local origSetMinMax = sb.SetMinMaxValues
+    sb.SetMinMaxValues = function(bar, lo, hi)
+        origSetMinMax(bar, lo, hi)
+        bar:BuiLayoutRound()
+    end
+    -- Colour goes to the round fill; the engine fill stays invisible.
+    local origSetColor = sb.SetStatusBarColor
+    sb.SetStatusBarColor = function(bar, r, g, b, a)
+        origSetColor(bar, r, g, b, 0)
+        bar.buiRoundFill:SetColor(r, g, b, a or 1)
+        bar:BuiLayoutRound()
+    end
+    local origSetTexture = sb.SetStatusBarTexture
+    sb.SetStatusBarTexture = function(bar, tex)
+        origSetTexture(bar, tex)
+        bar.buiRoundFill.mid:SetTexture(tex)
+        origSetColor(bar, bar.buiR or 1, bar.buiG or 1, bar.buiB or 1, 0)
+    end
+    sb.buiRoundFill.mid:SetTexture(self:GetBarTexture())
+    sb:BuiLayoutRound()
+end
+
+-- Corner radius for a round StatusBar (nil = half its height, round caps).
+function B:SetBarRadius(sb, radius)
+    sb.buiRadius = radius
+    if sb.BuiLayoutRound then sb:BuiLayoutRound() end
+end
+
+-- Track colour of a round StatusBar (the part behind the fill).
+function B:SetBarTrackColor(sb, r, g, b, a)
+    if sb.buiRoundTrack then sb.buiRoundTrack:SetColor(r, g, b, a) end
+end
+
 -- Accent bars follow the theme on refresh.
 function B:Bar(parent, name, r, g, b)
     local sb = CreateFrame("StatusBar", name, parent)
@@ -1274,10 +1528,14 @@ function B:Bar(parent, name, r, g, b)
     sb:SetMinMaxValues(0, 1)
     sb:SetValue(1)
     local bg = sb:CreateTexture(nil, "BACKGROUND")
-    self:Solid(bg, 0, 0, 0, 0.55)
     bg:SetAllPoints(sb)
     sb.buiBg = bg
-    self:Border(sb, 0, 0, 0, 1)
+    if self:IsRound() then
+        self:RoundifyStatusBar(sb)
+    else
+        self:Solid(bg, 0, 0, 0, 0.55)
+        self:Border(sb, 0, 0, 0, 1)
+    end
     if r then
         self:SetBarColor(sb, r, g, b)
     else
@@ -1287,6 +1545,252 @@ function B:Bar(parent, name, r, g, b)
     end
     table.insert(self.bars, sb)
     return sb
+end
+
+-------------------------------------------------------------------------------
+--  Round widgets (media\textures\round.tga, generated by tools/gen_textures.py)
+--  The 1.12 renderer has no corner radius: corners are quarters of a white
+--  disc, bar caps are its halves, dots use it whole.
+-------------------------------------------------------------------------------
+B.ROUND = "Interface\\AddOns\\BlackwellUI\\media\\textures\\round.tga"
+B.PANEL_COLOR = { r = 0.063, g = 0.071, b = 0.086 }
+
+-- Dot positions on a unit circle, clockwise from the top (gen_textures.py).
+local RING_24 = {
+    { 0.0000, 1.0000 }, { 0.2588, 0.9659 }, { 0.5000, 0.8660 }, { 0.7071, 0.7071 },
+    { 0.8660, 0.5000 }, { 0.9659, 0.2588 }, { 1.0000, 0.0000 }, { 0.9659, -0.2588 },
+    { 0.8660, -0.5000 }, { 0.7071, -0.7071 }, { 0.5000, -0.8660 }, { 0.2588, -0.9659 },
+    { 0.0000, -1.0000 }, { -0.2588, -0.9659 }, { -0.5000, -0.8660 }, { -0.7071, -0.7071 },
+    { -0.8660, -0.5000 }, { -0.9659, -0.2588 }, { -1.0000, 0.0000 }, { -0.9659, 0.2588 },
+    { -0.8660, 0.5000 }, { -0.7071, 0.7071 }, { -0.5000, 0.8660 }, { -0.2588, 0.9659 },
+}
+
+-- Rounded panel background: four disc quarters, two edge strips and a
+-- centre, laid out without overlap so the alpha stays even. Radius and
+-- colour come from the Appearance settings; it follows "Background opacity"
+-- unless fixedAlpha is given (tooltips keep their own opacity).
+function B:RoundPanel(f, radius, fixedAlpha)
+    local panel = f.buiRound
+    if not panel then
+        local rad = radius or (self.db and self.db.cornerRadius) or 10
+        panel = { parts = {} }
+        local function Part(round, l, rr, t, bb)
+            local tex = f:CreateTexture(nil, "BACKGROUND")
+            tex:SetTexture(round and self.ROUND or self.WHITE)
+            if round then tex:SetTexCoord(l, rr, t, bb) end
+            table.insert(panel.parts, tex)
+            return tex
+        end
+        local tl = Part(true, 0, 0.5, 0, 0.5)
+        tl:SetWidth(rad); tl:SetHeight(rad)
+        tl:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
+        local tr = Part(true, 0.5, 1, 0, 0.5)
+        tr:SetWidth(rad); tr:SetHeight(rad)
+        tr:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
+        local bl = Part(true, 0, 0.5, 0.5, 1)
+        bl:SetWidth(rad); bl:SetHeight(rad)
+        bl:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
+        local br = Part(true, 0.5, 1, 0.5, 1)
+        br:SetWidth(rad); br:SetHeight(rad)
+        br:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+        local top = Part(false)
+        top:SetPoint("TOPLEFT", tl, "TOPRIGHT", 0, 0)
+        top:SetPoint("BOTTOMRIGHT", tr, "BOTTOMLEFT", 0, 0)
+        local bottom = Part(false)
+        bottom:SetPoint("TOPLEFT", bl, "TOPRIGHT", 0, 0)
+        bottom:SetPoint("BOTTOMRIGHT", br, "BOTTOMLEFT", 0, 0)
+        local centre = Part(false)
+        centre:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -rad)
+        centre:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, rad)
+        function panel:SetAlpha(a)
+            for i = 1, table.getn(self.parts) do self.parts[i]:SetAlpha(a) end
+        end
+        function panel:SetColor(cr, cg, cb)
+            for i = 1, table.getn(self.parts) do self.parts[i]:SetVertexColor(cr, cg, cb) end
+        end
+        function panel:Show()
+            for i = 1, table.getn(self.parts) do self.parts[i]:Show() end
+        end
+        function panel:Hide()
+            for i = 1, table.getn(self.parts) do self.parts[i]:Hide() end
+        end
+        f.buiRound = panel
+        panel.fixedAlpha = fixedAlpha
+        table.insert(self.backdrops, { frame = f, bg = panel, baseAlpha = 0.85 })
+    end
+    panel:SetColor(self:GetPanelColor())
+    panel:SetAlpha(panel.fixedAlpha or (self.db and self.db.backdropAlpha) or 0.85)
+    return panel
+end
+
+-- Texture for round shapes in the active style (square in the sharp style).
+function B:ShapeTexture()
+    if self:IsRound() then return self.ROUND end
+    return self.WHITE
+end
+
+-- Thin bar with round caps: a full-width track and a fill drawn on top.
+-- bar:SetFill(0..1), bar:SetFillColor(r, g, b), bar:SetTrackColor(r, g, b, a).
+-- Anchor it with two points (or SetWidth) so it knows its width; the layout
+-- is redone on every SetFill, so callers set the fill each update.
+function B:RoundBar(parent, height)
+    local bar = CreateFrame("Frame", nil, parent)
+    bar:SetHeight(height)
+    bar.buiHeight = height
+    bar.buiFill = 0
+    local shape = self:ShapeTexture()
+    local function Strip(layer)
+        local s = {}
+        s.left = bar:CreateTexture(nil, layer)
+        s.left:SetTexture(shape)
+        s.left:SetTexCoord(0, 0.5, 0, 1)
+        s.left:SetWidth(height / 2)
+        s.left:SetHeight(height)
+        s.left:SetPoint("LEFT", bar, "LEFT", 0, 0)
+        s.mid = bar:CreateTexture(nil, layer)
+        s.mid:SetTexture(self.WHITE)
+        s.mid:SetHeight(height)
+        s.mid:SetPoint("LEFT", s.left, "RIGHT", 0, 0)
+        s.right = bar:CreateTexture(nil, layer)
+        s.right:SetTexture(shape)
+        s.right:SetTexCoord(0.5, 1, 0, 1)
+        s.right:SetWidth(height / 2)
+        s.right:SetHeight(height)
+        s.right:SetPoint("LEFT", s.mid, "RIGHT", 0, 0)
+        function s:SetColor(r, g, b, a)
+            local parts = { self.left, self.mid, self.right }
+            for i = 1, 3 do
+                parts[i]:SetVertexColor(r, g, b)
+                parts[i]:SetAlpha(a or 1)
+            end
+        end
+        -- Total width w >= height; the middle shrinks to nothing at w == height.
+        function s:Size(w)
+            local mid = w - bar.buiHeight
+            if mid < 0.5 then
+                self.mid:Hide()
+                self.right:ClearAllPoints()
+                self.right:SetPoint("LEFT", self.left, "RIGHT", 0, 0)
+            else
+                self.mid:SetWidth(mid)
+                self.mid:Show()
+                self.right:ClearAllPoints()
+                self.right:SetPoint("LEFT", self.mid, "RIGHT", 0, 0)
+            end
+        end
+        function s:Show() self.left:Show(); self.right:Show() end
+        function s:Hide() self.left:Hide(); self.mid:Hide(); self.right:Hide() end
+        return s
+    end
+    bar.track = Strip("BORDER")
+    bar.fill = Strip("ARTWORK")
+    bar.track:SetColor(1, 1, 1, 0.10)
+    bar.fill:SetColor(1, 1, 1, 1)
+    bar.fill:Hide()
+
+    function bar:Layout()
+        local v = self.buiFill or 0
+        -- An empty fill stays hidden even before the width is known.
+        if v <= 0 then self.fill:Hide() end
+        local w = B:FrameSize(self)
+        if not w or w < self.buiHeight then return end
+        self.track:Size(w)
+        if v <= 0 then
+            return
+        end
+        if v > 1 then v = 1 end
+        local fw = v * w
+        if fw < self.buiHeight then fw = self.buiHeight end
+        self.fill:Show()
+        self.fill:Size(fw)
+    end
+    function bar:SetFill(v)
+        self.buiFill = tonumber(v) or 0
+        self:Layout()
+    end
+    function bar:SetFillColor(r, g, b, a)
+        self.fill:SetColor(r, g, b, a)
+    end
+    function bar:SetTrackColor(r, g, b, a)
+        self.track:SetColor(r, g, b, a)
+    end
+    -- Changes the thickness after creation (options); caps follow.
+    function bar:SetBarHeight(h)
+        if not h or h <= 0 or h == self.buiHeight then return end
+        self.buiHeight = h
+        self:SetHeight(h)
+        local strips = { self.track, self.fill }
+        for i = 1, 2 do
+            local s = strips[i]
+            s.left:SetWidth(h / 2)
+            s.left:SetHeight(h)
+            s.mid:SetHeight(h)
+            s.right:SetWidth(h / 2)
+            s.right:SetHeight(h)
+        end
+        self:Layout()
+    end
+    return bar
+end
+
+-- Ring of 24 dots: ring:SetProgress(0..1, r, g, b) lights the first dots
+-- clockwise from the top in that colour, the rest stay dim.
+function B:DotRing(parent, size, dotSize)
+    local ring = CreateFrame("Frame", nil, parent)
+    ring:SetWidth(size)
+    ring:SetHeight(size)
+    ring.dots = {}
+    local rad = (size - dotSize) / 2
+    for i = 1, 24 do
+        local p = RING_24[i]
+        local d = ring:CreateTexture(nil, "ARTWORK")
+        d:SetTexture(self:ShapeTexture())
+        d:SetWidth(dotSize)
+        d:SetHeight(dotSize)
+        d:SetPoint("CENTER", ring, "CENTER", p[1] * rad, p[2] * rad)
+        ring.dots[i] = d
+    end
+    function ring:SetProgress(p, r, g, b)
+        local v = tonumber(p) or 0
+        if v < 0 then v = 0 end
+        if v > 1 then v = 1 end
+        local lit = math.floor(v * 24 + 0.5)
+        for i = 1, 24 do
+            local d = self.dots[i]
+            if i <= lit then
+                d:SetVertexColor(r or 1, g or 1, b or 1)
+                d:SetAlpha(1)
+            else
+                d:SetVertexColor(0.55, 0.57, 0.62)
+                d:SetAlpha(0.28)
+            end
+        end
+    end
+    ring:SetProgress(0)
+    return ring
+end
+
+-- Small round button with a centred label (meter header controls).
+function B:RoundButton(parent, size, label)
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetWidth(size)
+    btn:SetHeight(size)
+    local bg = btn:CreateTexture(nil, "BACKGROUND")
+    bg:SetTexture(self:ShapeTexture())
+    bg:SetAllPoints(btn)
+    btn.bg = bg
+    local fs = self:Font(btn, 9, "CENTER")
+    fs:SetPoint("CENTER", btn, "CENTER", 0, 0)
+    fs:SetText(label or "")
+    btn.fs = fs
+    function btn:SetState(r, g, b, active)
+        self.bg:SetVertexColor(r, g, b)
+        self.bg:SetAlpha(active and 0.30 or 0.12)
+        self.fs:SetTextColor(r, g, b)
+    end
+    btn:SetState(0.75, 0.75, 0.75, false)
+    btn:EnableMouse(true)
+    return btn
 end
 
 -- kind: "tex" (vertex colour) or "text" (text colour); refreshed with the theme.
@@ -1309,23 +1813,31 @@ end
 function B:Header(parent, title, height)
     local h = CreateFrame("Frame", nil, parent)
     h:SetHeight(height or 18)
-    h:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
-    h:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 0)
-    local bg = h:CreateTexture(nil, "BACKGROUND")
-    self:Solid(bg, 0.025, 0.022, 0.020, 0.95)
-    bg:SetAllPoints(h)
-    local rule = h:CreateTexture(nil, "ARTWORK")
-    rule:SetPoint("BOTTOMLEFT", h, "BOTTOMLEFT", 0, 0)
-    rule:SetPoint("BOTTOMRIGHT", h, "BOTTOMRIGHT", 0, 0)
-    rule:SetHeight(1)
-    rule:SetTexture(self.WHITE)
-    self:Accent(rule, "tex", 0.8)
+    local inset = 6
+    if self:IsRound() then
+        -- Round style: no strip, the title sits inside the panel's padding.
+        inset = 10
+        h:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -4)
+        h:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, -4)
+    else
+        h:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
+        h:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 0)
+        local bg = h:CreateTexture(nil, "BACKGROUND")
+        self:Solid(bg, 0.025, 0.022, 0.020, 0.95)
+        bg:SetAllPoints(h)
+        local rule = h:CreateTexture(nil, "ARTWORK")
+        rule:SetPoint("BOTTOMLEFT", h, "BOTTOMLEFT", 0, 0)
+        rule:SetPoint("BOTTOMRIGHT", h, "BOTTOMRIGHT", 0, 0)
+        rule:SetHeight(1)
+        rule:SetTexture(self.WHITE)
+        self:Accent(rule, "tex", 0.8)
+    end
     h.title = self:Font(h, 10, "LEFT")
-    h.title:SetPoint("LEFT", h, "LEFT", 6, 0)
+    h.title:SetPoint("LEFT", h, "LEFT", inset, 0)
     h.title:SetText(title or "")
     h.title:SetTextColor(0.92, 0.92, 0.92)
     h.value = self:Font(h, 10, "RIGHT")
-    h.value:SetPoint("RIGHT", h, "RIGHT", -6, 0)
+    h.value:SetPoint("RIGHT", h, "RIGHT", -inset, 0)
     self:Accent(h.value, "text")
     return h
 end
@@ -1345,12 +1857,20 @@ function B:ApplyPosition(frame)
     end
 end
 
+-- Scale of a frame: the global UI scale for movable frames, times the
+-- module's own scale setting (frame.buiModScale, set by ApplyModuleLook).
+function B:FrameScale(frame)
+    local s = frame.buiModScale or 1
+    if frame.buiKey then s = s * ((self.db and self.db.scale) or 1) end
+    return s
+end
+
 function B:RegisterMover(frame, key, label, point, relPoint, x, y)
     frame.buiKey = key
     frame.buiDefault = { point = point, relPoint = relPoint, x = x, y = y }
     frame:SetMovable(true)
     frame:SetClampedToScreen(true)
-    frame:SetScale(self.db.scale)
+    frame:SetScale(self:FrameScale(frame))
     self:ApplyPosition(frame)
 
     local ov = CreateFrame("Button", nil, frame)
@@ -1512,7 +2032,7 @@ function B:ResetPositions()
     for i = 1, table.getn(self.moverOrder) do
         self:ApplyPosition(self.movers[self.moverOrder[i]])
     end
-    self:Print("Positions reset.")
+    self:Print(self.L["Positions reset."])
 end
 
 function B:GetScreenDimensions()
@@ -1578,7 +2098,7 @@ end
 function B:ApplyScale()
     for i = 1, table.getn(self.moverOrder) do
         local f = self.movers[self.moverOrder[i]]
-        f:SetScale(self.db.scale)
+        f:SetScale(self:FrameScale(f))
         self:ApplyPosition(f)
     end
 end
@@ -2215,10 +2735,102 @@ end
 --  Modules: one shared 10 Hz ticker drives every module
 -------------------------------------------------------------------------------
 -- mod = { label, Create(mod), Update(mod, state), frame }
+-- Optional: mod.hint (one line for the options page), mod.options (list of
+-- option entries, see Options.lua), mod.lookFrames (frames that follow the
+-- module's scale / opacity / visibility; default { mod.frame }),
+-- mod.noLook (no scale / opacity / visibility settings), mod:ApplyOptions()
+-- (called after one of the module's settings changed).
 function B:RegisterModule(key, mod)
     mod.key = key
     self.modules[key] = mod
     table.insert(self.moduleOrder, key)
+end
+
+-------------------------------------------------------------------------------
+--  Per-module settings (B.db.mod[moduleKey][optionKey])
+-------------------------------------------------------------------------------
+function B:ModOpt(modKey, optKey, default)
+    local t = self.db and self.db.mod and self.db.mod[modKey]
+    if t and t[optKey] ~= nil then return t[optKey] end
+    return default
+end
+
+function B:SetModOpt(modKey, optKey, value)
+    if not self.db then return end
+    if type(self.db.mod) ~= "table" then self.db.mod = {} end
+    if type(self.db.mod[modKey]) ~= "table" then self.db.mod[modKey] = {} end
+    self.db.mod[modKey][optKey] = value
+end
+
+function B:ResetModOpts(modKey)
+    if self.db and type(self.db.mod) == "table" then
+        self.db.mod[modKey] = nil
+    end
+end
+
+function B:GetLookFrames(mod)
+    if mod.noLook then return {} end
+    if type(mod.lookFrames) == "table" then return mod.lookFrames end
+    if mod.frame then return { mod.frame } end
+    return {}
+end
+
+-- Scale from the module's settings; opacity and visibility run per tick.
+function B:ApplyModuleLook(mod)
+    local frames = self:GetLookFrames(mod)
+    local scale = self:ModOpt(mod.key, "scale", 1)
+    for i = 1, table.getn(frames) do
+        if frames[i] and frames[i].SetScale then
+            frames[i].buiModScale = scale
+            frames[i]:SetScale(self:FrameScale(frames[i]))
+            -- Saved positions are in the frame's own scale: re-place it.
+            if frames[i].buiKey then self:ApplyPosition(frames[i]) end
+        end
+    end
+end
+
+-- "always", "combat" (only in combat), "nocombat", "mouseover" (faded until
+-- the mouse is over it).
+function B:ApplyModuleVisibility(mod)
+    local frames = self:GetLookFrames(mod)
+    if table.getn(frames) == 0 then return end
+    local alpha = self:ModOpt(mod.key, "alpha", 1)
+    local vis = self:ModOpt(mod.key, "visibility", "always")
+    local factor = 1
+    if not self.unlocked then
+        if vis == "combat" or vis == "nocombat" then
+            local inCombat = (type(UnitAffectingCombat) == "function") and UnitAffectingCombat("player")
+            if (vis == "combat" and not inCombat) or (vis == "nocombat" and inCombat) then
+                factor = 0
+            end
+        elseif vis == "mouseover" then
+            factor = self:ModOpt(mod.key, "fadeAlpha", 0.15)
+            if type(MouseIsOver) == "function" then
+                for i = 1, table.getn(frames) do
+                    local fr = frames[i]
+                    if fr and fr:IsVisible() and MouseIsOver(fr) then
+                        factor = 1
+                        break
+                    end
+                end
+            end
+        end
+    end
+    for i = 1, table.getn(frames) do
+        if frames[i] and frames[i].SetAlpha then
+            frames[i]:SetAlpha(alpha * factor)
+        end
+    end
+end
+
+-- Called by the options page after a module setting changed.
+function B:OnModuleOptionChanged(mod)
+    self:ApplyModuleLook(mod)
+    if type(mod.ApplyOptions) == "function" then
+        local ok, err = pcall(mod.ApplyOptions, mod)
+        if not ok then self:ReportError(mod.key, err) end
+    end
+    self:Tick()
 end
 
 function B:IsEnabled(key)
@@ -2234,6 +2846,11 @@ function B:BuildModules()
                 self:ReportError(mod.key, err)
             else
                 mod.created = true
+                self:ApplyModuleLook(mod)
+                if type(mod.ApplyOptions) == "function" then
+                    local okOpt, errOpt = pcall(mod.ApplyOptions, mod)
+                    if not okOpt then self:ReportError(mod.key, errOpt) end
+                end
             end
             if mod.frame then mod.frame:Hide() end
         end
@@ -2278,6 +2895,7 @@ function B:Tick()
                     local ok, err = pcall(mod.Update, mod, s)
                     if not ok then self:ReportError(mod.key, err) end
                 end
+                self:ApplyModuleVisibility(mod)
             elseif mod.frame:IsShown() then
                 mod.frame:Hide()
             end
@@ -2319,9 +2937,16 @@ function B:OnModulesChanged()
     end
     if needsReload then
         if type(StaticPopup_Show) == "function" then
+            -- Texts are set here: the dialog table is built before the locale loads.
+            local dialog = StaticPopupDialogs["BLACKWELLUI_RELOAD"]
+            if dialog then
+                dialog.text = self.L["BlackwellUI: this module replaces Blizzard frames. Reload the UI to restore them now?"]
+                dialog.button1 = self.L["Reload"]
+                dialog.button2 = self.L["Later"]
+            end
             StaticPopup_Show("BLACKWELLUI_RELOAD")
         else
-            self:Print("Type /reload to restore the Blizzard frames of the disabled module.")
+            self:Print(self.L["Type /reload to restore the Blizzard frames of the disabled module."])
         end
     end
 
@@ -2334,10 +2959,17 @@ function B:RefreshTheme()
     local tex = self:GetBarTexture()
     local ar, ag, ab = self:GetAccent()
     local bAlpha = (self.db and self.db.backdropAlpha) or 0.85
+    local pr, pg, pb = self:GetPanelColor()
     for i = 1, table.getn(self.backdrops) do
         local entry = self.backdrops[i]
-        if entry.bg then
-            entry.bg:SetAlpha(bAlpha)
+        local bg = entry.bg
+        if bg then
+            if bg.SetColor then
+                bg:SetColor(pr, pg, pb)
+            elseif bg.SetVertexColor then
+                bg:SetVertexColor(pr, pg, pb)
+            end
+            bg:SetAlpha(bg.fixedAlpha or bAlpha)
         end
     end
     for i = 1, table.getn(self.bars) do
@@ -2367,19 +2999,60 @@ function B:InitTooltip()
 
     local function SkinTooltip(tt)
         if not tt then return end
-        tt:SetBackdrop({
-            bgFile = B.SOLID,
-            edgeFile = B.SOLID,
-            tile = false,
-            tileSize = 0,
-            edgeSize = 1,
-            insets = { left = 1, right = 1, top = 1, bottom = 1 },
-        })
-        tt:SetBackdropColor(0.05, 0.05, 0.05, 0.92)
-        tt:SetBackdropBorderColor(0.20, 0.20, 0.20, 1.0)
-        if type(tt.SetScale) == "function" then
-            tt:SetScale(0.82)
+        if B:IsRound() then
+            -- Round style: the stock backdrop is cleared and a round panel
+            -- drawn instead; an accent line under the top edge carries the
+            -- class / reaction colour.
+            tt:SetBackdrop(nil)
+            B:RoundPanel(tt, nil, 0.94)
+            if not tt.buiAccentLine then
+                local line = tt:CreateTexture(nil, "BORDER")
+                line:SetTexture(B.WHITE)
+                line:SetHeight(2)
+                local rad = (B.db and B.db.cornerRadius) or 10
+                line:SetPoint("TOPLEFT", tt, "TOPLEFT", rad, -1)
+                line:SetPoint("TOPRIGHT", tt, "TOPRIGHT", -rad, -1)
+                line:Hide()
+                tt.buiAccentLine = line
+            end
+        else
+            tt:SetBackdrop({
+                bgFile = B.SOLID,
+                edgeFile = B.SOLID,
+                tile = false,
+                tileSize = 0,
+                edgeSize = 1,
+                insets = { left = 1, right = 1, top = 1, bottom = 1 },
+            })
+            local pr, pg, pb = B:GetPanelColor()
+            tt:SetBackdropColor(pr, pg, pb, 0.92)
+            tt:SetBackdropBorderColor(0.20, 0.20, 0.20, 1.0)
         end
+        if type(tt.SetScale) == "function" then
+            tt:SetScale((B.db and B.db.tooltipScale) or 0.82)
+        end
+    end
+    self.SkinTooltip = function(_, tt) SkinTooltip(tt) end
+
+    -- Class / reaction colour: border (sharp) or accent line (round).
+    local function ColorTooltip(tt, r, g, b)
+        if B:IsRound() then
+            if tt.buiAccentLine then
+                tt.buiAccentLine:SetVertexColor(r, g, b)
+                tt.buiAccentLine:Show()
+            end
+        else
+            tt:SetBackdropBorderColor(r, g, b, 1.0)
+        end
+    end
+
+    -- The accent line belongs to unit tooltips only.
+    if type(GameTooltip.GetScript) == "function" then
+        local origHide = GameTooltip:GetScript("OnHide")
+        GameTooltip:SetScript("OnHide", function()
+            if this.buiAccentLine then this.buiAccentLine:Hide() end
+            if origHide then origHide() end
+        end)
     end
 
     SkinTooltip(GameTooltip)
@@ -2398,7 +3071,13 @@ function B:InitTooltip()
         local orig_Anchor = GameTooltip_SetDefaultAnchor
         GameTooltip_SetDefaultAnchor = function(tooltip, parent)
             orig_Anchor(tooltip, parent)
-            if tooltip and parent then
+            local anchorMode = (B.db and B.db.tooltipAnchor) or "hud"
+            if tooltip and parent and anchorMode == "cursor" then
+                tooltip:SetOwner(parent, "ANCHOR_CURSOR")
+                SkinTooltip(tooltip)
+            elseif tooltip and parent and anchorMode == "default" then
+                SkinTooltip(tooltip)
+            elseif tooltip and parent then
                 tooltip:ClearAllPoints()
                 local anchorFrame = nil
                 if BUI_EncounterFrame and BUI_EncounterFrame:IsShown() then
@@ -2425,22 +3104,27 @@ function B:InitTooltip()
     tooltipWatcher:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
     tooltipWatcher:SetScript("OnEvent", function()
         if UnitExists("mouseover") and GameTooltip:IsShown() then
+            if B.db and B.db.tooltipHideInCombat and type(UnitAffectingCombat) == "function" and UnitAffectingCombat("player") then
+                GameTooltip:Hide()
+                return
+            end
             SkinTooltip(GameTooltip)
+            if B.db and B.db.tooltipReactionColor == false then return end
             if UnitIsPlayer("mouseover") then
                 local loc, cl = UnitClass("mouseover")
                 local cc = B:ResolveClassColor(cl) or B:ResolveClassColor(loc)
                 if cc then
-                    GameTooltip:SetBackdropBorderColor(cc.r, cc.g, cc.b, 1.0)
+                    ColorTooltip(GameTooltip, cc.r, cc.g, cc.b)
                 end
             else
                 local reaction = UnitReaction("mouseover", "player")
                 if reaction then
                     if reaction <= 2 then
-                        GameTooltip:SetBackdropBorderColor(0.85, 0.20, 0.20, 1.0)
+                        ColorTooltip(GameTooltip, 0.85, 0.20, 0.20)
                     elseif reaction <= 4 then
-                        GameTooltip:SetBackdropBorderColor(0.85, 0.75, 0.20, 1.0)
+                        ColorTooltip(GameTooltip, 0.85, 0.75, 0.20)
                     else
-                        GameTooltip:SetBackdropBorderColor(0.20, 0.80, 0.25, 1.0)
+                        ColorTooltip(GameTooltip, 0.20, 0.80, 0.25)
                     end
                 end
             end
@@ -2460,6 +3144,19 @@ boot:RegisterEvent("DISPLAY_SIZE_CHANGED")
 boot:RegisterEvent("UI_SCALE_CHANGED")
 boot:RegisterEvent("PLAYER_LOGOUT")
 
+-- Short greeting in the player's language, once per game session: GetTime()
+-- keeps counting across /reload, so a reload within the hour stays quiet.
+function B:ShowWelcome()
+    if not self.db or self.db.welcomeMessage == false or not DEFAULT_CHAT_FRAME then return end
+    local now = (type(GetTime) == "function" and GetTime()) or 0
+    local last = tonumber(self.db.welcomeShownAt)
+    if last and now >= last and now - last < 3600 then return end
+    self.db.welcomeShownAt = now
+    local r, g, b = self:GetAccent()
+    local hex = string.format("|cff%02x%02x%02x", math.floor(r * 255), math.floor(g * 255), math.floor(b * 255))
+    DEFAULT_CHAT_FRAME:AddMessage(hex .. self.L["Thanks for running BlackwellUI! GLHF out there and go wreck some bosses. o7"] .. "|r")
+end
+
 local function Build()
     B:InitDB()
     if not B.built then
@@ -2469,6 +3166,7 @@ local function Build()
         B:InitTooltip()
         B:CheckResolution()
         B.lastNameplatesWanted = B:IsEnabled("nameplates")
+        B:ShowWelcome()
     end
     B:SyncHud()
     B:Tick()

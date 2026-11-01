@@ -14,11 +14,40 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
+local L = B.L
 local mod = {}
 mod.label = "Character"
 mod.alwaysActive = true
 -- Replaces PaperDoll stat functions; turning it off takes a /reload.
 mod.reloadOnToggle = true
+mod.toggleLabel = "Character window restyle"
+-- Restyles the game's own window: no scale / opacity / visibility settings.
+mod.noLook = true
+
+local SLOT_SIZE = 34
+local LIST_WIDTH = 235
+
+mod.options = {
+    { type = "section", label = "Equipment slots" },
+    { type = "toggle", key = "qualityBorders", label = "Quality colour slot borders", default = true },
+    { type = "toggle", key = "showItemLevel", label = "Item level on slots", default = false },
+    { type = "range", key = "slotSize", label = "Slot size", min = 28, max = 40, step = 2, default = 34, format = "%d px" },
+    { type = "section", label = "Stats" },
+    { type = "toggle", key = "showStats", label = "Show stat column", default = true },
+    { type = "toggle", key = "showCombatStats", label = "Combat enhancements", default = true, depends = "showStats" },
+    { type = "toggle", key = "showRunStats", label = "Run multipliers", default = true, depends = "showStats" },
+    { type = "toggle", key = "colorStats", label = "Coloured stat values", hint = "Off shows all values in white.", default = true, depends = "showStats" },
+    { type = "section", label = "Equipment list" },
+    { type = "toggle", key = "showEquipList", label = "Show equipment list", default = true },
+    { type = "range", key = "listWidth", label = "Panel width", min = 200, max = 320, step = 5, default = 235, format = "%d px", depends = "showEquipList" },
+    { type = "toggle", key = "qualityNames", label = "Colour item names by quality", default = true, depends = "showEquipList" },
+    { type = "section", label = "Text" },
+    { type = "range", key = "fontSize", label = "Font size", hint = "Added to the global font size.", min = -2, max = 4, step = 1, default = 0, format = "%d" },
+}
+
+local function Opt(key, default)
+    return B:ModOpt("character", key, default)
+end
 
 local modFunc = math.mod or math.fmod
 
@@ -114,6 +143,78 @@ local function CleanFrameTextures(f)
     end
 end
 
+-- Fonts that follow the module's font size option: { fs, base size }.
+local charFonts = {}
+
+local function CharFont(parent, size, justify)
+    local fs = B:Font(parent, size, justify)
+    table.insert(charFonts, { fs = fs, base = size })
+    return fs
+end
+
+-- Rounded shape in its own colour (not a panel, so the theme refresh leaves
+-- its colour alone): four disc quarters, two edge strips and a centre.
+-- Parts are marked buiKeep so CleanFrameTextures leaves them alone.
+local function RoundShape(f, rad, layer)
+    local shape = { parts = {} }
+    local function Part(round, l, rr, t, bb)
+        local tex = f:CreateTexture(nil, layer or "BACKGROUND")
+        tex.buiKeep = true
+        tex:SetTexture(round and B.ROUND or B.WHITE)
+        if round then tex:SetTexCoord(l, rr, t, bb) end
+        table.insert(shape.parts, tex)
+        return tex
+    end
+    local tl = Part(true, 0, 0.5, 0, 0.5)
+    tl:SetWidth(rad); tl:SetHeight(rad)
+    tl:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
+    local tr = Part(true, 0.5, 1, 0, 0.5)
+    tr:SetWidth(rad); tr:SetHeight(rad)
+    tr:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
+    local bl = Part(true, 0, 0.5, 0.5, 1)
+    bl:SetWidth(rad); bl:SetHeight(rad)
+    bl:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
+    local br = Part(true, 0.5, 1, 0.5, 1)
+    br:SetWidth(rad); br:SetHeight(rad)
+    br:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+    local top = Part(false)
+    top:SetPoint("TOPLEFT", tl, "TOPRIGHT", 0, 0)
+    top:SetPoint("BOTTOMRIGHT", tr, "BOTTOMLEFT", 0, 0)
+    local bottom = Part(false)
+    bottom:SetPoint("TOPLEFT", bl, "TOPRIGHT", 0, 0)
+    bottom:SetPoint("BOTTOMRIGHT", br, "BOTTOMLEFT", 0, 0)
+    local centre = Part(false)
+    centre:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -rad)
+    centre:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, rad)
+    function shape:SetColor(r, g, b, a)
+        for i = 1, table.getn(self.parts) do
+            self.parts[i]:SetVertexColor(r, g, b)
+            self.parts[i]:SetAlpha(a or 1)
+        end
+    end
+    return shape
+end
+
+-- Round disc behind a small button (close / rotate), no square border.
+local function RoundButtonBg(btn, r, g, b, a)
+    local bg = btn:CreateTexture(nil, "BACKGROUND")
+    bg.buiKeep = true
+    bg:SetTexture(B.ROUND)
+    bg:SetAllPoints(btn)
+    bg:SetVertexColor(r, g, b)
+    bg:SetAlpha(a or 1)
+    return bg
+end
+
+-- Slot frame colour: rounded ring in the round style, 1px border in sharp.
+local function SetSlotColor(slot, r, g, b, a)
+    if slot.buiRing then
+        slot.buiRing:SetColor(r, g, b, a)
+    else
+        B:SetBorderColor(slot, r, g, b, a)
+    end
+end
+
 -- Hidden tooltip to scan exact Item Level strings
 local scanTooltip = CreateFrame("GameTooltip", "BUI_CharScanTooltip", UIParent, "GameTooltipTemplate")
 scanTooltip:SetOwner(UIParent, "ANCHOR_NONE")
@@ -131,7 +232,7 @@ local function GetSlotItemInfo(slotId)
     local link = (type(GetInventoryItemLink) == "function" and GetInventoryItemLink("player", slotId)) or nil
     local quality = (type(GetInventoryItemQuality) == "function" and GetInventoryItemQuality("player", slotId)) or 1
 
-    local name = "Equipped Item"
+    local name = L["Equipped Item"]
     local iLvl = 0
 
     if link then
@@ -260,6 +361,15 @@ local function BuildModernCharacterFrame()
     if CharacterFrameBottomLeft then CharacterFrameBottomLeft:Hide() end
     if CharacterFrameBottomRight then CharacterFrameBottomRight:Hide() end
     if CharacterFramePortrait then CharacterFramePortrait:Hide() end
+    -- Ammo plays no part in Azeroth Survivors; the stock ammo slot would sit
+    -- unstyled next to the weapon slots, so it stays hidden.
+    local ammo = getglobal and getglobal("CharacterAmmoSlot")
+    if ammo then
+        ammo:Hide()
+        if type(ammo.SetScript) == "function" then
+            ammo:SetScript("OnShow", function() this:Hide() end)
+        end
+    end
 
     -- Hide Blizzard Classic Stats / Attributes & Resistances Boxes
     if type(PaperDollFrame_UpdateStats) == "function" then
@@ -300,15 +410,20 @@ local function BuildModernCharacterFrame()
         end
     end
 
-    -- 3. Sleek Dark Glass Backdrop & 1px Border
+    -- 3. Backdrop: rounded panel (round style) or dark glass with 1px border
+    local round = B:IsRound()
+    local rad = (B.db and B.db.cornerRadius) or 10
     B:Backdrop(CharacterFrame, 0.96)
-    B:Border(CharacterFrame, 0, 0, 0, 1)
+    if not round then
+        B:Border(CharacterFrame, 0, 0, 0, 1)
+    end
 
-    -- Top Accent Rule
+    -- Top Accent Rule (between the rounded corners in the round style)
+    local ruleInset = (round and rad) or 1
     local topRule = CharacterFrame:CreateTexture(nil, "ARTWORK")
     topRule.buiKeep = true
-    topRule:SetPoint("TOPLEFT", CharacterFrame, "TOPLEFT", 1, -1)
-    topRule:SetPoint("TOPRIGHT", CharacterFrame, "TOPRIGHT", -1, -1)
+    topRule:SetPoint("TOPLEFT", CharacterFrame, "TOPLEFT", ruleInset, -1)
+    topRule:SetPoint("TOPRIGHT", CharacterFrame, "TOPRIGHT", -ruleInset, -1)
     topRule:SetHeight(2)
     topRule:SetTexture(B.WHITE)
     B:Accent(topRule, "tex", 0.90)
@@ -335,8 +450,23 @@ local function BuildModernCharacterFrame()
         CharacterFrameCloseButton:SetHeight(18)
         CharacterFrameCloseButton:ClearAllPoints()
         CharacterFrameCloseButton:SetPoint("TOPRIGHT", CharacterFrame, "TOPRIGHT", -8, -8)
-        B:Backdrop(CharacterFrameCloseButton, 0.90)
-        B:Border(CharacterFrameCloseButton, 0.35, 0.35, 0.35, 1)
+        if round then
+            local cBg = RoundButtonBg(CharacterFrameCloseButton, 0.16, 0.17, 0.20, 0.95)
+            CharacterFrameCloseButton.buiBgDisc = cBg
+            local origEnter = (type(CharacterFrameCloseButton.GetScript) == "function" and CharacterFrameCloseButton:GetScript("OnEnter")) or nil
+            local origLeave = (type(CharacterFrameCloseButton.GetScript) == "function" and CharacterFrameCloseButton:GetScript("OnLeave")) or nil
+            CharacterFrameCloseButton:SetScript("OnEnter", function()
+                if this.buiBgDisc then this.buiBgDisc:SetVertexColor(0.70, 0.22, 0.20) end
+                if origEnter then origEnter() end
+            end)
+            CharacterFrameCloseButton:SetScript("OnLeave", function()
+                if this.buiBgDisc then this.buiBgDisc:SetVertexColor(0.16, 0.17, 0.20) end
+                if origLeave then origLeave() end
+            end)
+        else
+            B:Backdrop(CharacterFrameCloseButton, 0.90)
+            B:Border(CharacterFrameCloseButton, 0.35, 0.35, 0.35, 1)
+        end
         if not CharacterFrameCloseButton.fs then
             local cFs = B:Font(CharacterFrameCloseButton, 10, "CENTER")
             cFs:SetPoint("CENTER", CharacterFrameCloseButton, "CENTER", 0, 0)
@@ -355,12 +485,17 @@ local function BuildModernCharacterFrame()
         CharacterModelFrame:SetPoint("TOPLEFT", CharacterFrame, "TOPLEFT", 68, -48)
         CharacterModelFrame:SetWidth(188)
         CharacterModelFrame:SetHeight(334)
-        B:Border(CharacterModelFrame, 0.20, 0.20, 0.20, 1)
+        if round then
+            local mShape = RoundShape(CharacterModelFrame, rad, "BACKGROUND")
+            mShape:SetColor(0.02, 0.02, 0.02, 0.85)
+        else
+            B:Border(CharacterModelFrame, 0.20, 0.20, 0.20, 1)
 
-        local mBg = CharacterModelFrame:CreateTexture(nil, "BACKGROUND")
-        mBg.buiKeep = true
-        B:Solid(mBg, 0.02, 0.02, 0.02, 0.85)
-        mBg:SetAllPoints(CharacterModelFrame)
+            local mBg = CharacterModelFrame:CreateTexture(nil, "BACKGROUND")
+            mBg.buiKeep = true
+            B:Solid(mBg, 0.02, 0.02, 0.02, 0.85)
+            mBg:SetAllPoints(CharacterModelFrame)
+        end
 
         -- Interactive Drag Rotation
         CharacterModelFrame:EnableMouse(true)
@@ -390,8 +525,12 @@ local function BuildModernCharacterFrame()
             rotL:SetHeight(16)
             rotL:ClearAllPoints()
             rotL:SetPoint("TOPLEFT", CharacterModelFrame, "TOPLEFT", 4, -4)
-            B:Backdrop(rotL, 0.90)
-            B:Border(rotL, 0.25, 0.25, 0.25, 1)
+            if round then
+                RoundButtonBg(rotL, 0.16, 0.17, 0.20, 0.95)
+            else
+                B:Backdrop(rotL, 0.90)
+                B:Border(rotL, 0.25, 0.25, 0.25, 1)
+            end
             local lTxt = rotL:CreateFontString(nil, "OVERLAY")
             lTxt.buiKeep = true
             lTxt:SetFont(B:GetFontPath(), 9, "OUTLINE")
@@ -407,8 +546,12 @@ local function BuildModernCharacterFrame()
             rotR:SetHeight(16)
             rotR:ClearAllPoints()
             rotR:SetPoint("LEFT", rotL, "RIGHT", 3, 0)
-            B:Backdrop(rotR, 0.90)
-            B:Border(rotR, 0.25, 0.25, 0.25, 1)
+            if round then
+                RoundButtonBg(rotR, 0.16, 0.17, 0.20, 0.95)
+            else
+                B:Backdrop(rotR, 0.90)
+                B:Border(rotR, 0.25, 0.25, 0.25, 1)
+            end
             local rTxt = rotR:CreateFontString(nil, "OVERLAY")
             rTxt.buiKeep = true
             rTxt:SetFont(B:GetFontPath(), 9, "OUTLINE")
@@ -424,19 +567,38 @@ local function BuildModernCharacterFrame()
         local sDef = PAPERDOLL_SLOTS[i]
         local slot = getglobal and getglobal(sDef.name)
         if slot then
-            slot:SetWidth(34)
-            slot:SetHeight(34)
+            slot:SetWidth(SLOT_SIZE)
+            slot:SetHeight(SLOT_SIZE)
             slot:ClearAllPoints()
 
-            B:Backdrop(slot, 0.88)
-            B:Border(slot, 0.18, 0.18, 0.18, 1)
+            local icon = getglobal and getglobal(sDef.name .. "IconTexture")
+            if round then
+                -- Rounded quality ring, the icon sits 2px inside it.
+                slot.buiRing = RoundShape(slot, 6, "BACKGROUND")
+                slot.buiRing:SetColor(0.18, 0.18, 0.18, 0.80)
+                if icon then
+                    icon:ClearAllPoints()
+                    icon:SetPoint("TOPLEFT", slot, "TOPLEFT", 2, -2)
+                    icon:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -2, 2)
+                end
+            else
+                B:Backdrop(slot, 0.88)
+                B:Border(slot, 0.18, 0.18, 0.18, 1)
+            end
 
             local norm = getglobal and getglobal(sDef.name .. "NormalTexture")
             if norm then norm:SetAlpha(0) end
 
-            local icon = getglobal and getglobal(sDef.name .. "IconTexture")
             if icon then
                 icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            end
+
+            -- Item level badge (module option "Item level on slots").
+            if not slot.buiLvlFs then
+                local lvlFs = CharFont(slot, 8, "RIGHT")
+                lvlFs:SetPoint("BOTTOMRIGHT", slot, "BOTTOMRIGHT", -2, 3)
+                lvlFs:Hide()
+                slot.buiLvlFs = lvlFs
             end
 
             if sDef.col == "left" then
@@ -468,19 +630,27 @@ local function BuildModernCharacterFrame()
     statsContainer:SetPoint("TOPLEFT", mid, "TOPLEFT", 0, 0)
     mid.container = statsContainer
 
-    -- Helper to create category headers and stat rows
+    -- Helper to create category headers and stat rows. mid.layout keeps the
+    -- order so a section can be hidden and the rest moves up.
     mid.statRows = {}
+    mid.layout = {}
     local currY = 0
+    local currGroup = "combat"
+
+    local function AddLayout(frame, h)
+        table.insert(mid.layout, { frame = frame, h = h, group = currGroup })
+    end
 
     local function AddCategoryHeader(title)
         local hFrame = CreateFrame("Frame", nil, statsContainer)
         hFrame:SetWidth(195)
         hFrame:SetHeight(18)
         hFrame:SetPoint("TOPLEFT", statsContainer, "TOPLEFT", 0, -currY)
+        AddLayout(hFrame, 20)
 
-        local hFs = B:Font(hFrame, 9, "LEFT")
+        local hFs = CharFont(hFrame, 9, "LEFT")
         hFs:SetPoint("LEFT", hFrame, "LEFT", 2, 0)
-        hFs:SetText(title)
+        hFs:SetText(L[title])
         hFs:SetTextColor(1.0, 0.85, 0.40)
 
         local line = hFrame:CreateTexture(nil, "ARTWORK")
@@ -489,6 +659,7 @@ local function BuildModernCharacterFrame()
         line:SetHeight(1)
         line:SetTexture(B.WHITE)
         line:SetVertexColor(0.35, 0.35, 0.35, 0.80)
+        if round then line:SetAlpha(0.45) end
 
         currY = currY + 20
     end
@@ -498,15 +669,16 @@ local function BuildModernCharacterFrame()
         row:SetWidth(195)
         row:SetHeight(15)
         row:SetPoint("TOPLEFT", statsContainer, "TOPLEFT", 0, -currY)
+        AddLayout(row, 15)
 
-        local lbl = B:Font(row, 8, "LEFT")
+        local lbl = CharFont(row, 8, "LEFT")
         lbl:SetPoint("LEFT", row, "LEFT", 4, 0)
         lbl:SetWidth(125)
         lbl:SetTextColor(0.70, 0.70, 0.70)
-        lbl:SetText(defaultLabel)
+        lbl:SetText(L[defaultLabel] .. ":")
         row.lbl = lbl
 
-        local val = B:Font(row, 8, "RIGHT")
+        local val = CharFont(row, 8, "RIGHT")
         val:SetPoint("RIGHT", row, "RIGHT", -4, 0)
         val:SetWidth(65)
         val:SetTextColor(1, 1, 1)
@@ -519,33 +691,35 @@ local function BuildModernCharacterFrame()
 
     -- 1. Combat Enhancements
     AddCategoryHeader("Combat Enhancements")
-    AddStatRow("health", "Max Health:")
-    AddStatRow("dmg", "Damage Multiplier:")
-    AddStatRow("crit", "Critical Strike:")
-    AddStatRow("cm", "Critical Damage:")
-    AddStatRow("cd", "Cooldown Reduction:")
-    AddStatRow("spd", "Haste / Atk Speed:")
-    AddStatRow("area", "Area of Effect:")
-    AddStatRow("arm", "Armor / DR:")
-    AddStatRow("speed", "Movement Speed:")
-    AddStatRow("avoid", "Avoidance / Dodge:")
+    AddStatRow("health", "Max Health")
+    AddStatRow("dmg", "Damage Multiplier")
+    AddStatRow("crit", "Critical Strike")
+    AddStatRow("cm", "Critical Damage")
+    AddStatRow("cd", "Cooldown Reduction")
+    AddStatRow("spd", "Haste / Atk Speed")
+    AddStatRow("area", "Area of Effect")
+    AddStatRow("arm", "Armor / DR")
+    AddStatRow("speed", "Movement Speed")
+    AddStatRow("avoid", "Avoidance / Dodge")
 
+    currGroup = "run"
     currY = currY + 4
+    table.insert(mid.layout, { h = 4, group = "run" })
 
     -- 2. Run Multipliers & Perks (Azeroth Survivors)
     AddCategoryHeader("Run Multipliers & Perks")
-    AddStatRow("echo", "Echo Strike:")
-    AddStatRow("leech", "Lifesteal:")
-    AddStatRow("heal", "Kill Heal:")
-    AddStatRow("pick", "Pickup Radius:")
-    AddStatRow("luck", "Luck Multiplier:")
-    AddStatRow("bp", "Buff Power:")
-    AddStatRow("gold", "Gold Bonus:")
-    AddStatRow("xp", "Experience Bonus:")
-    AddStatRow("doth", "DoT Haste:")
-    AddStatRow("big", "Damage vs Elites:")
-    AddStatRow("exe", "Execute (<30% HP):")
-    AddStatRow("lives", "Revives / Lives:")
+    AddStatRow("echo", "Echo Strike")
+    AddStatRow("leech", "Lifesteal")
+    AddStatRow("heal", "Kill Heal")
+    AddStatRow("pick", "Pickup Radius")
+    AddStatRow("luck", "Luck Multiplier")
+    AddStatRow("bp", "Buff Power")
+    AddStatRow("gold", "Gold Bonus")
+    AddStatRow("xp", "Experience Bonus")
+    AddStatRow("doth", "DoT Haste")
+    AddStatRow("big", "Damage vs Elites")
+    AddStatRow("exe", "Execute (<30% HP)")
+    AddStatRow("lives", "Revives / Lives")
 
     ---------------------------------------------------------------------------
     --  7. Right Section: Complete Equipment List (Side-by-side Overview)
@@ -554,47 +728,57 @@ local function BuildModernCharacterFrame()
     right:SetWidth(235)
     right:SetHeight(396)
     right:SetPoint("TOPLEFT", CharacterFrame, "TOPLEFT", 524, -48)
-    B:Backdrop(right, 0.92)
-    B:Border(right, 0, 0, 0, 1)
+    if round then
+        B:Panel(right)
+        right.pad = 6
+    else
+        B:Backdrop(right, 0.92)
+        B:Border(right, 0, 0, 0, 1)
+        right.pad = 4
+    end
     CharacterFrame.rightPanel = right
 
-    -- Right Panel Header
+    -- Right Panel Header (round style: no strip, no rule, inset title)
     local rHdr = CreateFrame("Frame", nil, right)
     rHdr:SetHeight(24)
     rHdr:SetPoint("TOPLEFT", right, "TOPLEFT", 1, -1)
     rHdr:SetPoint("TOPRIGHT", right, "TOPRIGHT", -1, -1)
     right.header = rHdr
 
-    local rHdrBg = rHdr:CreateTexture(nil, "BACKGROUND")
-    B:Solid(rHdrBg, 0.04, 0.04, 0.04, 0.95)
-    rHdrBg:SetAllPoints(rHdr)
+    if not round then
+        local rHdrBg = rHdr:CreateTexture(nil, "BACKGROUND")
+        B:Solid(rHdrBg, 0.04, 0.04, 0.04, 0.95)
+        rHdrBg:SetAllPoints(rHdr)
+    end
 
     local pIcon = rHdr:CreateTexture(nil, "ARTWORK")
     pIcon:SetWidth(16)
     pIcon:SetHeight(16)
-    pIcon:SetPoint("LEFT", rHdr, "LEFT", 4, 0)
+    pIcon:SetPoint("LEFT", rHdr, "LEFT", (round and 8) or 4, 0)
     pIcon:SetTexture("Interface\\Icons\\INV_Misc_Book_09")
     pIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     right.pIcon = pIcon
 
-    local rNameFs = B:Font(rHdr, 9, "LEFT")
+    local rNameFs = CharFont(rHdr, 9, "LEFT")
     rNameFs:SetPoint("LEFT", pIcon, "RIGHT", 5, 0)
-    rNameFs:SetText("Equipment Overview")
+    rNameFs:SetText(L["Equipment Overview"])
     rNameFs:SetTextColor(1.0, 0.90, 0.62)
     right.nameFs = rNameFs
 
-    local rLvlFs = B:Font(rHdr, 9, "RIGHT")
-    rLvlFs:SetPoint("RIGHT", rHdr, "RIGHT", -6, 0)
+    local rLvlFs = CharFont(rHdr, 9, "RIGHT")
+    rLvlFs:SetPoint("RIGHT", rHdr, "RIGHT", (round and -10) or -6, 0)
     rLvlFs:SetText("")
     rLvlFs:SetTextColor(0.0, 0.90, 1.00)
     right.lvlFs = rLvlFs
 
-    local rRule = rHdr:CreateTexture(nil, "ARTWORK")
-    rRule:SetPoint("BOTTOMLEFT", rHdr, "BOTTOMLEFT", 0, 0)
-    rRule:SetPoint("BOTTOMRIGHT", rHdr, "BOTTOMRIGHT", 0, 0)
-    rRule:SetHeight(1)
-    rRule:SetTexture(B.WHITE)
-    B:Accent(rRule, "tex", 0.90)
+    if not round then
+        local rRule = rHdr:CreateTexture(nil, "ARTWORK")
+        rRule:SetPoint("BOTTOMLEFT", rHdr, "BOTTOMLEFT", 0, 0)
+        rRule:SetPoint("BOTTOMRIGHT", rHdr, "BOTTOMRIGHT", 0, 0)
+        rRule:SetHeight(1)
+        rRule:SetTexture(B.WHITE)
+        B:Accent(rRule, "tex", 0.90)
+    end
 
     -- 17 Equipment List Rows
     local listRows = {}
@@ -602,33 +786,38 @@ local function BuildModernCharacterFrame()
     for i = 1, nList do
         local lDef = LIST_SLOTS[i]
         local row = CreateFrame("Button", nil, right)
-        row:SetWidth(227)
+        row:SetWidth(LIST_WIDTH - 2 * right.pad)
         row:SetHeight(20)
-        row:SetPoint("TOPLEFT", right, "TOPLEFT", 4, -28 - (i - 1) * 21)
+        row:SetPoint("TOPLEFT", right, "TOPLEFT", right.pad, -28 - (i - 1) * 21)
         row.slotId = lDef.id
 
-        local badge = B:Font(row, 8, "LEFT")
+        local badge = CharFont(row, 8, "LEFT")
         badge:SetPoint("LEFT", row, "LEFT", 2, 0)
         badge:SetWidth(46)
         badge:SetHeight(16)
         badge:SetTextColor(0.25, 0.85, 0.95)
-        badge:SetText(lDef.label)
+        badge:SetText(L[lDef.label])
         row.badge = badge
 
-        local name = B:Font(row, 8, "LEFT")
+        local name = CharFont(row, 8, "LEFT")
         name:SetPoint("LEFT", badge, "RIGHT", 4, 0)
         name:SetPoint("RIGHT", row, "RIGHT", -4, 0)
         name:SetHeight(16)
         name:SetTextColor(0.50, 0.50, 0.50)
-        name:SetText("(Empty)")
+        name:SetText(L["(Empty)"])
         row.name = name
 
-        local hl = row:CreateTexture(nil, "HIGHLIGHT")
-        B:Solid(hl, 1, 1, 1, 0.12)
+        -- Hover tint, shown from OnEnter: this engine draws the HIGHLIGHT
+        -- layer all the time, not only under the mouse.
+        local hl = row:CreateTexture(nil, "BACKGROUND")
+        B:Solid(hl, 1, 1, 1, (round and 0.06) or 0.12)
         hl:SetAllPoints(row)
+        hl:Hide()
+        row.hl = hl
 
         row:EnableMouse(true)
         row:SetScript("OnEnter", function()
+            if this.hl then this.hl:Show() end
             if this.slotId then
                 GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
                 GameTooltip:ClearLines()
@@ -640,6 +829,7 @@ local function BuildModernCharacterFrame()
             end
         end)
         row:SetScript("OnLeave", function()
+            if this.hl then this.hl:Hide() end
             GameTooltip:Hide()
         end)
 
@@ -650,6 +840,10 @@ local function BuildModernCharacterFrame()
     -- Hide Tabs & Clutter
     HideCharacterTabs()
     SuppressAZSMoreStats()
+
+    if type(mod.ApplyOptions) == "function" then
+        mod:ApplyOptions()
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -677,10 +871,13 @@ local function UpdateCharacterFrame()
         local cr = math.floor((cCol.r or 1) * 255 + 0.5)
         local cg = math.floor((cCol.g or 1) * 255 + 0.5)
         local cb = math.floor((cCol.b or 1) * 255 + 0.5)
-        CharacterLevelText:SetText(string.format("Level %d %s |cff%02x%02x%02x%s|r", pLvl, pRace, cr, cg, cb, pClass))
+        local classText = string.format("|cff%02x%02x%02x%s|r", cr, cg, cb, pClass)
+        CharacterLevelText:SetText(string.format(L["Level %d %s %s"], math.floor(pLvl), pRace, classText))
     end
 
     -- 2. Scan Equipment, Update Slots and Quality Borders
+    local showQuality = Opt("qualityBorders", true)
+    local showItemLevel = Opt("showItemLevel", false)
     local nSlots = table.getn(PAPERDOLL_SLOTS)
     for i = 1, nSlots do
         local sDef = PAPERDOLL_SLOTS[i]
@@ -693,12 +890,24 @@ local function UpdateCharacterFrame()
                     local qr, qg, qb = GetItemQualityColor(info.quality)
                     if qr and qg and qb then qCol = { r = qr, g = qg, b = qb } end
                 end
-                B:SetBorderColor(slot, qCol.r, qCol.g, qCol.b, 1)
+                if showQuality then
+                    SetSlotColor(slot, qCol.r, qCol.g, qCol.b, 1)
+                else
+                    SetSlotColor(slot, 0.30, 0.31, 0.34, 1)
+                end
 
-                if slot.buiLvlFs then slot.buiLvlFs:Hide() end
+                if slot.buiLvlFs then
+                    if showItemLevel and info.iLvl and info.iLvl > 0 then
+                        slot.buiLvlFs:SetText(tostring(math.floor(info.iLvl)))
+                        slot.buiLvlFs:SetTextColor(qCol.r, qCol.g, qCol.b)
+                        slot.buiLvlFs:Show()
+                    else
+                        slot.buiLvlFs:Hide()
+                    end
+                end
                 slot:Show()
             else
-                B:SetBorderColor(slot, 0.18, 0.18, 0.18, 0.80)
+                SetSlotColor(slot, 0.18, 0.18, 0.18, 0.80)
                 if slot.buiLvlFs then slot.buiLvlFs:Hide() end
                 if sDef.optional then
                     slot:Hide()
@@ -732,10 +941,14 @@ local function UpdateCharacterFrame()
                     if qr and qg and qb then qCol = { r = qr, g = qg, b = qb } end
                 end
                 row.name:SetText(info.name)
-                row.name:SetTextColor(qCol.r, qCol.g, qCol.b)
+                if Opt("qualityNames", true) then
+                    row.name:SetTextColor(qCol.r, qCol.g, qCol.b)
+                else
+                    row.name:SetTextColor(0.90, 0.90, 0.90)
+                end
             else
                 row.itemLink = nil
-                row.name:SetText("(Empty)")
+                row.name:SetText(L["(Empty)"])
                 row.name:SetTextColor(0.40, 0.40, 0.40)
             end
         end
@@ -883,7 +1096,7 @@ local function UpdateCharacterFrame()
         if r.heal then
             local hVal = s.heal
             if hVal and hVal > 0 then
-                r.heal.val:SetText(string.format("+%.0f HP", hVal))
+                r.heal.val:SetText(string.format(L["+%.0f HP"], hVal))
                 r.heal.val:SetTextColor(0.30, 0.95, 0.50)
             else
                 r.heal.val:SetText("0")
@@ -894,10 +1107,10 @@ local function UpdateCharacterFrame()
         if r.pick then
             local pVal = s.pick
             if pVal and pVal > 0 then
-                r.pick.val:SetText(string.format("%.0f yd", pVal))
+                r.pick.val:SetText(string.format(L["%.0f yd"], pVal))
                 r.pick.val:SetTextColor(0.90, 0.90, 0.90)
             else
-                r.pick.val:SetText("0 yd")
+                r.pick.val:SetText(L["0 yd"])
                 r.pick.val:SetTextColor(0.60, 0.60, 0.60)
             end
         end
@@ -988,10 +1201,108 @@ local function UpdateCharacterFrame()
                 r.lives.val:SetTextColor(0.60, 0.60, 0.60)
             end
         end
+
+        -- "Coloured stat values" off: every value in plain white.
+        if not Opt("colorStats", true) then
+            for _, row in pairs(r) do
+                if row.val then row.val:SetTextColor(0.92, 0.92, 0.92) end
+            end
+        end
     end
 
     HideCharacterTabs()
     SuppressAZSMoreStats()
+end
+
+-------------------------------------------------------------------------------
+--  Module options (applied once the window is restyled)
+-------------------------------------------------------------------------------
+-- Slot size, stat sections, list panel width, window width and fonts. The
+-- window is built on first use, so before that there is nothing to apply.
+function mod:ApplyOptions()
+    if not modernFrameBuilt or not CharacterFrame then return end
+
+    -- Slots keep their grid cell; a smaller slot is centred in it.
+    local size = Opt("slotSize", SLOT_SIZE)
+    local shift = math.floor((SLOT_SIZE - size) / 2)
+    local nSlots = table.getn(PAPERDOLL_SLOTS)
+    for i = 1, nSlots do
+        local sDef = PAPERDOLL_SLOTS[i]
+        local slot = getglobal and getglobal(sDef.name)
+        if slot then
+            slot:SetWidth(size)
+            slot:SetHeight(size)
+            slot:ClearAllPoints()
+            if sDef.col == "left" then
+                slot:SetPoint("TOPLEFT", CharacterFrame, "TOPLEFT", 16 + shift, -48 - (sDef.order - 1) * 42 - shift)
+            elseif sDef.col == "right" then
+                slot:SetPoint("TOPLEFT", CharacterFrame, "TOPLEFT", 262 + shift, -48 - (sDef.order - 1) * 42 - shift)
+            elseif sDef.col == "bottom" then
+                slot:SetPoint("TOPLEFT", CharacterFrame, "TOPLEFT", 100 + (sDef.order - 1) * 44 + shift, -390 - shift)
+            end
+        end
+    end
+
+    -- Fonts
+    local off = Opt("fontSize", 0)
+    for i = 1, table.getn(charFonts) do
+        local e = charFonts[i]
+        e.fs.buiSize = e.base + off
+        B:ApplyFont(e.fs)
+    end
+
+    -- Columns from left to right: stats (195 px), equipment list.
+    local x = 312
+    local mid = CharacterFrame.middleStats
+    if mid then
+        if Opt("showStats", true) then
+            mid:ClearAllPoints()
+            mid:SetPoint("TOPLEFT", CharacterFrame, "TOPLEFT", x, -48)
+            mid:Show()
+            x = x + 212
+            local showGroup = {
+                combat = Opt("showCombatStats", true),
+                run = Opt("showRunStats", true),
+            }
+            local y = 0
+            for i = 1, table.getn(mid.layout) do
+                local e = mid.layout[i]
+                if showGroup[e.group] then
+                    if e.frame then
+                        e.frame:ClearAllPoints()
+                        e.frame:SetPoint("TOPLEFT", mid.container, "TOPLEFT", 0, -y)
+                        e.frame:Show()
+                    end
+                    y = y + e.h
+                elseif e.frame then
+                    e.frame:Hide()
+                end
+            end
+        else
+            mid:Hide()
+        end
+    end
+
+    local right = CharacterFrame.rightPanel
+    if right then
+        if Opt("showEquipList", true) then
+            local w = Opt("listWidth", LIST_WIDTH)
+            right:SetWidth(w)
+            right:ClearAllPoints()
+            right:SetPoint("TOPLEFT", CharacterFrame, "TOPLEFT", x, -48)
+            right:Show()
+            for i = 1, table.getn(right.rows) do
+                right.rows[i]:SetWidth(w - 2 * (right.pad or 4))
+            end
+            x = x + w + 16
+        else
+            right:Hide()
+        end
+    end
+
+    if x < 324 then x = 324 end
+    CharacterFrame:SetWidth(x)
+    if PaperDollFrame then PaperDollFrame:SetWidth(x) end
 end
 
 -------------------------------------------------------------------------------

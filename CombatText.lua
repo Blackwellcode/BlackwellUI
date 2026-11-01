@@ -12,9 +12,65 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
+local L = B.L
 local mod = {}
-mod.label = "Combat Text"
+mod.label = "Combat text"
 mod.alwaysActive = false
+mod.hint = "Replaces Blizzard's floating numbers. Turning it off restores them at once."
+
+mod.options = {
+    { type = "section", label = "Show" },
+    { type = "toggle", key = "showOutgoing", label = "Outgoing damage", default = true },
+    { type = "toggle", key = "showIncoming", label = "Incoming damage", default = true },
+    { type = "toggle", key = "showMisses", label = "Dodges, parries and misses", default = true, depends = "showIncoming" },
+    { type = "toggle", key = "showSource", label = "Attacker name", default = true, depends = "showIncoming" },
+    { type = "toggle", key = "showAuras", label = "Buffs and debuffs", default = true },
+    { type = "toggle", db = "sctAlerts", label = "Ability alerts",
+      hint = "Ready, Overpower and Execute prompts. They do not check your class.", default = false },
+    { type = "section", label = "Text" },
+    { type = "range", key = "outFontSize", label = "Outgoing font size", min = 10, max = 28, step = 1, default = 14, format = "%d px" },
+    { type = "range", key = "incFontSize", label = "Incoming font size", min = 10, max = 28, step = 1, default = 13, format = "%d px" },
+    { type = "range", key = "auraFontSize", label = "Aura font size", min = 10, max = 24, step = 1, default = 13, format = "%d px" },
+    { type = "range", key = "alertFontSize", label = "Alert font size", min = 12, max = 30, step = 1, default = 16, format = "%d px" },
+    { type = "range", key = "critScale", label = "Critical hit size", min = 1, max = 2, step = 0.05, default = 1.2, format = "%.2fx" },
+    { type = "toggle", key = "colorBySchool", label = "Colour by spell school", default = true },
+    { type = "toggle", key = "showIcons", label = "Show icons", default = true },
+    { type = "section", label = "Motion" },
+    { type = "range", key = "duration", label = "Duration", min = 0.8, max = 4, step = 0.1, default = 1.8, format = "%.1f s" },
+    { type = "range", key = "scrollHeight", label = "Scroll distance", min = 40, max = 300, step = 10, default = 130, format = "%d px" },
+    { type = "range", key = "arcWidth", label = "Arc width", min = 0, max = 150, step = 5, default = 60, format = "%d px" },
+    { type = "toggle", key = "mergeHits", label = "Merge rapid hits", default = true },
+    { type = "range", key = "mergeWindow", label = "Merge window", min = 0.1, max = 1, step = 0.05, default = 0.35, format = "%.2f s", depends = "mergeHits" },
+}
+
+local function Opt(key, default)
+    return B:ModOpt("combattext", key, default)
+end
+
+local function CritSize(base, isCrit)
+    if not isCrit then return base end
+    return math.floor(base * Opt("critScale", 1.2) + 0.5)
+end
+
+-- Icons and their frame follow "Show icons"; the black frame is sharp-style only.
+local function ShowIcon(f, tex)
+    if not Opt("showIcons", true) then
+        f.icon:Hide()
+        f.iconBorder:Hide()
+        f.text:ClearAllPoints()
+        f.text:SetPoint("LEFT", f, "LEFT", 0, 0)
+        return
+    end
+    f.icon:SetTexture(tex)
+    f.icon:Show()
+    if B:IsRound() then
+        f.iconBorder:Hide()
+    else
+        f.iconBorder:Show()
+    end
+    f.text:ClearAllPoints()
+    f.text:SetPoint("LEFT", f.iconBorder, "RIGHT", 4, 0)
+end
 
 local SCHOOL_HEX = {
     ["physical"] = "|cffffffff",
@@ -58,19 +114,21 @@ local anchorStatic = nil
 local anchorAlerts = nil
 
 local function CreatePoolFrame(parent, frameName, isAlert)
-    local f = CreateFrame("Frame", frameName, UIParent)
+    local f = CreateFrame("Frame", frameName, parent or UIParent)
     f:SetFrameStrata("HIGH")
     f:SetWidth(200)
     f:SetHeight(20)
     f:Hide()
 
-    -- 16x16 icon (or 18x18 for alert) with 1px black border
+    -- 16x16 icon (or 18x18 for alert); sharp style: 1px black border,
+    -- round style: the borderless icon (the border texture stays as spacer).
     local iconSize = isAlert and 18 or 16
     local iconBorder = f:CreateTexture(nil, "BACKGROUND")
     iconBorder:SetWidth(iconSize + 2)
     iconBorder:SetHeight(iconSize + 2)
     iconBorder:SetPoint("LEFT", f, "LEFT", 0, 0)
     B:Solid(iconBorder, 0, 0, 0, 1)
+    if B:IsRound() then iconBorder:Hide() end
     f.iconBorder = iconBorder
 
     local icon = f:CreateTexture(nil, "ARTWORK")
@@ -124,23 +182,26 @@ end
 
 -- Public API
 function mod:AddOutgoing(spellName, amount, isCrit, school)
-    if not B:IsEnabled("combattext") then return end
+    if not B:IsEnabled("combattext") or not Opt("showOutgoing", true) then return end
     amount = tonumber(amount) or 0
     if amount <= 0 then return end
     spellName = spellName or "Physical"
 
     local now = (type(GetTime) == "function" and GetTime()) or 0
 
-    -- Check for Multi-Hit / Batching within 0.35s
+    -- Check for Multi-Hit / Batching within the merge window (0.35s by default)
     local n = table.getn(poolOutgoing)
+    local window = Opt("mergeWindow", 0.35)
+    local merge = Opt("mergeHits", true)
+    local bySchool = Opt("colorBySchool", true)
     for i = 1, n do
         local f = poolOutgoing[i]
-        if f.inUse and f.abilityKey == spellName and (now - f.spawnTime) < 0.35 then
+        if merge and f.inUse and f.abilityKey == spellName and (now - f.spawnTime) < window then
             f.amount = f.amount + amount
             f.hits = f.hits + 1
             f.isCrit = f.isCrit or isCrit
-            local cHex = mod:GetSchoolHex(school or f.school)
-            f.text:SetText(cHex .. tostring(f.amount) .. "|r |cffffff00[" .. tostring(f.hits) .. " Hits]|r")
+            local cHex = bySchool and mod:GetSchoolHex(school or f.school) or "|cffffffff"
+            f.text:SetText(cHex .. tostring(f.amount) .. "|r |cffffff00" .. string.format(L["[%d Hits]"], math.floor(f.hits)) .. "|r")
             f.elapsed = math.max(0, f.elapsed - 0.25)
             return
         end
@@ -155,19 +216,16 @@ function mod:AddOutgoing(spellName, amount, isCrit, school)
     f.school = school
     f.spawnTime = now
     f.elapsed = 0
-    f.duration = 1.8
+    f.duration = Opt("duration", 1.8)
     f.anchor = anchorOutgoing
 
-    local tex = B:GetAbilityIcon(spellName)
-    f.icon:SetTexture(tex)
-    f.icon:Show()
-    f.iconBorder:Show()
+    ShowIcon(f, B:GetAbilityIcon(spellName))
 
-    local colorHex = mod:GetSchoolHex(school)
+    local colorHex = bySchool and mod:GetSchoolHex(school) or "|cffffffff"
     f.text:SetText(colorHex .. tostring(amount) .. "|r")
 
-    local fontSize = isCrit and 17 or 14
-    f.text:SetFont(B.FONTS["Barlow Bold"] or B:GetFontPath(), fontSize, "OUTLINE")
+    local fontSize = CritSize(Opt("outFontSize", 14), isCrit)
+    f.text:SetFont(B:GetBoldFontPath(), fontSize, "OUTLINE")
 
     f:ClearAllPoints()
     f:SetPoint("CENTER", anchorOutgoing, "CENTER", 0, 0)
@@ -176,26 +234,33 @@ function mod:AddOutgoing(spellName, amount, isCrit, school)
 end
 
 function mod:AddIncoming(sourceName, amount, isCrit, missType)
-    if not B:IsEnabled("combattext") then return end
+    if not B:IsEnabled("combattext") or not Opt("showIncoming", true) then return end
+    if missType and not Opt("showMisses", true) then return end
     local f = GetFreeFrame(poolIncoming)
     f.inUse = true
     f.spawnTime = (type(GetTime) == "function" and GetTime()) or 0
     f.elapsed = 0
-    f.duration = 1.8
+    f.duration = Opt("duration", 1.8)
     f.anchor = anchorIncoming
     f.icon:Hide()
     f.iconBorder:Hide()
+    f.text:ClearAllPoints()
+    f.text:SetPoint("LEFT", f.iconBorder, "RIGHT", 4, 0)
 
-    sourceName = sourceName or "Enemy"
+    sourceName = sourceName or L["Enemy"]
+    local prefix = ""
+    if Opt("showSource", true) then
+        prefix = "|cffff2020(" .. sourceName .. ")|r "
+    end
     if missType then
-        f.text:SetText("|cffff2020(" .. sourceName .. ")|r |cff00e5ff" .. string.upper(missType) .. "|r")
+        f.text:SetText(prefix .. "|cff00e5ff" .. L[string.upper(missType)] .. "|r")
     else
         amount = tonumber(amount) or 0
-        f.text:SetText("|cffff2020(" .. sourceName .. ")|r |cffffffff-" .. tostring(amount) .. "|r")
+        f.text:SetText(prefix .. "|cffffffff-" .. tostring(amount) .. "|r")
     end
 
-    local fontSize = isCrit and 16 or 13
-    f.text:SetFont(B.FONTS["Barlow Bold"] or B:GetFontPath(), fontSize, "OUTLINE")
+    local fontSize = CritSize(Opt("incFontSize", 13), isCrit)
+    f.text:SetFont(B:GetBoldFontPath(), fontSize, "OUTLINE")
 
     f:ClearAllPoints()
     f:SetPoint("CENTER", anchorIncoming, "CENTER", 0, 0)
@@ -204,30 +269,28 @@ function mod:AddIncoming(sourceName, amount, isCrit, missType)
 end
 
 function mod:AddAura(name, isDebuff, isFade)
-    if not B:IsEnabled("combattext") then return end
+    if not B:IsEnabled("combattext") or not Opt("showAuras", true) then return end
+    local shownName = name or L["Aura"]
     name = name or "Aura"
     local f = GetFreeFrame(poolStatic)
     f.inUse = true
     f.spawnTime = (type(GetTime) == "function" and GetTime()) or 0
     f.elapsed = 0
-    f.duration = 2.0
+    f.duration = Opt("duration", 1.8) + 0.2
     f.anchor = anchorStatic
 
-    local tex = B:GetAbilityIcon(name)
-    f.icon:SetTexture(tex)
-    f.icon:Show()
-    f.iconBorder:Show()
+    ShowIcon(f, B:GetAbilityIcon(name))
 
     if isFade then
-        f.text:SetText("|cffaaaaaa[" .. name .. " Faded]|r")
+        f.text:SetText("|cffaaaaaa" .. string.format(L["[%s Faded]"], shownName) .. "|r")
     elseif isDebuff then
         -- Cyan / Teal
-        f.text:SetText("|cff00e5ff[" .. name .. "]|r")
+        f.text:SetText("|cff00e5ff[" .. shownName .. "]|r")
     else
         -- Golden Yellow
-        f.text:SetText("|cffffd100[" .. name .. "]|r")
+        f.text:SetText("|cffffd100[" .. shownName .. "]|r")
     end
-    f.text:SetFont(B.FONTS["Barlow Bold"] or B:GetFontPath(), 13, "OUTLINE")
+    f.text:SetFont(B:GetBoldFontPath(), Opt("auraFontSize", 13), "OUTLINE")
 
     f:ClearAllPoints()
     f:SetPoint("CENTER", anchorStatic, "CENTER", 0, 0)
@@ -237,32 +300,30 @@ end
 
 function mod:AddAlert(spellName, alertType)
     if not B:IsEnabled("combattext") or (B.db and B.db.sctAlerts == false) then return end
+    local shownName = (spellName and string.upper(spellName)) or L["ABILITY"]
     spellName = spellName or "Ability"
     local f = GetFreeFrame(poolAlerts)
     f.inUse = true
     f.spawnTime = (type(GetTime) == "function" and GetTime()) or 0
     f.elapsed = 0
-    f.duration = 2.2
+    f.duration = Opt("duration", 1.8) + 0.4
     f.anchor = anchorAlerts
 
-    local tex = B:GetAbilityIcon(spellName)
-    f.icon:SetTexture(tex)
-    f.icon:Show()
-    f.iconBorder:Show()
+    ShowIcon(f, B:GetAbilityIcon(spellName))
 
     if alertType == "READY" then
         -- Red spell name + White READY NOW!
-        f.text:SetText("|cffff2020" .. string.upper(spellName) .. "|r |cffffffffREADY NOW!|r")
+        f.text:SetText("|cffff2020" .. shownName .. "|r |cffffffff" .. L["READY NOW!"] .. "|r")
     elseif alertType == "EXECUTE" then
-        f.text:SetText("|cffff2020EXECUTE!|r")
+        f.text:SetText("|cffff2020" .. L["EXECUTE!"] .. "|r")
     elseif alertType == "OVERPOWER" then
-        f.text:SetText("|cffffb800OVERPOWER!|r")
+        f.text:SetText("|cffffb800" .. L["OVERPOWER!"] .. "|r")
     elseif alertType == "REVENGE" then
-        f.text:SetText("|cff00ff88REVENGE!|r")
+        f.text:SetText("|cff00ff88" .. L["REVENGE!"] .. "|r")
     else
-        f.text:SetText("|cffff2020" .. string.upper(spellName) .. "!|r")
+        f.text:SetText("|cffff2020" .. shownName .. "!|r")
     end
-    f.text:SetFont(B.FONTS["Barlow Bold"] or B:GetFontPath(), 16, "OUTLINE")
+    f.text:SetFont(B:GetBoldFontPath(), Opt("alertFontSize", 16), "OUTLINE")
 
     f:ClearAllPoints()
     f:SetPoint("CENTER", anchorAlerts, "CENTER", 0, 0)
@@ -431,6 +492,8 @@ end
 -------------------------------------------------------------------------------
 local function UpdateArcPool(pool, curveDir, dt)
     local n = table.getn(pool)
+    local arcWidth = Opt("arcWidth", 60)
+    local rise = Opt("scrollHeight", 130)
     for i = 1, n do
         local f = pool[i]
         if f.inUse then
@@ -449,8 +512,8 @@ local function UpdateArcPool(pool, curveDir, dt)
 
                 -- Parabolic arc: curveDir is -1 for Left, +1 for Right
                 local curveProgress = math.pow(progress, 0.7)
-                local curX = 60 * curveDir * curveProgress
-                local curY = 130 * progress
+                local curX = arcWidth * curveDir * curveProgress
+                local curY = rise * progress
                 f:ClearAllPoints()
                 f:SetPoint("CENTER", f.anchor or UIParent, "CENTER", curX, curY)
             end
@@ -528,42 +591,48 @@ function mod:Create()
     local aInc = CreateFrame("Frame", "BUI_SCT_Incoming", UIParent)
     aInc:SetWidth(120)
     aInc:SetHeight(40)
-    B:RegisterMover(aInc, "sct_incoming", "Incoming Combat Text", "CENTER", "CENTER", -260, 0)
+    B:RegisterMover(aInc, "sct_incoming", L["Incoming Combat Text"], "CENTER", "CENTER", -260, 0)
     anchorIncoming = aInc
 
     local aOut = CreateFrame("Frame", "BUI_SCT_Outgoing", UIParent)
     aOut:SetWidth(120)
     aOut:SetHeight(40)
-    B:RegisterMover(aOut, "sct_outgoing", "Outgoing Combat Text", "CENTER", "CENTER", 260, 0)
+    B:RegisterMover(aOut, "sct_outgoing", L["Outgoing Combat Text"], "CENTER", "CENTER", 260, 0)
     anchorOutgoing = aOut
 
     local aStat = CreateFrame("Frame", "BUI_SCT_Static", UIParent)
     aStat:SetWidth(160)
     aStat:SetHeight(30)
-    B:RegisterMover(aStat, "sct_static", "Auras & Buffs", "CENTER", "CENTER", 0, 180)
+    B:RegisterMover(aStat, "sct_static", L["Auras & Buffs"], "CENTER", "CENTER", 0, 180)
     anchorStatic = aStat
 
     local aAlert = CreateFrame("Frame", "BUI_SCT_Alerts", UIParent)
     aAlert:SetWidth(200)
     aAlert:SetHeight(30)
-    B:RegisterMover(aAlert, "sct_alerts", "Alerts & Cooldowns", "CENTER", "CENTER", 0, -140)
+    B:RegisterMover(aAlert, "sct_alerts", L["Alerts & Cooldowns"], "CENTER", "CENTER", 0, -140)
     anchorAlerts = aAlert
 
-    -- 2. Pre-allocate Frame Pools
+    -- 2. Pre-allocate Frame Pools under one holder, so the module's scale,
+    -- opacity and visibility settings reach every number at once.
+    local holder = CreateFrame("Frame", nil, UIParent)
+    holder:SetAllPoints(UIParent)
+    holder:SetFrameStrata("HIGH")
+    self.holder = holder
+    self.lookFrames = { holder }
     for i = 1, 12 do
-        local f = CreatePoolFrame(UIParent, "BUI_SCT_Inc_" .. i, false)
+        local f = CreatePoolFrame(holder, "BUI_SCT_Inc_" .. i, false)
         table.insert(poolIncoming, f)
     end
     for i = 1, 16 do
-        local f = CreatePoolFrame(UIParent, "BUI_SCT_Out_" .. i, false)
+        local f = CreatePoolFrame(holder, "BUI_SCT_Out_" .. i, false)
         table.insert(poolOutgoing, f)
     end
     for i = 1, 8 do
-        local f = CreatePoolFrame(UIParent, "BUI_SCT_Stat_" .. i, false)
+        local f = CreatePoolFrame(holder, "BUI_SCT_Stat_" .. i, false)
         table.insert(poolStatic, f)
     end
     for i = 1, 4 do
-        local f = CreatePoolFrame(UIParent, "BUI_SCT_Alert_" .. i, true)
+        local f = CreatePoolFrame(holder, "BUI_SCT_Alert_" .. i, true)
         table.insert(poolAlerts, f)
     end
 

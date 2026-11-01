@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="media/screenshots/hero-elwynn-horde.jpg" alt="BlackwellUI in a horde fight: damage meter, run clock, boss schedule, radar and floating combat text" width="100%">
+<img src="media/screenshots/hero-round.jpg" alt="BlackwellUI 2.8 in the new round style: unit frames, spell tiles, buff bars, damage meter, run clock, boss schedule and rare timers" width="100%">
 
 # BlackwellUI
 
@@ -16,7 +16,7 @@ See every number that decides a run: who deals the damage, when the next boss sp
 &nbsp;
 <a href="https://buymeacoffee.com/blackwellcode"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=0d1117" alt="Buy me a coffee" height="44"></a>
 
-[Features](#features) · [Screenshots](#screenshots) · [Installation](#installation) · [Commands](#commands) · [FAQ](#faq) · [Report a bug](https://github.com/Blackwellcode/BlackwellUI/issues/new/choose)
+[What's new](#whats-new-in-28) · [Screenshots](#screenshots) · [Features](#features) · [Installation](#installation) · [Commands](#commands) · [FAQ](#faq) · [Report a bug](https://github.com/Blackwellcode/BlackwellUI/issues/new/choose)
 
 </div>
 
@@ -26,14 +26,27 @@ See every number that decides a run: who deals the damage, when the next boss sp
 
 Azeroth Survivors turns the 1.12.1 client into a horde-survival roguelite: spells fire on their own, the screen fills with enemies, and a run is won or lost on build decisions. The stock interface was made for a different game.
 
-BlackwellUI replaces it with one dark, 1px-bordered HUD that puts the run in front of you:
+BlackwellUI replaces it with one clean HUD that puts the run in front of you:
 
 | | |
 |---|---|
 | **Know your damage** | A five-tab meter (Damage, Healing, Boss, Taken, Party) with share, DPS, biggest crit and item-proc merging. |
-| **Know the clock** | Run timer, next boss, the full boss schedule and the "4 Guardians before 8:00" goal in one panel. |
+| **Know the clock** | Run timer with a countdown ring to the next boss, the full boss schedule and the "4 Guardians before 8:00" goal. |
 | **Know the map** | Minimap radar pins for caches and guardian lairs, rare spawn timers and a live elites & bosses tracker. |
-| **Make it yours** | Drag every frame on a 32px alignment grid, pick one of five accent themes or your own colour, scale for any resolution. |
+| **Make it yours** | Round or classic sharp style, 200+ settings, every frame movable on a 32px grid, any accent colour. |
+| **Speaks your language** | Follows the game's language automatically: English, Deutsch, Français, Español, Português (Brasil), Polski, Čeština, Română, Türkçe, Русский, Українська, 简体中文, 日本語, 한국어. |
+
+---
+
+## What's new in 2.8
+
+- **A new round look for every frame.** Panels, bars, buttons, tooltips, the character window and the control center are redrawn with rounded corners and a calmer, modern layout. Unit frames are one full health bar each, as in the classic layout, now with rounded corners.
+- **The classic sharp style is one click away** (`/bw` → Appearance → Interface style). Both styles share every setting.
+- **200+ settings.** Each of the 17 modules has its own page with size, opacity and visibility (always, in combat, out of combat, or faded until mouse-over) plus its own options: rows and columns of the meter, health text formats, tile size, data bar items, chat timestamps, minimap clock, combat text sizes, nameplate layout and many more.
+- **Enemy colours that mean something.** Bosses red, rare guardians yellow, elites blue, normal enemies violet, the final boss crimson; the same colours on the target frame, the elites & bosses list and the nameplates, all adjustable.
+- **A thicker XP line** above the data bar (2 to 12 px, 6 px by default).
+- **A welcome line in your language** when you log in (can be turned off).
+- **Built-in checks for bug reports:** `/bw selftest` tries every setting and reports errors, `/bw layoutcheck` lists frames that overlap.
 
 ---
 
@@ -41,35 +54,23 @@ BlackwellUI replaces it with one dark, 1px-bordered HUD that puts the run in fro
 
 <div align="center">
 
-<img src="media/screenshots/meter-tooltip.jpg" alt="Damage meter with per-spell tooltip" height="300">
-<img src="media/screenshots/radar-timer-stack.jpg" alt="Rare timers, minimap radar, run clock and elites tracker" height="300">
+<img src="media/screenshots/style-compare.jpg" alt="The same HUD in the new round style and in the classic sharp style" width="88%">
 
-<sub>**Left:** damage meter with per-spell breakdown on hover. **Right:** rare timers, radar minimap, run clock with boss schedule, elites & bosses tracker.</sub>
-
-<br><br>
-
-<img src="media/screenshots/build-tooltip.jpg" alt="Spell tiles with cooldown and upgrade tooltip" width="88%">
-
-<sub>Spell tiles with live cooldowns, rank badges and tooltips that list every upgrade on the spell.</sub>
+<sub>The same layout in the new round style (top) and the classic sharp style (bottom).</sub>
 
 <br><br>
 
-<img src="media/screenshots/theme-strip.jpg" alt="The run clock in the five accent themes" width="100%">
+<img src="media/screenshots/hud-stack.jpg" alt="Rare timers, minimap, run clock with countdown ring, boss schedule and elites tracker" height="420">
+<img src="media/screenshots/tooltip-round.jpg" alt="Round spell tooltip above the spell tiles" height="200">
 
-<sub>Five accent themes plus a custom RGB colour; every bar, header and accent line follows it.</sub>
-
-<br><br>
-
-<img src="media/screenshots/edit-mode-grid.jpg" alt="Edit mode with alignment grid and labelled frame movers" width="100%">
-
-<sub>Edit mode (`/bw unlock`): every frame is labelled and snaps to a 32px grid with centre axes.</sub>
+<sub>**Left:** rare timers, minimap, run clock with a countdown ring to the next boss, boss schedule, elites & bosses in their enemy colours. **Right:** spell tooltip with damage school, range, upgrades and talents.</sub>
 
 <br><br>
 
-<img src="media/screenshots/control-center-general.jpg" alt="BlackwellUI control center, General page" width="49%">
-<img src="media/screenshots/control-center.jpg" alt="BlackwellUI control center, HUD page" width="49%">
+<img src="media/screenshots/control-appearance.jpg" alt="Control center, Appearance page" width="49%">
+<img src="media/screenshots/control-module.jpg" alt="Control center, Damage Meter page" width="49%">
 
-<sub>The control center (`/bw`): five pages, a plain-language hint under every setting, and options that only matter for a module stay greyed out while it is off.</sub>
+<sub>The control center (`/bw`): General, Appearance and Tooltips, then one scrollable page per module.</sub>
 
 </div>
 
@@ -80,56 +81,59 @@ BlackwellUI replaces it with one dark, 1px-bordered HUD that puts the run in fro
 <details open>
 <summary><b>Combat analytics</b></summary>
 
-- **Damage meter** with five tabs: Damage, Healing, Boss, Taken, Party. Click the header to cycle, or a tab to jump.
+- **Damage meter** with five tabs: Damage, Healing, Boss, Taken, Party. Click the title to cycle, or a tab to jump.
 - **Hover breakdown** per spell: damage, DPS, share of the total and biggest crit.
 - **Proc merging** (`M` button): folds item procs such as `Amulet of the Inferno: Consecration` into the spell they belong to.
 - **Session reset** (`R` button): left-click starts a fresh session, right-click returns to run totals.
 - **Party drilldown**: in the Party tab, click a player to see their spells, hits and crits.
-- **Floating combat text** in its own style: outgoing and incoming numbers, multi-hit merging (`223 (9 Hits)`), ability alerts. Blizzard's numbers are hidden while it is on and come back when you turn it off.
+- **Floating combat text** in its own style: outgoing and incoming numbers, multi-hit merging (`223 (9 Hits)`), ability alerts, sizes and timings to taste. Blizzard's numbers come back as soon as you turn it off.
 
 </details>
 
 <details open>
 <summary><b>Run intelligence</b></summary>
 
-- **Run clock** with run length, zone and difficulty, the next boss and the full boss schedule.
+- **Run clock** with run length, zone and difficulty, a countdown ring to the next boss and the full boss schedule.
 - **Guardian goal**: tracks the "4 Guardians before 8:00" objective right in the timer.
-- **Elites & bosses tracker** with HP and percent; click a row to target it.
+- **Elites & bosses tracker** with HP and percent in enemy colours; click a row to target it.
 - **Rare spawn timers** for every lair: alive, fighting, or the time until respawn.
-- **Data bar** along the bottom: level, XP, kills with a rolling kill pace (`[57/m]`), gold, lives, total damage and FPS at a glance.
+- **Data bar** along the bottom: level, XP, kills with a rolling kill pace (`[57/m]`), gold, lives, total damage and FPS; pick which items show.
 - **Loot log** with quality colours and run timestamps.
 
 </details>
 
 <details open>
-<summary><b>Radar & map</b></summary>
+<summary><b>Unit frames</b></summary>
 
-- **Minimap pins** for caches and guardian lairs; pins outside the map range stick to its edge so nothing is lost.
-- **Square minimap** with a 1px border and player coordinates.
+- **Hero, target, target of target, pet and party frames**: one full health bar each, with name, level or status and health text inside.
+- **Enemy colours** on the target: boss red, rare guardian yellow, elite blue, normal enemy violet, final boss crimson. Players show in their class colour.
+- **Target debuff bars** with tick damage and timers above the target frame.
+- Health text as value, percent, both, current / max or hidden; widths, heights, text size and every element switchable.
 
 </details>
 
 <details open>
 <summary><b>Your build</b></summary>
 
-- **Spell tiles** with cooldown overlays, rank badges and full tooltips including all upgrades.
-- **Buff bars** above the tiles for shrines, racials and procs (toggle with `/bw buffs`).
+- **Spell tiles** with cooldown overlays, rank badges and full tooltips including all upgrades; tile size, spacing and growth direction to taste.
+- **Buff bars** above the tiles for shrines, racials and procs.
 - **Level-up button**: with stored level-ups, a `LEVEL UP READY (N)` button appears above your spells.
-- **Equipment panel** with every equipped item, quality-coloured.
-- **Stat multipliers** panel: damage, cooldown, crit, area, speed, echo and more, read live from the game. It can grow upwards, so it fits above the chat as well as below the minimap.
+- **Equipment panel** with every equipped item and a quality ring.
+- **Stat multipliers** panel: damage, cooldown, crit, area, speed, echo and more, read live from the game; choose rows, colours and growth direction.
 
 </details>
 
 <details open>
 <summary><b>Layout & style</b></summary>
 
+- **Round or sharp style**, corner radius, panel colour, background opacity, font, text size, text outline and bar texture.
+- **Themes**: Blackwell, Crimson, Amber, Emerald, Violet, Monolith, class colour or any custom colour.
+- **Per-module size, opacity and visibility**: always, only in combat, only out of combat, or faded until the mouse is over it.
 - **Edit mode** with labelled movers, a 32px alignment grid and centre axes.
-- **Auto scaling** that fits the layout to your resolution (ultrawide included; the screenshots are 3440x1440), or a fixed scale (`/bw scale 0.9`).
-- **Themes**: Blackwell, Crimson, Amber, Emerald, Violet, Monolith, class colour or any custom RGB colour.
-- **Fonts and bar textures** switchable in the control center; all textures are power-of-two for the WebGPU client.
-- **Nameplates** in the same style, coloured by reaction and unit kind.
-- **Chat cleanup**: optional filter for level-up spam.
-- **Control center** (`/bw`) with five pages: General, Appearance, HUD, Combat, Map & Run. Every one of the 17 modules can be turned off on its own.
+- **Auto scaling** that fits the layout to your resolution, or a fixed scale (`/bw scale 0.9`).
+- **Tooltips** in the HUD style, positioned next to the HUD, at the cursor or where the game puts them, with class and reaction colours.
+- **Minimap, radar pins, chat and nameplates** in the same style, each with its own settings.
+- **14 languages**, detected from the game's own language setting. Spell names on your tiles follow the game's language too. Override it in `/bw` (General, Language) or with `/bw lang de`.
 
 </details>
 
@@ -153,7 +157,7 @@ Download the new zip and replace the `BlackwellUI` folder. Your settings live in
 
 ### Uninstalling cleanly
 
-BlackwellUI hides the stock run HUD and Blizzard's floating damage numbers. Those are game settings, and the client only saves them while you play. **Before you delete the addon**, open `/bw`, untick **Combat text** (Combat page) and **Replace the stock run HUD** (General page); the game gets its own settings back straight away. Then remove the folder.
+BlackwellUI hides the stock run HUD and Blizzard's floating damage numbers. Those are game settings, and the client only saves them while you play. **Before you delete the addon**, open `/bw`, switch off **Combat text** (its module page) and **Replace the stock run HUD** (General page); the game gets its own settings back straight away. Then remove the folder.
 
 ---
 
@@ -171,6 +175,9 @@ BlackwellUI hides the stock run HUD and Blizzard's floating damage numbers. Thos
 | `/bw pins` · `/bw loot` · `/bw rares` · `/bw gear` · `/bw plates` | Toggle radar pins, loot log, rare timers, equipment panel, nameplates |
 | `/bw buffs` | Toggle the buff bars above the spell tiles |
 | `/bw autoscale` · `/bw scale 0.9` | Automatic or fixed UI scale (0.5 to 2.0) |
+| `/bw lang` · `/bw lang de` · `/bw lang auto` | Show or set the interface language (applies after `/reload`) |
+| `/bw selftest` | Try every setting once and report errors (settings are restored afterwards) |
+| `/bw layoutcheck` | List HUD frames that overlap |
 | `/bw help` | List all commands in chat |
 
 ---
@@ -188,17 +195,20 @@ BlackwellUI hides the stock run HUD and Blizzard's floating damage numbers. Thos
 
 ## FAQ
 
+**I prefer the old look.**<br>
+`/bw` → Appearance → Interface style → *Sharp (classic)*, then reload. All your settings stay.
+
 **My floating damage numbers or the stock HUD are gone.**<br>
-That is BlackwellUI replacing them. Untick *Combat text* (Combat page) or *Replace the stock run HUD* (General page) in `/bw` and they return immediately.
+That is BlackwellUI replacing them. Switch off *Combat text* (its module page) or *Replace the stock run HUD* (General page) in `/bw` and they return immediately.
 
 **I turned off the Chat, Minimap, Unit Frames, Character or Action Bars module and nothing changed.**<br>
-These modules take over Blizzard frames, so switching them off needs a `/reload`. BlackwellUI asks you when you untick them.
+These modules take over Blizzard frames, so switching them off needs a `/reload`. BlackwellUI asks you when you switch them off.
 
 **A frame is off-screen or in the wrong place.**<br>
 `/bw unlock` to drag it back, or `/bw reset` to restore the default layout.
 
 **I found a bug.**<br>
-Please [open an issue](https://github.com/Blackwellcode/BlackwellUI/issues/new/choose) with your BlackwellUI version (shown in `/bw`), Windows or browser client, and the Lua error text if there is one (`/err` opens the script log).
+Please [open an issue](https://github.com/Blackwellcode/BlackwellUI/issues/new/choose) with your BlackwellUI version (shown in `/bw`), Windows or browser client, the Lua error text if there is one (`/err` opens the script log), and the result of `/bw selftest`.
 
 ---
 

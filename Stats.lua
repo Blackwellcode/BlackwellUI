@@ -2,7 +2,7 @@
 --  BlackwellUI for Azeroth Survivors  -  Stats.lua
 --  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
 --  Active Player Multipliers & Run Stats panel (Left Side).
---  - Sleek dark translucent window (0.05, 0.05, 0.05, 0.88) with 1px border
+--  - Round panel (round style) or dark translucent window with 1px border (sharp)
 --  - Real-time multipliers parsed from AZS_STATS (Damage, CDR, Crit, Area, etc.)
 --  - Gold/accent stat values
 --  - Movable via /bui unlock (default TOPLEFT, 12, -140)
@@ -10,6 +10,7 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
+local L = B.L
 local mod = {}
 mod.label = "Multipliers"
 
@@ -28,36 +29,57 @@ local STAT_DEFS = {
     { key = "arm",   label = "Armor / DR",  desc = "Damage reduction.", fmt = function(v) return string.format("%.0f%%", v * 100) end,        check = function(v) return v and v > 0 end },
     { key = "lch",   label = "Lifesteal",   desc = "Percent of damage converted to healing.", fmt = function(v) return string.format("%.1f%%", v * 100) end,        check = function(v) return v and v > 0 end },
     { key = "heal",  label = "Kill Heal",   desc = "Flat health regained per kill.", fmt = function(v) return string.format("+%.0f", v) end,               check = function(v) return v and v > 0 end },
-    { key = "pick",  label = "Pickup",      desc = "XP and gold attraction radius.", fmt = function(v) return string.format("%.0f yd", v) end,             check = function(v) return v and v > 0 end },
+    { key = "pick",  label = "Pickup",      desc = "XP and gold attraction radius.", fmt = function(v) return string.format(L["%.0f yd"], v) end,             check = function(v) return v and v > 0 end },
     { key = "luck",  label = "Luck",        desc = "Odds of higher tier level-up upgrades.", fmt = function(v) return string.format("+%.0f%%", v * 100) end,       check = function(v) return v and v > 0 end },
     { key = "bp",    label = "Buff Power",  desc = "Bonus buff strength.", fmt = function(v) return string.format("+%.0f%%", v * 100) end,       check = function(v) return v and v > 0 end },
     { key = "big",   label = "Vs Elites",   desc = "Bonus damage against Elites & Bosses.", fmt = function(v) return string.format("+%.0f%%", v * 100) end,       check = function(v) return v and v > 0 end },
     { key = "exe",   label = "Execute",     desc = "Bonus damage against targets below 30% HP.", fmt = function(v) return string.format("+%.0f%%", v * 100) end,       check = function(v) return v and v > 0 end },
 }
 
+-- Neutral value per stat: multipliers sit at 1, bonuses at 0. Used to colour
+-- gains and losses.
+local STAT_BASE = { dmg = 1, cm = 1, area = 1, spd = 1 }
+
+mod.hint = "Damage, cooldown, crit, area and the other run multipliers."
+mod.options = {
+    { type = "section", label = "Layout" },
+    { type = "range",  key = "width", label = "Width", min = 130, max = 320, step = 5, default = 170, format = "%d px" },
+    { type = "range",  key = "rowHeight", label = "Row height", min = 11, max = 24, step = 1, default = 15, format = "%d px" },
+    { type = "range",  key = "fontSize", label = "Text size", min = 7, max = 16, step = 1, default = 9, format = "%d" },
+    { type = "range",  key = "maxRows", label = "Max rows", min = 1, max = 15, step = 1, default = 15, format = "%d" },
+    { type = "toggle", db = "statsGrowUp", label = "Grow upwards (bottom edge stays in place)", default = false },
+    { type = "toggle", key = "compact", label = "Compact layout", hint = "No header, tighter padding.", default = false },
+    { type = "section", label = "Values" },
+    { type = "toggle", key = "showZero", label = "Show inactive values", hint = "Also lists multipliers still at their base value.", default = false },
+    { type = "toggle", key = "colorSign", label = "Colour gains and losses", hint = "Green above the base value, red below it.", default = false },
+    { type = "color",  key = "valueColor", label = "Value colour", default = { r = 1.0, g = 0.84, b = 0.20 } },
+    { type = "toggle", key = "showTooltips", label = "Show tooltips", default = true },
+    { type = "section", label = "Rows" },
+}
+for i = 1, table.getn(STAT_DEFS) do
+    local def = STAT_DEFS[i]
+    table.insert(mod.options, { type = "toggle", key = "row_" .. def.key, label = def.label, default = true })
+end
+
 function mod:Create()
     local f = CreateFrame("Frame", "BUI_StatsFrame", UIParent)
     f:SetWidth(PANEL_WIDTH)
     f:SetHeight(120)
-    B:Backdrop(f, 0.88)
+    -- Round style: rounded panel, inset header, rows on the header's inset.
+    -- Sharp style: flat backdrop with 1px border and the dark header strip.
+    B:Panel(f)
     self.frame = f
+    self.round = B:IsRound()
 
-    f.header = B:Header(f, "MULTIPLIERS", 18)
+    f.header = B:Header(f, L["MULTIPLIERS"], 18)
 
     local rows = {}
     for i = 1, MAX_STAT_ROWS do
         local r = CreateFrame("Frame", nil, f)
-        r:SetWidth(PANEL_WIDTH - 12)
         r:SetHeight(ROW_HEIGHT)
         r:SetPoint("TOPLEFT", f, "TOPLEFT", 6, -22 - (i - 1) * ROW_HEIGHT)
+        r:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -22 - (i - 1) * ROW_HEIGHT)
         r:EnableMouse(true)
-
-        local lbl = B:Font(r, 9, "LEFT")
-        lbl:SetPoint("LEFT", r, "LEFT", 2, 0)
-        lbl:SetWidth(95)
-        lbl:SetHeight(ROW_HEIGHT)
-        lbl:SetTextColor(0.72, 0.72, 0.72)
-        r.lbl = lbl
 
         local val = B:Font(r, 9, "RIGHT")
         val:SetPoint("RIGHT", r, "RIGHT", -2, 0)
@@ -66,12 +88,19 @@ function mod:Create()
         val:SetTextColor(1.0, 0.84, 0.20)
         r.val = val
 
+        local lbl = B:Font(r, 9, "LEFT")
+        lbl:SetPoint("LEFT", r, "LEFT", 2, 0)
+        lbl:SetPoint("RIGHT", val, "LEFT", -2, 0)
+        lbl:SetHeight(ROW_HEIGHT)
+        lbl:SetTextColor(0.72, 0.72, 0.72)
+        r.lbl = lbl
+
         r:SetScript("OnEnter", function()
-            if this.statLabel and this.statDesc then
+            if this.statLabel and this.statDesc and B:ModOpt("stats", "showTooltips", true) then
                 GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
                 GameTooltip:ClearLines()
-                GameTooltip:AddLine(this.statLabel .. " " .. (this.statValue or ""), 1, 1, 1)
-                GameTooltip:AddLine(this.statDesc, 0.8, 0.8, 0.8)
+                GameTooltip:AddLine(L[this.statLabel] .. " " .. (this.statValue or ""), 1, 1, 1)
+                GameTooltip:AddLine(L[this.statDesc], 0.8, 0.8, 0.8)
                 GameTooltip:Show()
             end
         end)
@@ -82,7 +111,63 @@ function mod:Create()
     end
     f.rows = rows
 
-    B:RegisterMover(f, "stats", "Run Multipliers", "TOPLEFT", "TOPLEFT", 12, -140)
+    B:RegisterMover(f, "stats", L["Run Multipliers"], "TOPLEFT", "TOPLEFT", 12, -140)
+end
+
+-- Sizes, fonts, padding and header from the module settings. Safe to call
+-- repeatedly; the row contents are filled by Update.
+function mod:ApplyOptions()
+    local f = self.frame
+    if not f then return end
+    local key = self.key
+    local width = math.floor(tonumber(B:ModOpt(key, "width", 170)) or PANEL_WIDTH)
+    local rowH = math.floor(tonumber(B:ModOpt(key, "rowHeight", 15)) or ROW_HEIGHT)
+    local fontSize = math.floor(tonumber(B:ModOpt(key, "fontSize", 9)) or 9)
+    local maxRows = math.floor(tonumber(B:ModOpt(key, "maxRows", 15)) or MAX_STAT_ROWS)
+    if maxRows < 1 then maxRows = 1 end
+    if maxRows > MAX_STAT_ROWS then maxRows = MAX_STAT_ROWS end
+    local compact = B:ModOpt(key, "compact", false)
+
+    -- Padding: the round panel needs room for its corners. Rows keep a 2px
+    -- text inset of their own, so the round row edge lines the text up with
+    -- the header title (inset 10).
+    local rowSide = (self.round and 8) or 6
+    local top = (self.round and 24) or 22
+    local bottom = (self.round and 8) or 4
+    if compact then
+        rowSide = (self.round and 5) or 4
+        top = (self.round and 6) or 4
+        bottom = (self.round and 6) or 4
+        f.header:Hide()
+    else
+        f.header:Show()
+    end
+
+    self.rowH = rowH
+    self.padTop = top
+    self.padBottom = bottom
+    self.maxRows = maxRows
+
+    f:SetWidth(width)
+    local valW = math.floor(fontSize * 6 + 1)
+    for i = 1, MAX_STAT_ROWS do
+        local r = f.rows[i]
+        r:SetHeight(rowH)
+        r:ClearAllPoints()
+        r:SetPoint("TOPLEFT", f, "TOPLEFT", rowSide, -top - (i - 1) * rowH)
+        r:SetPoint("TOPRIGHT", f, "TOPRIGHT", -rowSide, -top - (i - 1) * rowH)
+        r.lbl.buiSize = fontSize
+        B:ApplyFont(r.lbl)
+        r.lbl:SetHeight(rowH)
+        r.val.buiSize = fontSize
+        B:ApplyFont(r.val)
+        r.val:SetWidth(valW)
+        r.val:SetHeight(rowH)
+        if i > maxRows then r:Hide() end
+    end
+
+    -- The "Grow upwards" switch is one of this module's options as well.
+    if not B.unlocked then self:ApplyGrowth() end
 end
 
 -- Growth direction: the edge the panel is anchored by stays put while rows are
@@ -152,18 +237,36 @@ function mod:Update(state)
         }
     end
 
+    local key = self.key
+    local showZero = B:ModOpt(key, "showZero", false)
+    local colorSign = B:ModOpt(key, "colorSign", false)
+    local vc = B:ModOpt(key, "valueColor", nil)
+    local vr, vg, vb = 1.0, 0.84, 0.20
+    if type(vc) == "table" and vc.r then vr, vg, vb = vc.r, vc.g, vc.b end
+
     local activeList = {}
     local totalDefs = table.getn(STAT_DEFS)
     for i = 1, totalDefs do
         local def = STAT_DEFS[i]
         local rawVal = s[def.key]
-        if def.check(rawVal) then
-            local formatted = def.fmt(rawVal)
-            table.insert(activeList, {
-                label = def.label,
-                val = formatted,
-                desc = def.desc,
-            })
+        if B:ModOpt(key, "row_" .. def.key, true) then
+            local active = def.check(rawVal) and true or false
+            if active or showZero then
+                local num = tonumber(rawVal)
+                local formatted = "-"
+                local delta = 0
+                if num then
+                    formatted = def.fmt(num)
+                    delta = num - (STAT_BASE[def.key] or 0)
+                end
+                table.insert(activeList, {
+                    label = def.label,
+                    val = formatted,
+                    desc = def.desc,
+                    delta = delta,
+                    active = active,
+                })
+            end
         end
     end
 
@@ -173,19 +276,30 @@ function mod:Update(state)
     else
         f:Show()
         f.header.value:SetText(tostring(nActive))
+        local maxRows = self.maxRows or MAX_STAT_ROWS
+        local rowH = self.rowH or ROW_HEIGHT
         local shown = nActive
-        if shown > MAX_STAT_ROWS then shown = MAX_STAT_ROWS end
+        if shown > maxRows then shown = maxRows end
         -- Re-anchor before resizing so the chosen edge stays fixed. Not while
         -- unlocked: the mover is dragging the frame then.
         if not B.unlocked then self:ApplyGrowth() end
-        f:SetHeight(22 + shown * ROW_HEIGHT + 4)
+        f:SetHeight((self.padTop or 22) + shown * rowH + (self.padBottom or 4))
 
         for i = 1, MAX_STAT_ROWS do
             local r = f.rows[i]
             if i <= shown then
                 local item = activeList[i]
-                r.lbl:SetText(item.label .. ":")
+                r.lbl:SetText(L[item.label] .. ":")
                 r.val:SetText(item.val)
+                if not item.active then
+                    r.val:SetTextColor(0.50, 0.50, 0.50)
+                elseif colorSign and item.delta > 0 then
+                    r.val:SetTextColor(0.35, 0.90, 0.45)
+                elseif colorSign and item.delta < 0 then
+                    r.val:SetTextColor(1.0, 0.35, 0.30)
+                else
+                    r.val:SetTextColor(vr, vg, vb)
+                end
                 r.statLabel = item.label
                 r.statValue = item.val
                 r.statDesc = item.desc

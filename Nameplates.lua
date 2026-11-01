@@ -6,7 +6,9 @@
 --    - Unit kind sizing: Normal (100x9), Elite (130x11), Guardian (150x12), Boss (170x14)
 --    - 30% Execute Range marker line; bar turns gold when <= 30% HP
 --    - Reaction & Kind colors: Bosses (Purple), Guardians (Cyan), Elites (Amber), Normal (Neon Red)
---    - Target frame highlight (1px accent border) and Target Debuffs (up to 6 with stacks)
+--    - Target frame highlight (1px accent border, accent outline in the round
+--      style) and Target Debuffs (up to 6 with stacks)
+--    - Round style: rounded health bar drawn over the (invisible) stock fill
 --  Lua 5.0 / WoW 1.12.1: no '#', no '%', no string methods.
 -------------------------------------------------------------------------------
 
@@ -14,11 +16,49 @@ local B = BlackwellUI
 local mod = {}
 mod.label = "Nameplates"
 mod.alwaysActive = false
+mod.hint = "Coloured by reaction and unit kind. Show or hide them with V."
+-- Plates belong to the game world (WorldFrame), not to a frame of ours.
+mod.noLook = true
 
 local EXECUTE_RANGE = 0.30
 local EXECUTE_COLOR = { 1.00, 0.86, 0.25 }
 local PLATE_DEBUFFS = 6
 local DEBUFF_SIZE = 15
+
+mod.options = {
+    { type = "section", label = "Size" },
+    { type = "range", key = "width", label = "Width", min = 60, max = 200, step = 5, default = 100, format = "%d px" },
+    { type = "range", key = "height", label = "Height", min = 4, max = 20, step = 1, default = 9, format = "%d px" },
+    { type = "toggle", key = "sizeByKind", label = "Bigger plates for elites and bosses", default = true },
+    { type = "section", label = "Text" },
+    { type = "toggle", key = "showName", label = "Show name", default = true },
+    { type = "range", key = "nameSize", label = "Name font size", min = 7, max = 16, step = 1, default = 9, format = "%d px", depends = "showName" },
+    { type = "toggle", key = "showLevel", label = "Show level", default = true },
+    { type = "toggle", key = "goldLevel", label = "Gold level for elites and bosses", default = true, depends = "showLevel" },
+    { type = "choice", key = "healthText", label = "Health text", default = "auto",
+      values = {
+          { value = "auto", label = "By unit kind" }, { value = "percent", label = "Percent" },
+          { value = "value", label = "Current value" }, { value = "both", label = "Value and percent" },
+          { value = "none", label = "Hidden" },
+      } },
+    { type = "section", label = "Colours" },
+    { type = "toggle", key = "colorByKind", label = "Colour elites, guardians and bosses", default = true },
+    { type = "toggle", key = "showExecute", label = "Execute range", hint = "Marker line and gold bar below the threshold.", default = true },
+    { type = "range", key = "executeRange", label = "Execute threshold", min = 0.1, max = 0.5, step = 0.05, default = EXECUTE_RANGE, format = "pct", depends = "showExecute" },
+    { type = "color", key = "executeColor", label = "Execute colour", default = { r = EXECUTE_COLOR[1], g = EXECUTE_COLOR[2], b = EXECUTE_COLOR[3] }, depends = "showExecute" },
+    { type = "toggle", key = "targetHighlight", label = "Highlight the target", default = true },
+    { type = "section", label = "Debuffs" },
+    { type = "toggle", key = "showDebuffs", label = "Target debuffs", default = true },
+    { type = "range", key = "maxDebuffs", label = "Max debuffs", min = 1, max = PLATE_DEBUFFS, step = 1, default = PLATE_DEBUFFS, format = "%d", depends = "showDebuffs" },
+    { type = "range", key = "debuffSize", label = "Debuff size", min = 10, max = 24, step = 1, default = DEBUFF_SIZE, format = "%d px", depends = "showDebuffs" },
+}
+
+local function Opt(key, default)
+    return B:ModOpt("nameplates", key, default)
+end
+
+-- Bumped by ApplyOptions: plates re-run their sizing on the next update.
+local optVersion = 1
 
 local KINDS = {
     normal   = { width = 100, height = 9,  nameSize = 9,  color = { 0.84, 0.20, 0.20 } },
@@ -169,19 +209,29 @@ local function UpdatePlateDebuffs(plate, isTarget, lift)
     local debuffs = plate.debuffs
     if not debuffs then return end
 
-    if not isTarget then
+    if not isTarget or not Opt("showDebuffs", true) then
         for i = 1, PLATE_DEBUFFS do
             if debuffs[i] then debuffs[i]:Hide() end
         end
         return
     end
 
+    local maxShown = math.floor(Opt("maxDebuffs", PLATE_DEBUFFS))
+    local size = Opt("debuffSize", DEBUFF_SIZE)
     for i = 1, PLATE_DEBUFFS do
         local df = debuffs[i]
-        local tex, count = UnitDebuff("target", i)
+        local tex, count = nil, nil
+        if i <= maxShown then
+            tex, count = UnitDebuff("target", i)
+        end
         if tex then
+            if df.buiSize ~= size then
+                df.buiSize = size
+                df:SetWidth(size)
+                df:SetHeight(size)
+            end
             df:ClearAllPoints()
-            df:SetPoint("BOTTOMLEFT", plate.healthBar, "TOPLEFT", (i - 1) * (DEBUFF_SIZE + 2), lift)
+            df:SetPoint("BOTTOMLEFT", plate.healthBar, "TOPLEFT", (i - 1) * (size + 2), lift)
             df.icon:SetTexture(tex)
             if count and count > 1 then
                 df.count:SetText(tostring(count))
@@ -232,6 +282,129 @@ local function ClassifyReaction(r, g, b)
     return "hostile"
 end
 
+-- Round style helpers: the visible bar is a rounded PlateBar over the stock fill.
+local function HideStockFill(healthBar)
+    if type(healthBar.GetStatusBarTexture) == "function" then
+        local t = healthBar:GetStatusBarTexture()
+        if t then t:SetAlpha(0) end
+    end
+end
+
+local function PaintBar(plate, r, g, b)
+    B:SetBarColor(plate.healthBar, r, g, b)
+    if plate.rbar then
+        plate.rbar:SetFillColor(r, g, b, 1)
+        -- SetStatusBarColor may bring the fill alpha back: hide it again.
+        HideStockFill(plate.healthBar)
+    end
+end
+
+-- Rounded plate bar (round style only). Like B:RoundBar, but its height can
+-- change, since plates resize with the unit kind: bar:SetBarHeight(h),
+-- bar:SetFill(0..1), bar:SetFillColor(r, g, b, a), bar:SetTrackColor(r, g, b, a).
+local function PlateBar(parent, height)
+    local bar = CreateFrame("Frame", nil, parent)
+    local function Strip(layer, spanning)
+        local st = {}
+        st.left = bar:CreateTexture(nil, layer)
+        st.left:SetTexture(B.ROUND)
+        st.left:SetTexCoord(0, 0.5, 0, 1)
+        st.left:SetPoint("LEFT", bar, "LEFT", 0, 0)
+        st.mid = bar:CreateTexture(nil, layer)
+        st.mid:SetTexture(B.WHITE)
+        st.mid:SetPoint("LEFT", st.left, "RIGHT", 0, 0)
+        st.right = bar:CreateTexture(nil, layer)
+        st.right:SetTexture(B.ROUND)
+        st.right:SetTexCoord(0.5, 1, 0, 1)
+        if spanning then
+            -- Full width: anchored to both edges, needs no width math.
+            st.right:SetPoint("RIGHT", bar, "RIGHT", 0, 0)
+            st.mid:SetPoint("RIGHT", st.right, "LEFT", 0, 0)
+        else
+            st.right:SetPoint("LEFT", st.mid, "RIGHT", 0, 0)
+        end
+        st.parts = { st.left, st.mid, st.right }
+        function st:SetColor(r, g, b, a)
+            for i = 1, 3 do
+                self.parts[i]:SetVertexColor(r, g, b)
+                self.parts[i]:SetAlpha(a or 1)
+            end
+        end
+        function st:SetStripHeight(h)
+            self.left:SetWidth(h / 2)
+            self.left:SetHeight(h)
+            self.mid:SetHeight(h)
+            self.right:SetWidth(h / 2)
+            self.right:SetHeight(h)
+        end
+        return st
+    end
+    bar.track = Strip("BORDER", true)
+    bar.fill = Strip("ARTWORK", false)
+    bar.track:SetColor(1, 1, 1, 0.10)
+    bar.fill:SetColor(1, 1, 1, 1)
+    bar.buiFill = 0
+
+    function bar:SetBarHeight(h)
+        if self.buiHeight == h then return end
+        self.buiHeight = h
+        self:SetHeight(h)
+        self.track:SetStripHeight(h)
+        self.fill:SetStripHeight(h)
+        self:Layout()
+    end
+    function bar:Layout()
+        local w = self:GetWidth()
+        local h = self.buiHeight or 1
+        local v = self.buiFill or 0
+        if not w or w < h or v <= 0 then
+            for i = 1, 3 do self.fill.parts[i]:Hide() end
+            return
+        end
+        if v > 1 then v = 1 end
+        local mid = v * w - h
+        self.fill.left:Show()
+        self.fill.right:Show()
+        if mid < 0.5 then
+            self.fill.mid:Hide()
+            self.fill.right:ClearAllPoints()
+            self.fill.right:SetPoint("LEFT", self.fill.left, "RIGHT", 0, 0)
+        else
+            self.fill.mid:SetWidth(mid)
+            self.fill.mid:Show()
+            self.fill.right:ClearAllPoints()
+            self.fill.right:SetPoint("LEFT", self.fill.mid, "RIGHT", 0, 0)
+        end
+    end
+    function bar:SetFill(v)
+        self.buiFill = tonumber(v) or 0
+        self:Layout()
+    end
+    function bar:SetFillColor(r, g, b, a)
+        self.fill:SetColor(r, g, b, a)
+    end
+    function bar:SetTrackColor(r, g, b, a)
+        self.track:SetColor(r, g, b, a)
+    end
+    bar:SetBarHeight(height)
+    return bar
+end
+
+-- Width, height and name size for a unit kind under the current options.
+local function KindSize(kind)
+    local cfg = KINDS[kind] or KINDS.normal
+    local base = KINDS.normal
+    local w = Opt("width", base.width)
+    local h = Opt("height", base.height)
+    local n = Opt("nameSize", base.nameSize)
+    if Opt("sizeByKind", true) and cfg ~= base then
+        w = math.floor(w * cfg.width / base.width + 0.5)
+        h = math.floor(h * cfg.height / base.height + 0.5)
+        n = n + (cfg.nameSize - base.nameSize)
+    end
+    return w, h, n
+end
+
 local function UpdatePlate(plate)
     if not plate or not plate.buiSkinned then return end
 
@@ -274,29 +447,66 @@ local function UpdatePlate(plate)
     if plate.buiFiltered then
         plate.buiFiltered = nil
     end
+    local showName = Opt("showName", true)
+    local showLevel = Opt("showLevel", true)
+    local healthMode = Opt("healthText", "auto")
+    local executeRange = Opt("executeRange", EXECUTE_RANGE)
+    local showExecute = Opt("showExecute", true)
+
     if not healthBar:IsShown() then healthBar:Show() end
     healthBar:SetAlpha(1)
-    if name and not name:IsShown() then name:Show() name:SetAlpha(1) end
-    if level and not level:IsShown() then level:Show() level:SetAlpha(1) end
-    if hpFs and not hpFs:IsShown() then hpFs:Show() hpFs:SetAlpha(1) end
+    if name then
+        if showName then
+            if not name:IsShown() then name:Show() name:SetAlpha(1) end
+        elseif name:IsShown() then
+            name:Hide()
+        end
+    end
+    if level then
+        if showLevel then
+            if not level:IsShown() then level:Show() level:SetAlpha(1) end
+        elseif level:IsShown() then
+            level:Hide()
+        end
+    end
+    if hpFs then
+        if healthMode ~= "none" then
+            if not hpFs:IsShown() then hpFs:Show() hpFs:SetAlpha(1) end
+        elseif hpFs:IsShown() then
+            hpFs:Hide()
+        end
+    end
 
-    -- Sizing update if kind changed
-    if plate.buiKind ~= kind then
+    -- Sizing update if kind or the options changed
+    local width, height, nameSize = KindSize(kind)
+    if plate.buiKind ~= kind or plate.buiOptVer ~= optVersion then
         plate.buiKind = kind
-        healthBar:SetWidth(cfg.width)
-        healthBar:SetHeight(cfg.height)
+        plate.buiOptVer = optVersion
+        healthBar:SetWidth(width)
+        healthBar:SetHeight(height)
+        if plate.rbar then
+            plate.rbar:SetBarHeight(height)
+            plate.buiFillShare = nil
+        end
+        if plate.rglow then
+            plate.rglow:SetBarHeight(height + 4)
+            plate.rglow:SetFill(0)
+        end
         if plate.marker then
-            plate.marker:SetHeight(cfg.height)
+            plate.marker:SetHeight(height)
             plate.marker:ClearAllPoints()
-            plate.marker:SetPoint("LEFT", healthBar, "LEFT", cfg.width * EXECUTE_RANGE, 0)
+            plate.marker:SetPoint("LEFT", healthBar, "LEFT", width * executeRange, 0)
         end
         if name then
-            name:SetFont(B:GetFontPath(), cfg.nameSize, "OUTLINE")
+            name:SetFont(B:GetFontPath(), nameSize, "OUTLINE")
             name:ClearAllPoints()
             name:SetPoint("BOTTOM", healthBar, "TOP", 0, 3)
         end
         if hpFs then
-            hpFs:SetFont(B:GetFontPath(), math.max(8, cfg.height - 1), "OUTLINE")
+            hpFs:SetFont(B:GetFontPath(), math.max(8, height - 1), "OUTLINE")
+        end
+        if plate.castBar then
+            plate.castBar:SetWidth(width)
         end
     end
 
@@ -311,23 +521,45 @@ local function UpdatePlate(plate)
     if share > 1 then share = 1 end
 
     local pct = math.floor(share * 100 + 0.5)
-    if maxv and (maxv - minv == 100 or maxv <= 1) then
+    local pctOnly = maxv and (maxv - minv == 100 or maxv <= 1)
+    if healthMode == "none" then
+        hpFs:SetText("")
+    elseif pctOnly or healthMode == "percent" then
         hpFs:SetText(tostring(pct) .. "%")
-    elseif kind == "normal" then
+    elseif healthMode == "value" or (healthMode == "auto" and kind == "normal") then
         hpFs:SetText(B:Short(cur))
     else
         hpFs:SetText(B:Short(cur) .. " / " .. B:Short(maxv) .. "  " .. tostring(pct) .. "%")
     end
 
+    -- Round bar fill: relaid only when the share or the width changed.
+    if plate.rbar then
+        local w = healthBar:GetWidth() or 0
+        if plate.buiFillShare ~= share or plate.buiFillWidth ~= w then
+            plate.buiFillShare = share
+            plate.buiFillWidth = w
+            plate.rbar:SetFill(share)
+        end
+    end
+
     -- Execute Marker & Color logic
-    if share <= EXECUTE_RANGE then
+    if showExecute and share <= executeRange then
         -- Execute threshold: gold color and hide marker line
         if plate.marker then plate.marker:Hide() end
-        B:SetBarColor(healthBar, EXECUTE_COLOR[1], EXECUTE_COLOR[2], EXECUTE_COLOR[3])
+        local ec = Opt("executeColor", nil)
+        if type(ec) == "table" and ec.r then
+            PaintBar(plate, ec.r, ec.g, ec.b)
+        else
+            PaintBar(plate, EXECUTE_COLOR[1], EXECUTE_COLOR[2], EXECUTE_COLOR[3])
+        end
     else
-        if plate.marker then plate.marker:Show() end
-        if kind == "boss" or kind == "guardian" or kind == "elite" then
-            B:SetBarColor(healthBar, cfg.color[1], cfg.color[2], cfg.color[3])
+        if plate.marker then
+            if showExecute then plate.marker:Show() else plate.marker:Hide() end
+        end
+        if Opt("colorByKind", true) and (kind == "boss" or kind == "guardian" or kind == "elite") then
+            -- Same colours as the target frame and the elites & bosses list.
+            local kr, kg, kb = B:KindColor(kind)
+            PaintBar(plate, kr, kg, kb)
         else
             -- Once recoloured, GetStatusBarColor returns our own colour. Classify
             -- only a colour the engine wrote and keep that reaction otherwise.
@@ -336,32 +568,45 @@ local function UpdatePlate(plate)
                 healthBar.buiReaction = ClassifyReaction(r, g, b)
             end
             local reaction = healthBar.buiReaction
+            local normal = KINDS.normal.color
             if reaction == "neutral" then
-                B:SetBarColor(healthBar, 0.95, 0.78, 0.12)
+                PaintBar(plate, 0.95, 0.78, 0.12)
             elseif reaction == "friendly" then
-                B:SetBarColor(healthBar, 0.15, 0.85, 0.35)
+                PaintBar(plate, 0.15, 0.85, 0.35)
             elseif reaction == "tapped" then
-                B:SetBarColor(healthBar, 0.50, 0.50, 0.50)
+                PaintBar(plate, 0.50, 0.50, 0.50)
+            elseif Opt("colorByKind", true) then
+                local kr, kg, kb = B:KindColor("normal")
+                PaintBar(plate, kr, kg, kb)
             else
-                B:SetBarColor(healthBar, cfg.color[1], cfg.color[2], cfg.color[3])
+                PaintBar(plate, normal[1], normal[2], normal[3])
             end
         end
     end
 
-    -- Target indicator border
-    if isTarget then
+    -- Target indicator: 1px border (sharp) or accent outline (round)
+    local highlight = isTarget and Opt("targetHighlight", true)
+    if highlight then
         local ar, ag, ab = B:GetAccent()
         B:SetBorderColor(healthBar, ar, ag, ab, 1)
+        if plate.rglow then
+            plate.rglow:SetTrackColor(ar, ag, ab, 0.9)
+            if not plate.rglow:IsShown() then
+                plate.rglow:Show()
+                plate.rglow:SetFill(0)
+            end
+        end
     else
         B:SetBorderColor(healthBar, 0, 0, 0, 1)
+        if plate.rglow and plate.rglow:IsShown() then plate.rglow:Hide() end
     end
 
     -- Target Debuffs
-    local lift = (name and name:IsShown()) and (cfg.nameSize + 7) or 4
+    local lift = (name and name:IsShown()) and (nameSize + 7) or 4
     UpdatePlateDebuffs(plate, isTarget, lift)
 
     -- Elite / Boss indicator text styling
-    if (kind ~= "normal") and level then
+    if (kind ~= "normal") and level and Opt("goldLevel", true) then
         level:SetTextColor(1.0, 0.82, 0.10)
     end
 end
@@ -437,17 +682,42 @@ local function SkinPlate(plate)
     healthBar:SetWidth(KINDS.normal.width)
     healthBar:SetHeight(KINDS.normal.height)
 
-    -- 1px Border
-    B:Border(healthBar, 0, 0, 0, 1)
+    local round = B:IsRound()
+    local overlay = healthBar
+    if round then
+        -- Round style: accent outline (target) below a rounded bar that
+        -- replaces the stock fill; marker and text sit on the rounded bar.
+        local glowBar = PlateBar(healthBar, KINDS.normal.height + 4)
+        glowBar:SetPoint("LEFT", healthBar, "LEFT", -2, 0)
+        glowBar:SetPoint("RIGHT", healthBar, "RIGHT", 2, 0)
+        glowBar:SetFrameLevel(healthBar:GetFrameLevel() + 1)
+        glowBar:EnableMouse(false)
+        glowBar:SetFill(0)
+        glowBar:Hide()
+        plate.rglow = glowBar
 
-    -- Dark backdrop behind healthBar
-    local bg = healthBar:CreateTexture(nil, "BACKGROUND")
-    B:Solid(bg, 0.05, 0.05, 0.05, 0.85)
-    bg:SetAllPoints(healthBar)
-    healthBar.buiBg = bg
+        local rbar = PlateBar(healthBar, KINDS.normal.height)
+        rbar:SetPoint("LEFT", healthBar, "LEFT", 0, 0)
+        rbar:SetPoint("RIGHT", healthBar, "RIGHT", 0, 0)
+        rbar:SetFrameLevel(healthBar:GetFrameLevel() + 2)
+        rbar:EnableMouse(false)
+        rbar:SetTrackColor(0.05, 0.05, 0.05, 0.85)
+        plate.rbar = rbar
+        overlay = rbar
+        HideStockFill(healthBar)
+    else
+        -- 1px Border
+        B:Border(healthBar, 0, 0, 0, 1)
+
+        -- Dark backdrop behind healthBar
+        local bg = healthBar:CreateTexture(nil, "BACKGROUND")
+        B:Solid(bg, 0.05, 0.05, 0.05, 0.85)
+        bg:SetAllPoints(healthBar)
+        healthBar.buiBg = bg
+    end
 
     -- Execute Range Marker Line (1px vertical overlay)
-    local marker = healthBar:CreateTexture(nil, "OVERLAY")
+    local marker = overlay:CreateTexture(nil, "OVERLAY")
     marker:SetWidth(1)
     marker:SetHeight(KINDS.normal.height)
     marker:SetTexture(B.WHITE)
@@ -461,7 +731,7 @@ local function SkinPlate(plate)
         local df = CreateFrame("Frame", nil, healthBar)
         df:SetWidth(DEBUFF_SIZE)
         df:SetHeight(DEBUFF_SIZE)
-        B:Border(df, 0, 0, 0, 1)
+        if not round then B:Border(df, 0, 0, 0, 1) end
         local icon = df:CreateTexture(nil, "ARTWORK")
         icon:SetAllPoints(df)
         icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -476,8 +746,8 @@ local function SkinPlate(plate)
     plate.debuffs = debuffs
 
     -- Health percentage fontstring
-    local hpFs = B:Font(healthBar, 8, "RIGHT")
-    hpFs:SetPoint("RIGHT", healthBar, "RIGHT", -2, 0)
+    local hpFs = B:Font(overlay, 8, "RIGHT")
+    hpFs:SetPoint("RIGHT", healthBar, "RIGHT", round and -4 or -2, 0)
     plate.hpFs = hpFs
 
     -- Style Name font
@@ -507,7 +777,7 @@ local function SkinPlate(plate)
         castBar:SetPoint("TOP", healthBar, "BOTTOM", 0, -4)
         castBar:SetWidth(KINDS.normal.width)
         castBar:SetHeight(8)
-        B:Border(castBar, 0, 0, 0, 1)
+        if not round then B:Border(castBar, 0, 0, 0, 1) end
         local cbg = castBar:CreateTexture(nil, "BACKGROUND")
         B:Solid(cbg, 0.05, 0.05, 0.05, 0.85)
         cbg:SetAllPoints(castBar)
@@ -583,6 +853,10 @@ function mod:Create()
 
     self.frame = scanner
     self.scanner = scanner
+end
+
+function mod:ApplyOptions()
+    optVersion = optVersion + 1
 end
 
 function mod:Update(state)

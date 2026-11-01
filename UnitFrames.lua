@@ -13,11 +13,71 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
+local L = B.L
 local mod = {}
 mod.label = "Unit Frames"
 mod.alwaysActive = true
 -- Blizzard unit frames are suppressed via OnShow; turning it off takes a /reload.
 mod.reloadOnToggle = true
+mod.hint = "Hero, target, target of target and the elites & bosses list."
+mod.fontList = {}
+
+local HEALTH_TEXT_VALUES = {
+    { value = "both", label = "Value and percent" },
+    { value = "percent", label = "Percent" },
+    { value = "value", label = "Current value" },
+    { value = "curmax", label = "Current / max" },
+    { value = "none", label = "Hidden" },
+}
+
+mod.options = {
+    { type = "section", label = "Hero & target" },
+    { type = "range", key = "heroWidth", label = "Hero width", min = 160, max = 320, step = 10, default = 210, format = "%d px" },
+    { type = "range", key = "heroHeight", label = "Hero height", min = 40, max = 80, step = 2, default = 46, format = "%d px" },
+    { type = "range", key = "targetWidth", label = "Target width", min = 160, max = 320, step = 10, default = 210, format = "%d px" },
+    { type = "range", key = "targetHeight", label = "Target height", min = 40, max = 80, step = 2, default = 46, format = "%d px" },
+    { type = "range", key = "fontSize", label = "Text size", hint = "Added to the global text size.", min = -3, max = 4, step = 1, default = 0, format = "%d" },
+    { type = "choice", key = "healthText", label = "Health text", default = "both", values = HEALTH_TEXT_VALUES },
+    { type = "toggle", key = "shortNumbers", label = "Short numbers", hint = "Shows 12.5K instead of 12500.", default = true },
+    { type = "toggle", key = "showNames", label = "Show names", default = true },
+    { type = "toggle", key = "showLevel", label = "Show level and badges", default = true },
+    { type = "toggle", key = "showPowerBar", label = "Show power bars", default = true },
+    { type = "toggle", key = "showShieldBar", label = "Show shield bar", default = true },
+    { type = "toggle", key = "showXpBar", label = "Show XP bar", default = true },
+    { type = "toggle", db = "colorHealthByClass", label = "Class-coloured health", default = true },
+    { type = "toggle", key = "customHealthColor", label = "Custom health colour", hint = "Used when class-coloured health is off, instead of the accent.", default = false },
+    { type = "color", key = "healthColor", label = "Health colour", default = { r = 0.20, g = 0.80, b = 0.20 }, depends = "customHealthColor" },
+    { type = "toggle", key = "showDebuffs", label = "Target debuff bars", default = true },
+    { type = "range", key = "maxDebuffs", label = "Max debuff bars", min = 1, max = 6, step = 1, default = 6, format = "%d", depends = "showDebuffs" },
+    { type = "toggle", key = "showToT", label = "Target of target", default = true },
+    { type = "toggle", key = "showPet", label = "Pet frame", default = true },
+
+    { type = "section", label = "Elites & bosses" },
+    { type = "range", key = "encWidth", label = "Width", min = 180, max = 400, step = 10, default = 260, format = "%d px" },
+    { type = "range", key = "encMaxRows", label = "Max rows", min = 1, max = 20, step = 1, default = 20, format = "%d" },
+    { type = "range", key = "encRowHeight", label = "Row height", min = 12, max = 28, step = 1, default = 18, format = "%d px" },
+    { type = "toggle", key = "encShowTags", label = "Show kind tags", hint = "[BOSS], [GUARD], [ELITE] in front of the name.", default = true },
+    { type = "choice", key = "encHealthText", label = "Health text", default = "curmaxpct", values = {
+        { value = "curmaxpct", label = "Current / max (percent)" },
+        { value = "both", label = "Value and percent" },
+        { value = "percent", label = "Percent" },
+        { value = "value", label = "Current value" },
+        { value = "none", label = "Hidden" },
+    } },
+
+    { type = "section", label = "Enemy colours" },
+    { type = "note", label = "Target frame, elites & bosses list and nameplates use these colours." },
+    { type = "color", key = "colorBoss", label = "Boss", default = { r = 0.86, g = 0.20, b = 0.20 } },
+    { type = "color", key = "colorFinal", label = "Final boss", default = { r = 0.86, g = 0.16, b = 0.42 } },
+    { type = "color", key = "colorGuardian", label = "Rare guardian", default = { r = 1.00, g = 0.78, b = 0.15 } },
+    { type = "color", key = "colorElite", label = "Elite", default = { r = 0.25, g = 0.60, b = 1.00 } },
+    { type = "color", key = "colorNormal", label = "Normal enemy", default = { r = 0.58, g = 0.42, b = 0.92 } },
+
+    { type = "section", label = "Party" },
+    { type = "toggle", key = "showParty", label = "Party frames", default = true },
+    { type = "range", key = "partyWidth", label = "Party frame width", min = 90, max = 200, step = 5, default = 130, format = "%d px", depends = "showParty" },
+    { type = "range", key = "partySpacing", label = "Party spacing", min = 0, max = 20, step = 1, default = 6, format = "%d px", depends = "showParty" },
+}
 
 local MAX_ENCOUNTER_ROWS = 20
 local ENC_WIDTH = 260
@@ -215,6 +275,282 @@ local REACTION_COLORS = {
     tapped   = { r = 0.55, g = 0.55, b = 0.55 }, -- Grey
 }
 
+-------------------------------------------------------------------------------
+--  Style & option helpers
+-------------------------------------------------------------------------------
+-- Defaults that differ per style: the round frames are one health bar
+-- without power / xp / shield lines. Sizes and positions stay those of the
+-- classic layout in both styles.
+local STYLE_DEFAULTS = {
+    showPowerBar = { sharp = true, round = false },
+    showXpBar = { sharp = true, round = false },
+    showShieldBar = { sharp = true, round = false },
+}
+
+local function Opt(key, default)
+    local sd = STYLE_DEFAULTS[key]
+    if sd then
+        if B:IsRound() then default = sd.round else default = sd.sharp end
+    end
+    return B:ModOpt("unitframes", key, default)
+end
+
+local function OptColor(key, def)
+    local c = Opt(key, def)
+    if type(c) == "table" and c.r then return c.r, c.g, c.b end
+    return def.r, def.g, def.b
+end
+
+-- Font strings of this module remember their base size for the text size option.
+local function Font(parent, size, justify)
+    local fs = B:Font(parent, size, justify)
+    table.insert(mod.fontList, { fs = fs, size = size })
+    return fs
+end
+
+-- Corner radius for a panel that can shrink to minHeight: capped at half
+-- of it, else the round panel's centre strip gets a negative height.
+local function PanelRadius(minHeight)
+    local rad = (B.db and B.db.cornerRadius) or 10
+    local cap = math.floor(minHeight / 2)
+    if rad > cap then rad = cap end
+    if rad < 0 then rad = 0 end
+    return rad
+end
+
+-- Inset that keeps square bar corners inside a round corner: r * (1 - 1/sqrt 2).
+local function RoundInset(radius)
+    local p = math.ceil(radius * 0.3)
+    if p < 2 then p = 2 end
+    return p
+end
+
+-- Background in the active style; returns the inner padding for the bars.
+local function FramePanel(f, minHeight, alpha)
+    if B:IsRound() then
+        local rad = PanelRadius(minHeight)
+        B:Panel(f, rad)
+        return RoundInset(rad)
+    end
+    B:Backdrop(f, alpha)
+    return 1
+end
+
+-- Thin bar: RoundBar with round caps in the round style, StatusBar in sharp.
+local function ThinBar(parent, height, r, g, b)
+    if B:IsRound() then
+        local bar = B:RoundBar(parent, height)
+        if r then
+            bar.buiR, bar.buiG, bar.buiB = r, g, b
+            bar:SetFillColor(r, g, b)
+        end
+        return bar
+    end
+    local sb = B:Bar(parent, nil, r, g, b)
+    sb:SetHeight(height)
+    return sb
+end
+
+-- Value / colour setters that work on both StatusBars and RoundBars.
+local function SetBarFill(bar, v)
+    if type(bar.SetFill) == "function" then
+        bar:SetFill(v)
+    else
+        bar:SetValue(v)
+    end
+end
+
+local function SetBarRGB(bar, r, g, b)
+    if type(bar.SetFillColor) == "function" then
+        bar.buiR, bar.buiG, bar.buiB = r, g, b
+        bar:SetFillColor(r, g, b)
+    else
+        B:SetBarColor(bar, r, g, b)
+    end
+end
+
+local function FormatNumber(v, short)
+    if short then return B:Short(v) end
+    return string.format("%d", math.floor((tonumber(v) or 0) + 0.5))
+end
+
+-- mode: "both" (12K | 52%), "percent", "value", "curmax" (12K / 20K),
+-- "curmaxpct" (12K / 20K (52%)), "none".
+local function FormatHealth(cur, max, pct, mode, short)
+    local pctInt = math.floor((pct or 0) * 100 + 0.5)
+    if mode == "none" then
+        return ""
+    elseif mode == "percent" then
+        return string.format("%d%%", pctInt)
+    elseif mode == "value" then
+        return FormatNumber(cur, short)
+    elseif mode == "curmax" then
+        return FormatNumber(cur, short) .. " / " .. FormatNumber(max, short)
+    elseif mode == "curmaxpct" then
+        return string.format("%s / %s (%d%%)", FormatNumber(cur, short), FormatNumber(max, short), pctInt)
+    end
+    return string.format("%s | %d%%", FormatNumber(cur, short), pctInt)
+end
+
+-- Frame layout presets. sharpHpOff: health height = frame height - off with
+-- the power bar shown (the old fixed layout); powerH: round power bar height.
+local LAYOUT_BIG   = { sharpHpOff = 11, sharpPowerGap = 2, powerH = 4 }
+local LAYOUT_SMALL = { sharpHpOff = 7, sharpPowerGap = 1, powerH = 3 }
+local LAYOUT_PARTY = { sharpHpOff = 10, sharpPowerGap = 1, powerH = 4 }
+
+-- Stacks health, power and the thin xp / shield slot inside a frame whose
+-- health bar is anchored at the top (TOPLEFT/TOPRIGHT, inset f.buiPad).
+local function LayoutStack(f, h, cfg, showPower, slot)
+    local round = B:IsRound()
+    local hpH
+    if round then
+        hpH = h - 2 * (f.buiPad or 3)
+        if showPower then hpH = hpH - cfg.powerH - 2 end
+        if slot then hpH = hpH - 4 end
+    elseif showPower then
+        hpH = h - cfg.sharpHpOff
+    else
+        hpH = h - 2
+        if slot then hpH = hpH - 3 end
+    end
+    if hpH < 6 then hpH = 6 end
+    f:SetHeight(h)
+    f.hpBar:SetHeight(hpH)
+
+    local below = f.hpBar
+    if f.pBar then
+        local gap = round and 2 or cfg.sharpPowerGap
+        f.pBar:ClearAllPoints()
+        f.pBar:SetPoint("TOPLEFT", f.hpBar, "BOTTOMLEFT", 0, -gap)
+        f.pBar:SetPoint("TOPRIGHT", f.hpBar, "BOTTOMRIGHT", 0, -gap)
+        if showPower then
+            f.pBar:Show()
+            below = f.pBar
+        else
+            f.pBar:Hide()
+        end
+    end
+    local slotGap = round and 2 or 1
+    local slotBars = { f.shBar, f.xpBar }
+    for i = 1, 2 do
+        local sb = slotBars[i]
+        if sb then
+            sb:ClearAllPoints()
+            sb:SetPoint("TOPLEFT", below, "BOTTOMLEFT", 0, -slotGap)
+            sb:SetPoint("TOPRIGHT", below, "BOTTOMRIGHT", 0, -slotGap)
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+--  Round style: the health bar is the frame. It fills the whole frame with
+--  the frame's corner radius; name, level / status and the health value sit
+--  inside it, as in the classic layout. Power, xp and shield lines are off by
+--  default and, when switched on, run as thin lines along the bottom edge.
+-------------------------------------------------------------------------------
+local function FullBar(f, w, h, showPower, showSlot, big)
+    f:SetWidth(w)
+    f:SetHeight(h)
+    local rad = (B.db and B.db.cornerRadius) or 10
+    if rad > h / 2 then rad = math.floor(h / 2) end
+    local pad = 10
+    if rad > pad then pad = rad end
+
+    f.hpBar:ClearAllPoints()
+    f.hpBar:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
+    f.hpBar:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+    B:SetBarRadius(f.hpBar, rad)
+    B:SetBarTrackColor(f.hpBar, 0, 0, 0, 0.35)
+
+    f.nameText:ClearAllPoints()
+    f.hpText:ClearAllPoints()
+    f.hpText:SetPoint("RIGHT", f, "RIGHT", -pad, 0)
+    f.hpText:SetJustifyH("RIGHT")
+    local sub = f.lvlText or f.badgeText
+    if big and h >= 34 then
+        -- Two text rows: name on top, level / status below.
+        f.nameText:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -6)
+        if sub then
+            sub:ClearAllPoints()
+            sub:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", pad, 6)
+            sub:SetJustifyH("LEFT")
+        end
+    else
+        f.nameText:SetPoint("LEFT", f, "LEFT", pad, 0)
+        if sub then
+            sub:ClearAllPoints()
+            sub:SetPoint("LEFT", f.nameText, "RIGHT", 4, 0)
+        end
+    end
+    -- Room for the health text: "12.5K | 85%" on big frames, "85%" on small.
+    if big then
+        f.nameText:SetWidth(w - 2 * pad - 90)
+    else
+        f.nameText:SetWidth(w - 2 * pad - 36)
+    end
+    f.nameText:SetJustifyH("LEFT")
+
+    -- Optional thin lines inside the bottom edge.
+    local y = 3
+    if f.pBar then
+        f.pBar:ClearAllPoints()
+        f.pBar:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", rad, y)
+        f.pBar:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -rad, y)
+        if showPower then
+            f.pBar:Show()
+            y = y + 4
+        else
+            f.pBar:Hide()
+        end
+    end
+    local slotBars = { f.shBar, f.xpBar }
+    for i = 1, 2 do
+        local sb = slotBars[i]
+        if sb then
+            sb:ClearAllPoints()
+            sb:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", rad, y)
+            sb:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -rad, y)
+            if not showSlot then sb:Hide() end
+        end
+    end
+end
+
+-- Health text: one string in the sharp style, split into "current / max"
+-- (left) and percent (right) on the round cards.
+local function SetHealthTexts(f, cur, max, pct, mode, short)
+    if not f.hpLeft then
+        f.hpText:SetText(FormatHealth(cur, max, pct, mode, short))
+        return
+    end
+    local pctText = string.format("%d%%", math.floor((pct or 0) * 100 + 0.5))
+    if mode == "none" then
+        f.hpLeft:SetText("")
+        f.hpText:SetText("")
+    elseif mode == "percent" then
+        f.hpLeft:SetText("")
+        f.hpText:SetText(pctText)
+    elseif mode == "value" then
+        f.hpLeft:SetText(FormatNumber(cur, short))
+        f.hpText:SetText("")
+    elseif mode == "curmax" then
+        f.hpLeft:SetText(FormatNumber(cur, short) .. " / " .. FormatNumber(max, short))
+        f.hpText:SetText("")
+    else
+        f.hpLeft:SetText(FormatNumber(cur, short) .. " / " .. FormatNumber(max, short))
+        f.hpText:SetText(pctText)
+    end
+end
+
+-- Hover tint in a normal layer: this engine draws the HIGHLIGHT layer all
+-- the time, not only under the mouse. Shown from OnEnter, hidden on OnLeave.
+local function HoverTint(owner, region, alpha)
+    local hl = owner:CreateTexture(nil, "OVERLAY")
+    B:Solid(hl, 1, 1, 1, alpha or 0.12)
+    hl:SetAllPoints(region or owner)
+    hl:Hide()
+    return hl
+end
+
 local function SuppressBlizzardFrame(f)
     if not f then return end
     f:Hide()
@@ -246,6 +582,9 @@ function mod:Create()
     local root = CreateFrame("Frame", "BUI_UnitFrames", UIParent)
     root:SetAllPoints(UIParent)
     self.frame = root
+    -- Frames are built once: a style switch needs /reload.
+    local round = B:IsRound()
+    self.round = round
 
     self:HideBlizzardFrames()
 
@@ -256,25 +595,27 @@ function mod:Create()
     BUI_PlayerFrame = hero
     hero:SetWidth(210)
     hero:SetHeight(46)
-    B:Backdrop(hero, 0.90)
+    -- Round style: round panel, bars inset so they stay inside its corners.
+    local bigPad = FramePanel(hero, 40, 0.90)
+    hero.buiPad = bigPad
 
     -- Health Bar (208 x 35) - Dominates frame
     local hpBar = B:Bar(hero, nil, 0.2, 0.8, 0.2)
-    hpBar:SetPoint("TOPLEFT", hero, "TOPLEFT", 1, -1)
-    hpBar:SetPoint("TOPRIGHT", hero, "TOPRIGHT", -1, -1)
+    hpBar:SetPoint("TOPLEFT", hero, "TOPLEFT", bigPad, -bigPad)
+    hpBar:SetPoint("TOPRIGHT", hero, "TOPRIGHT", -bigPad, -bigPad)
     hpBar:SetHeight(35)
     hero.hpBar = hpBar
 
     -- Player Name (inside Health Bar, TOPLEFT aligned)
-    local nameText = B:Font(hpBar, 11, "LEFT")
-    nameText:SetPoint("TOPLEFT", hpBar, "TOPLEFT", 6, -3)
+    local nameText = Font(hpBar, 11, "LEFT")
+    nameText:SetPoint("TOPLEFT", hpBar, "TOPLEFT", 6, round and -2 or -3)
     nameText:SetWidth(110)
     nameText:SetHeight(14)
     nameText:SetTextColor(1, 1, 1)
     hero.nameText = nameText
 
     -- Health Text (inside Health Bar, RIGHT aligned, e.g. "270 | 100%")
-    local hpText = B:Font(hpBar, 11, "RIGHT")
+    local hpText = Font(hpBar, 11, "RIGHT")
     hpText:SetPoint("RIGHT", hpBar, "RIGHT", -6, 0)
     hpText:SetWidth(90)
     hpText:SetHeight(16)
@@ -282,40 +623,44 @@ function mod:Create()
     hero.hpText = hpText
 
     -- Level badge (inside Health Bar, BOTTOMLEFT aligned)
-    local lvlText = B:Font(hpBar, 8, "LEFT")
-    lvlText:SetPoint("BOTTOMLEFT", hpBar, "BOTTOMLEFT", 6, 4)
+    local lvlText = Font(hpBar, 8, "LEFT")
+    lvlText:SetPoint("BOTTOMLEFT", hpBar, "BOTTOMLEFT", 6, round and 2 or 4)
     lvlText:SetWidth(60)
     lvlText:SetHeight(12)
     B:Accent(lvlText, "text")
     hero.lvlText = lvlText
 
-    -- Power Bar (208 x 6) Mana / Rage / Energy
-    local pBar = B:Bar(hero, nil, 0.0, 0.55, 1.0)
+
+    -- Power Bar (208 x 6) Mana / Rage / Energy; thin round-capped bar in the round style
+    local pBar = ThinBar(hero, round and LAYOUT_BIG.powerH or 6, 0.0, 0.55, 1.0)
     pBar:SetPoint("TOPLEFT", hpBar, "BOTTOMLEFT", 0, -2)
     pBar:SetPoint("TOPRIGHT", hpBar, "BOTTOMRIGHT", 0, -2)
-    pBar:SetHeight(6)
     hero.pBar = pBar
 
-    local pText = B:Font(pBar, 8, "CENTER")
+    local pText = Font(pBar, 8, "CENTER")
     pText:SetPoint("CENTER", pBar, "CENTER", 0, 0)
+    -- The round power bar is too thin to carry a number.
+    if round then pText:Hide() end
     hero.pText = pText
 
     -- Shield Bar (absorb indicator overlay on power bar bottom)
-    local shBar = B:Bar(hero, nil, 0.25, 0.70, 1.00)
+    local shBar = ThinBar(hero, 2, 0.25, 0.70, 1.00)
     shBar:SetPoint("TOPLEFT", pBar, "BOTTOMLEFT", 0, -1)
     shBar:SetPoint("TOPRIGHT", pBar, "BOTTOMRIGHT", 0, -1)
-    shBar:SetHeight(2)
     shBar:Hide()
     hero.shBar = shBar
 
     -- XP Bar (2px Cyber Accent at bottom)
-    local xpBar = B:Bar(hero, nil)
+    local xpBar = ThinBar(hero, 2)
     xpBar:SetPoint("TOPLEFT", pBar, "BOTTOMLEFT", 0, -1)
     xpBar:SetPoint("TOPRIGHT", pBar, "BOTTOMRIGHT", 0, -1)
-    xpBar:SetHeight(2)
     hero.xpBar = xpBar
+    -- Shield and XP share the slot: the shield draws on top while it is up.
+    if shBar.SetFrameLevel and xpBar.GetFrameLevel then
+        shBar:SetFrameLevel(xpBar:GetFrameLevel() + 1)
+    end
 
-    B:RegisterMover(hero, "hero", "Hero Frame", "BOTTOM", "BOTTOM", -220, 140)
+    B:RegisterMover(hero, "hero", L["Hero Frame"], "BOTTOM", "BOTTOM", -220, 140)
     self.hero = hero
 
     ---------------------------------------------------------------------------
@@ -324,32 +669,32 @@ function mod:Create()
     local tgt = CreateFrame("Frame", "BUI_TargetFrame", root)
     tgt:SetWidth(210)
     tgt:SetHeight(46)
-    B:Backdrop(tgt, 0.90)
+    tgt.buiPad = FramePanel(tgt, 40, 0.90)
 
     -- Target Health Bar (208 x 35)
     local tgtHpBar = B:Bar(tgt, nil, 0.8, 0.2, 0.2)
-    tgtHpBar:SetPoint("TOPLEFT", tgt, "TOPLEFT", 1, -1)
-    tgtHpBar:SetPoint("TOPRIGHT", tgt, "TOPRIGHT", -1, -1)
+    tgtHpBar:SetPoint("TOPLEFT", tgt, "TOPLEFT", tgt.buiPad, -tgt.buiPad)
+    tgtHpBar:SetPoint("TOPRIGHT", tgt, "TOPRIGHT", -tgt.buiPad, -tgt.buiPad)
     tgtHpBar:SetHeight(35)
     tgt.hpBar = tgtHpBar
 
     -- Target Name (inside Health Bar, TOPLEFT aligned)
-    local tgtNameText = B:Font(tgtHpBar, 11, "LEFT")
-    tgtNameText:SetPoint("TOPLEFT", tgtHpBar, "TOPLEFT", 6, -3)
+    local tgtNameText = Font(tgtHpBar, 11, "LEFT")
+    tgtNameText:SetPoint("TOPLEFT", tgtHpBar, "TOPLEFT", 6, round and -2 or -3)
     tgtNameText:SetWidth(115)
     tgtNameText:SetHeight(14)
     tgtNameText:SetTextColor(1, 1, 1)
     tgt.nameText = tgtNameText
 
     -- Target Badge (boss/elite/enraged status inside Health Bar, BOTTOMLEFT aligned)
-    local badgeText = B:Font(tgtHpBar, 8, "LEFT")
-    badgeText:SetPoint("BOTTOMLEFT", tgtHpBar, "BOTTOMLEFT", 6, 4)
+    local badgeText = Font(tgtHpBar, 8, "LEFT")
+    badgeText:SetPoint("BOTTOMLEFT", tgtHpBar, "BOTTOMLEFT", 6, round and 2 or 4)
     badgeText:SetWidth(100)
     badgeText:SetHeight(12)
     tgt.badgeText = badgeText
 
     -- Target HP Text (inside Health Bar, RIGHT aligned, e.g. "118K | 52%")
-    local tgtHpText = B:Font(tgtHpBar, 11, "RIGHT")
+    local tgtHpText = Font(tgtHpBar, 11, "RIGHT")
     tgtHpText:SetPoint("RIGHT", tgtHpBar, "RIGHT", -6, 0)
     tgtHpText:SetWidth(90)
     tgtHpText:SetHeight(16)
@@ -357,10 +702,9 @@ function mod:Create()
     tgt.hpText = tgtHpText
 
     -- Target Power Bar (208 x 6)
-    local tgtPBar = B:Bar(tgt, nil, 0.0, 0.55, 1.0)
+    local tgtPBar = ThinBar(tgt, round and LAYOUT_BIG.powerH or 6, 0.0, 0.55, 1.0)
     tgtPBar:SetPoint("TOPLEFT", tgtHpBar, "BOTTOMLEFT", 0, -2)
     tgtPBar:SetPoint("TOPRIGHT", tgtHpBar, "BOTTOMRIGHT", 0, -2)
-    tgtPBar:SetHeight(6)
     tgt.pBar = tgtPBar
 
     -- Target Debuff Bars (Stacked above Target Frame, matching center Buff Bars)
@@ -378,7 +722,10 @@ function mod:Create()
         iconFrame:SetWidth(DEBUFF_BAR_HEIGHT)
         iconFrame:SetHeight(DEBUFF_BAR_HEIGHT)
         iconFrame:SetPoint("LEFT", r, "LEFT", 0, 0)
-        B:Border(iconFrame, 0, 0, 0, 1)
+        -- Square black frame only in the sharp style.
+        if not round then
+            B:Border(iconFrame, 0, 0, 0, 1)
+        end
 
         local icon = iconFrame:CreateTexture(nil, "ARTWORK")
         icon:SetAllPoints(iconFrame)
@@ -394,20 +741,20 @@ function mod:Create()
         r.bar = bar
 
         -- Debuff Name on the left
-        local nameFs = B:Font(bar, 9, "LEFT")
+        local nameFs = Font(bar, 9, "LEFT")
         nameFs:SetPoint("LEFT", bar, "LEFT", 4, 0)
         nameFs:SetWidth(95)
         nameFs:SetHeight(12)
         r.nameFs = nameFs
 
         -- Tick Damage in the center
-        local centerFs = B:Font(bar, 10, "CENTER")
+        local centerFs = Font(bar, 10, "CENTER")
         centerFs:SetPoint("CENTER", bar, "CENTER", 0, 0)
         centerFs:SetTextColor(1.0, 0.85, 0.20)
         r.centerFs = centerFs
 
         -- Time / Stacks on the right
-        local timeFs = B:Font(bar, 9, "RIGHT")
+        local timeFs = Font(bar, 9, "RIGHT")
         timeFs:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
         timeFs:SetWidth(44)
         timeFs:SetHeight(12)
@@ -421,7 +768,7 @@ function mod:Create()
                     GameTooltip:SetUnitDebuff("target", this.debuffIndex)
                 end
                 if this.tickDmg and this.tickDmg > 0 then
-                    GameTooltip:AddLine(string.format("Tick Damage: %d", this.tickDmg), 1.0, 0.85, 0.20)
+                    GameTooltip:AddLine(string.format(L["Tick Damage: %d"], this.tickDmg), 1.0, 0.85, 0.20)
                 end
                 GameTooltip:Show()
             end
@@ -445,30 +792,29 @@ function mod:Create()
     tot:SetWidth(110)
     tot:SetHeight(24)
     tot:SetPoint("TOPLEFT", tgt, "TOPRIGHT", 6, 0)
-    B:Backdrop(tot, 0.90)
+    tot.buiPad = FramePanel(tot, 24, 0.90)
 
     local totHpBar = B:Bar(tot, nil, 0.8, 0.2, 0.2)
-    totHpBar:SetPoint("TOPLEFT", tot, "TOPLEFT", 1, -1)
-    totHpBar:SetPoint("TOPRIGHT", tot, "TOPRIGHT", -1, -1)
+    totHpBar:SetPoint("TOPLEFT", tot, "TOPLEFT", tot.buiPad, -tot.buiPad)
+    totHpBar:SetPoint("TOPRIGHT", tot, "TOPRIGHT", -tot.buiPad, -tot.buiPad)
     totHpBar:SetHeight(17)
     tot.hpBar = totHpBar
 
-    local totName = B:Font(totHpBar, 9, "LEFT")
+    local totName = Font(totHpBar, 9, "LEFT")
     totName:SetPoint("LEFT", totHpBar, "LEFT", 4, 0)
     totName:SetWidth(60)
     totName:SetHeight(12)
     tot.nameText = totName
 
-    local totPct = B:Font(totHpBar, 9, "RIGHT")
+    local totPct = Font(totHpBar, 9, "RIGHT")
     totPct:SetPoint("RIGHT", totHpBar, "RIGHT", -4, 0)
     totPct:SetWidth(38)
     totPct:SetHeight(12)
     tot.hpText = totPct
 
-    local totPBar = B:Bar(tot, nil, 0.0, 0.55, 1.0)
+    local totPBar = ThinBar(tot, 3, 0.0, 0.55, 1.0)
     totPBar:SetPoint("TOPLEFT", totHpBar, "BOTTOMLEFT", 0, -1)
     totPBar:SetPoint("TOPRIGHT", totHpBar, "BOTTOMRIGHT", 0, -1)
-    totPBar:SetHeight(3)
     tot.pBar = totPBar
 
     tot:Hide()
@@ -481,30 +827,29 @@ function mod:Create()
     pet:SetWidth(110)
     pet:SetHeight(24)
     pet:SetPoint("TOPRIGHT", hero, "BOTTOMRIGHT", 0, -8)
-    B:Backdrop(pet, 0.90)
+    pet.buiPad = FramePanel(pet, 24, 0.90)
 
     local petHpBar = B:Bar(pet, nil, 0.2, 0.8, 0.2)
-    petHpBar:SetPoint("TOPLEFT", pet, "TOPLEFT", 1, -1)
-    petHpBar:SetPoint("TOPRIGHT", pet, "TOPRIGHT", -1, -1)
+    petHpBar:SetPoint("TOPLEFT", pet, "TOPLEFT", pet.buiPad, -pet.buiPad)
+    petHpBar:SetPoint("TOPRIGHT", pet, "TOPRIGHT", -pet.buiPad, -pet.buiPad)
     petHpBar:SetHeight(17)
     pet.hpBar = petHpBar
 
-    local petName = B:Font(petHpBar, 9, "LEFT")
+    local petName = Font(petHpBar, 9, "LEFT")
     petName:SetPoint("LEFT", petHpBar, "LEFT", 4, 0)
     petName:SetWidth(60)
     petName:SetHeight(12)
     pet.nameText = petName
 
-    local petPct = B:Font(petHpBar, 9, "RIGHT")
+    local petPct = Font(petHpBar, 9, "RIGHT")
     petPct:SetPoint("RIGHT", petHpBar, "RIGHT", -4, 0)
     petPct:SetWidth(38)
     petPct:SetHeight(12)
     pet.hpText = petPct
 
-    local petPBar = B:Bar(pet, nil, 1.0, 0.50, 0.25)
+    local petPBar = ThinBar(pet, 3, 1.0, 0.50, 0.25)
     petPBar:SetPoint("TOPLEFT", petHpBar, "BOTTOMLEFT", 0, -1)
     petPBar:SetPoint("TOPRIGHT", petHpBar, "BOTTOMRIGHT", 0, -1)
-    petPBar:SetHeight(3)
     pet.pBar = petPBar
 
     pet:Hide()
@@ -516,9 +861,9 @@ function mod:Create()
     local enc = CreateFrame("Frame", "BUI_EncounterFrame", root)
     enc:SetWidth(ENC_WIDTH)
     enc:SetHeight(130)
-    B:Backdrop(enc, 0.88)
+    FramePanel(enc, 40, 0.88)
 
-    enc.header = B:Header(enc, "ELITES & BOSSES", 18)
+    enc.header = B:Header(enc, L["ELITES & BOSSES"], 18)
 
     local rows = {}
     for i = 1, MAX_ENCOUNTER_ROWS do
@@ -532,29 +877,26 @@ function mod:Create()
         bar:EnableMouse(false)
         r.bar = bar
 
-        local badgeFs = B:Font(bar, 9, "LEFT")
+        local badgeFs = Font(bar, 9, "LEFT")
         badgeFs:SetPoint("LEFT", bar, "LEFT", 3, 0)
         badgeFs:SetWidth(40)
         badgeFs:SetHeight(12)
         r.badgeFs = badgeFs
 
-        local rHpFs = B:Font(bar, 9, "RIGHT")
+        local rHpFs = Font(bar, 9, "RIGHT")
         rHpFs:SetPoint("RIGHT", bar, "RIGHT", -3, 0)
         rHpFs:SetWidth(100)
         rHpFs:SetHeight(12)
         r.hpFs = rHpFs
 
-        local rNameFs = B:Font(bar, 9, "LEFT")
+        local rNameFs = Font(bar, 9, "LEFT")
         rNameFs:SetPoint("LEFT", badgeFs, "RIGHT", 3, 0)
         rNameFs:SetPoint("RIGHT", rHpFs, "LEFT", -3, 0)
         rNameFs:SetHeight(12)
         r.nameFs = rNameFs
 
-        -- Hover highlight
-        local hl = r:CreateTexture(nil, "HIGHLIGHT")
-        B:Solid(hl, 1, 1, 1, 0.15)
-        hl:SetAllPoints(r)
-        r.hl = hl
+        -- Hover highlight (normal layer on the bar, shown from OnEnter)
+        r.hl = HoverTint(bar, bar, 0.12)
 
         r:EnableMouse(true)
         r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -571,18 +913,22 @@ function mod:Create()
         end)
 
         r:SetScript("OnEnter", function()
+            if this.hl then this.hl:Show() end
             if this.unitName then
                 GameTooltip:SetOwner(this, "ANCHOR_TOP")
                 GameTooltip:ClearLines()
                 GameTooltip:AddLine(this.unitName, 1, 1, 1)
                 if this.unitHp and this.unitHpm then
-                    GameTooltip:AddLine(string.format("Health: %d / %d (%d%%)", this.unitHp, this.unitHpm, this.unitPct or 0), 1, 0.82, 0)
+                    GameTooltip:AddLine(string.format(L["Health: %d / %d (%d%%)"], this.unitHp, this.unitHpm, this.unitPct or 0), 1, 0.82, 0)
                 end
-                GameTooltip:AddLine("Click to target", 0, 0.9, 1)
+                GameTooltip:AddLine(L["Click to target"], 0, 0.9, 1)
                 GameTooltip:Show()
             end
         end)
-        r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        r:SetScript("OnLeave", function()
+            if this.hl then this.hl:Hide() end
+            GameTooltip:Hide()
+        end)
 
         r:Hide()
         rows[i] = r
@@ -590,7 +936,7 @@ function mod:Create()
     enc.rows = rows
 
     enc:Hide()
-    B:RegisterMover(enc, "encounters", "Elites & Bosses", "TOPRIGHT", "TOPRIGHT", -12, -340)
+    B:RegisterMover(enc, "encounters", L["Elites & Bosses"], "TOPRIGHT", "TOPRIGHT", -12, -340)
     self.enc = enc
 
     ---------------------------------------------------------------------------
@@ -608,37 +954,35 @@ function mod:Create()
         pf:SetWidth(130)
         pf:SetHeight(30)
         pf:SetPoint("TOPLEFT", partyRoot, "TOPLEFT", (i - 1) * 136, 0)
-        B:Backdrop(pf, 0.90)
+        pf.buiPad = FramePanel(pf, 30, 0.90)
 
         local hpBar = B:Bar(pf, nil, 0.2, 0.8, 0.2)
-        hpBar:SetPoint("TOPLEFT", pf, "TOPLEFT", 1, -1)
-        hpBar:SetPoint("TOPRIGHT", pf, "TOPRIGHT", -1, -1)
+        hpBar:SetPoint("TOPLEFT", pf, "TOPLEFT", pf.buiPad, -pf.buiPad)
+        hpBar:SetPoint("TOPRIGHT", pf, "TOPRIGHT", -pf.buiPad, -pf.buiPad)
         hpBar:SetHeight(20)
         pf.hpBar = hpBar
 
-        local nameFs = B:Font(hpBar, 9, "LEFT")
+        local nameFs = Font(hpBar, 9, "LEFT")
         nameFs:SetPoint("LEFT", hpBar, "LEFT", 4, 0)
         nameFs:SetWidth(72)
         nameFs:SetHeight(12)
         nameFs:SetTextColor(1, 1, 1)
         pf.nameText = nameFs
 
-        local hpFs = B:Font(hpBar, 9, "RIGHT")
+        local hpFs = Font(hpBar, 9, "RIGHT")
         hpFs:SetPoint("RIGHT", hpBar, "RIGHT", -4, 0)
         hpFs:SetWidth(48)
         hpFs:SetHeight(12)
         hpFs:SetTextColor(1, 1, 1)
         pf.hpText = hpFs
 
-        local pBar = B:Bar(pf, nil, 0.0, 0.55, 1.0)
+        local pBar = ThinBar(pf, round and LAYOUT_PARTY.powerH or 5, 0.0, 0.55, 1.0)
         pBar:SetPoint("TOPLEFT", hpBar, "BOTTOMLEFT", 0, -1)
         pBar:SetPoint("TOPRIGHT", hpBar, "BOTTOMRIGHT", 0, -1)
-        pBar:SetHeight(5)
         pf.pBar = pBar
 
-        local hl = pf:CreateTexture(nil, "HIGHLIGHT")
-        B:Solid(hl, 1, 1, 1, 0.15)
-        hl:SetAllPoints(pf)
+        -- Hover highlight (normal layer on the health bar, shown from OnEnter)
+        pf.hl = HoverTint(hpBar, hpBar, 0.12)
 
         pf:EnableMouse(true)
         if pf.RegisterForClicks then
@@ -652,6 +996,7 @@ function mod:Create()
             end
         end)
         pf:SetScript("OnEnter", function()
+            if this.hl then this.hl:Show() end
             local unit = this.unitId
             if unit and UnitExists(unit) then
                 GameTooltip:SetOwner(this, "ANCHOR_TOP")
@@ -659,7 +1004,10 @@ function mod:Create()
                 GameTooltip:Show()
             end
         end)
-        pf:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        pf:SetScript("OnLeave", function()
+            if this.hl then this.hl:Hide() end
+            GameTooltip:Hide()
+        end)
 
         pf:Hide()
         partyFrames[i] = pf
@@ -667,7 +1015,11 @@ function mod:Create()
     self.partyFrames = partyFrames
 
     partyRoot:Hide()
-    B:RegisterMover(partyRoot, "party", "Party Frames", "BOTTOM", "BOTTOM", 0, 68)
+    B:RegisterMover(partyRoot, "party", L["Party Frames"], "BOTTOM", "BOTTOM", 0, 68)
+
+    -- Separately placed frames: Core's scale / opacity / visibility act on these
+    -- (pet and target of target are children of hero and target).
+    self.lookFrames = { hero, tgt, enc, partyRoot }
 
     local ufWatcher = CreateFrame("Frame")
     ufWatcher:RegisterEvent("PLAYER_TARGET_CHANGED")
@@ -693,6 +1045,144 @@ function mod:Create()
     self.cmbWatcher = cmbWatcher
 end
 
+-- Sizes, layout, text size and element visibility from the module settings.
+-- Called after Create and after every option change; safe to repeat.
+function mod:ApplyOptions()
+    if not self.hero then return end
+    local round = self.round
+    -- Enemy colours from the settings into the shared kind colour table.
+    local kindKeys = { boss = "colorBoss", final = "colorFinal", guardian = "colorGuardian", elite = "colorElite", normal = "colorNormal" }
+    for kind, optKey in pairs(kindKeys) do
+        local c = B:ModOpt("unitframes", optKey, nil)
+        local target = B.KIND_COLORS[kind]
+        if target then
+            if not target.buiDefault then
+                target.buiDefault = { r = target.r, g = target.g, b = target.b }
+            end
+            local src = (type(c) == "table" and c.r and c) or target.buiDefault
+            target.r, target.g, target.b = src.r, src.g, src.b
+        end
+    end
+    -- The options page shows (and resets to) the active style's defaults.
+    for i = 1, table.getn(self.options or {}) do
+        local entry = self.options[i]
+        local sd = entry.key and STYLE_DEFAULTS[entry.key]
+        if sd then
+            if round then entry.default = sd.round else entry.default = sd.sharp end
+        end
+    end
+    local showPower = Opt("showPowerBar", true)
+    local showNames = Opt("showNames", true)
+    local showLevel = Opt("showLevel", true)
+
+    -- Text size offset on top of the global size.
+    local fontOff = math.floor(tonumber(Opt("fontSize", 0)) or 0)
+    for i = 1, table.getn(self.fontList) do
+        local e = self.fontList[i]
+        e.fs.buiSize = e.size + fontOff
+        B:ApplyFont(e.fs)
+    end
+
+    -- Hero
+    local hero = self.hero
+    local heroW = Opt("heroWidth", 210)
+    hero:SetWidth(heroW)
+    local xpSlot = Opt("showXpBar", true) or Opt("showShieldBar", true)
+    if round then
+        FullBar(hero, heroW, Opt("heroHeight", 46), showPower, xpSlot, true)
+    else
+        LayoutStack(hero, Opt("heroHeight", 46), LAYOUT_BIG, showPower, xpSlot)
+        hero.nameText:SetWidth(heroW - 100)
+    end
+    if showNames then hero.nameText:Show() else hero.nameText:Hide() end
+    if showLevel then hero.lvlText:Show() else hero.lvlText:Hide() end
+    if Opt("showXpBar", true) then hero.xpBar:Show() else hero.xpBar:Hide() end
+    if not Opt("showShieldBar", true) then hero.shBar:Hide() end
+
+    -- Target (the sharp layout keeps its old 35px health bar with the slot)
+    local tgt = self.target
+    local tgtW = Opt("targetWidth", 210)
+    tgt:SetWidth(tgtW)
+    if round then
+        FullBar(tgt, tgtW, Opt("targetHeight", 46), showPower, false, true)
+    else
+        LayoutStack(tgt, Opt("targetHeight", 46), LAYOUT_BIG, showPower, true)
+        tgt.nameText:SetWidth(tgtW - 95)
+    end
+    if showNames then tgt.nameText:Show() else tgt.nameText:Hide() end
+    if showLevel then tgt.badgeText:Show() else tgt.badgeText:Hide() end
+    if tgt.debuffBars then
+        for i = 1, MAX_TARGET_DEBUFFS do
+            local r = tgt.debuffBars[i]
+            r:ClearAllPoints()
+            if round then
+                r:SetWidth(tgtW)
+                r:SetPoint("BOTTOMLEFT", tgt, "TOPLEFT", 0, 4 + (i - 1) * 18)
+            else
+                r:SetWidth(tgtW - 2)
+                r:SetPoint("BOTTOMLEFT", tgt, "TOPLEFT", 1, 4 + (i - 1) * 18)
+            end
+        end
+    end
+
+    -- Target of target and pet
+    local small = { self.tot, self.pet }
+    for i = 1, 2 do
+        local f = small[i]
+        if f then
+            if round then
+                FullBar(f, 130, 24, showPower, false, false)
+            else
+                LayoutStack(f, 24, LAYOUT_SMALL, showPower, false)
+            end
+            if showNames then f.nameText:Show() else f.nameText:Hide() end
+        end
+    end
+
+    -- Elites & bosses
+    local enc = self.enc
+    local encW = Opt("encWidth", ENC_WIDTH)
+    local rowH = Opt("encRowHeight", 18)
+    local showTags = Opt("encShowTags", true)
+    local inset = round and 8 or 4
+    local top = round and 26 or 22
+    enc:SetWidth(encW)
+    for i = 1, MAX_ENCOUNTER_ROWS do
+        local r = enc.rows[i]
+        r:SetWidth(encW - 2 * inset)
+        r:SetHeight(rowH)
+        r:ClearAllPoints()
+        r:SetPoint("TOPLEFT", enc, "TOPLEFT", inset, -top - (i - 1) * (rowH + 3))
+        r.nameFs:ClearAllPoints()
+        if showTags then
+            r.badgeFs:Show()
+            r.nameFs:SetPoint("LEFT", r.badgeFs, "RIGHT", 3, 0)
+        else
+            r.badgeFs:Hide()
+            r.nameFs:SetPoint("LEFT", r.bar, "LEFT", 3, 0)
+        end
+        r.nameFs:SetPoint("RIGHT", r.hpFs, "LEFT", -3, 0)
+    end
+
+    -- Party
+    local pw = Opt("partyWidth", 130)
+    local sp = Opt("partySpacing", 6)
+    self.partyRoot:SetWidth(4 * pw + 3 * sp)
+    for i = 1, 4 do
+        local pf = self.partyFrames[i]
+        pf:SetWidth(pw)
+        pf:ClearAllPoints()
+        pf:SetPoint("TOPLEFT", self.partyRoot, "TOPLEFT", (i - 1) * (pw + sp), 0)
+        if round then
+            FullBar(pf, pw, 28, showPower, false, false)
+        else
+            LayoutStack(pf, 30, LAYOUT_PARTY, showPower, false)
+            pf.nameText:SetWidth(pw - 58)
+        end
+        if showNames then pf.nameText:Show() else pf.nameText:Hide() end
+    end
+end
+
 function mod:Update(state)
     local run = state and state.run or {}
     local zone = state and state.zone or {}
@@ -708,7 +1198,7 @@ function mod:Update(state)
     hero.nameText:SetText(heroName)
 
     local lvl = run.lvl or UnitLevel("player") or 1
-    hero.lvlText:SetText("Lv " .. tostring(lvl))
+    hero.lvlText:SetText(string.format(L["Lv %s"], tostring(lvl)))
 
     local hp = tonumber(run.hp)
     local hpm = tonumber(run.hpm)
@@ -725,17 +1215,23 @@ function mod:Update(state)
     local hpPct = B:Percent(hp, hpm)
     hero.hpBar:SetValue(hpPct)
 
-    -- Player class color or theme accent on Health Bar
+    -- Player class color, custom colour or theme accent on Health Bar
     local cr, cg, cb
     if B.db and B.db.colorHealthByClass == false then
-        cr, cg, cb = B:GetAccent()
+        if Opt("customHealthColor", false) then
+            cr, cg, cb = OptColor("healthColor", { r = 0.20, g = 0.80, b = 0.20 })
+        else
+            cr, cg, cb = B:GetAccent()
+        end
     else
         cr, cg, cb = B:GetClassColor()
     end
     B:SetBarColor(hero.hpBar, cr, cg, cb)
+    if hero.buiDot then hero.buiDot:SetVertexColor(cr, cg, cb) end
 
-    local pctInt = math.floor(hpPct * 100 + 0.5)
-    hero.hpText:SetText(string.format("%s | %d%%", B:Short(hp), pctInt))
+    local healthMode = Opt("healthText", "both")
+    local shortNum = Opt("shortNumbers", true)
+    SetHealthTexts(hero, hp, hpm, hpPct, healthMode, shortNum)
 
     -- Power bar (Mana / Rage / Energy)
     local pType = UnitPowerType("player") or 0
@@ -743,10 +1239,10 @@ function mod:Update(state)
     local pMax = UnitManaMax("player") or 1
     if pMax <= 0 then pMax = 1 end
     local pPct = B:Percent(pCur, pMax)
-    hero.pBar:SetValue(pPct)
+    SetBarFill(hero.pBar, pPct)
 
     local pColor = POWER_COLORS[pType] or POWER_COLORS[0]
-    B:SetBarColor(hero.pBar, pColor.r, pColor.g, pColor.b)
+    SetBarRGB(hero.pBar, pColor.r, pColor.g, pColor.b)
 
     if pType == 1 or pType == 3 then
         hero.pText:SetText(tostring(pCur))
@@ -756,10 +1252,10 @@ function mod:Update(state)
 
     -- Shield absorb
     local sh = tonumber(run.sh) or 0
-    if sh > 0 then
+    if sh > 0 and Opt("showShieldBar", true) then
         local shPct = B:Percent(sh, hpm)
-        hero.shBar:SetValue(shPct)
         hero.shBar:Show()
+        SetBarFill(hero.shBar, shPct)
     else
         hero.shBar:Hide()
     end
@@ -768,9 +1264,14 @@ function mod:Update(state)
     local xp = tonumber(run.xp) or UnitXP("player") or 0
     local xpn = tonumber(run.xpn) or UnitXPMax("player") or 0
     if xpn > 0 then
-        hero.xpBar:SetValue(B:Percent(xp, xpn))
+        SetBarFill(hero.xpBar, B:Percent(xp, xpn))
     else
-        hero.xpBar:SetValue(0)
+        SetBarFill(hero.xpBar, 0)
+    end
+    -- The round XP bar is no StatusBar: it follows the theme accent here.
+    if type(hero.xpBar.SetFillColor) == "function" then
+        local xr, xg, xb = B:GetAccent()
+        hero.xpBar:SetFillColor(xr, xg, xb)
     end
 
     ---------------------------------------------------------------------------
@@ -796,15 +1297,21 @@ function mod:Update(state)
             local kInfo = B.KIND_COLORS[kind] or B.KIND_COLORS["normal"]
 
             if kind == "dead" then
-                tgt.nameText:SetText(tData.name or "Target")
+                tgt.nameText:SetText(tData.name or L["Target"])
                 tgt.nameText:SetTextColor(0.5, 0.5, 0.5)
-                tgt.badgeText:SetText("DEAD")
+                tgt.badgeText:SetText(L["DEAD"])
                 tgt.badgeText:SetTextColor(0.5, 0.5, 0.5)
                 tgt.hpBar:SetValue(0)
                 B:SetBarColor(tgt.hpBar, 0.4, 0.4, 0.4)
-                tgt.hpText:SetText("0%")
+                if healthMode == "none" then
+                    tgt.hpText:SetText("")
+                else
+                    tgt.hpText:SetText("0%")
+                end
+                if tgt.hpLeft then tgt.hpLeft:SetText("") end
+                if tgt.buiDot then tgt.buiDot:SetVertexColor(0.4, 0.4, 0.4) end
             else
-                tgt.nameText:SetText(tData.name or "Target")
+                tgt.nameText:SetText(tData.name or L["Target"])
                 tgt.nameText:SetTextColor(1, 1, 1)
 
                 local badge = kInfo.label or ""
@@ -817,7 +1324,7 @@ function mod:Update(state)
                     badge = "AWAKE"
                 end
 
-                tgt.badgeText:SetText(badge)
+                tgt.badgeText:SetText(L[badge])
                 tgt.badgeText:SetTextColor(br, bg, bb)
 
                 local tHp = tonumber(tData.hp) or 0
@@ -827,13 +1334,13 @@ function mod:Update(state)
                 tgt.hpBar:SetValue(tPct)
                 B:SetBarColor(tgt.hpBar, kInfo.r, kInfo.g, kInfo.b)
 
-                local tPctInt = math.floor(tPct * 100 + 0.5)
-                tgt.hpText:SetText(string.format("%s | %d%%", B:Short(tHp), tPctInt))
+                SetHealthTexts(tgt, tHp, tHpm, tPct, healthMode, shortNum)
+            if tgt.buiDot then tgt.buiDot:SetVertexColor(tgt.hpBar.buiR or 1, tgt.hpBar.buiG or 1, tgt.hpBar.buiB or 1) end
             end
             tgt.pBar:Hide()
         else
             -- Standard WoW Target
-            local tName = UnitName("target") or "Target"
+            local tName = UnitName("target") or L["Target"]
             local tClass = UnitClassification("target")
             local tHp = UnitHealth("target")
             local tHpm = UnitHealthMax("target")
@@ -852,7 +1359,7 @@ function mod:Update(state)
             elseif tClass == "rare" then
                 badge = "RARE"
             end
-            tgt.badgeText:SetText(badge)
+            tgt.badgeText:SetText(L[badge])
             tgt.badgeText:SetTextColor(1.0, 0.8, 0.2)
 
             local tPct = B:Percent(tHp, tHpm)
@@ -871,7 +1378,17 @@ function mod:Update(state)
                 local reaction = UnitReaction("target", "player")
                 if reaction then
                     if reaction <= 2 then
-                        B:SetBarColor(tgt.hpBar, REACTION_COLORS.hostile.r, REACTION_COLORS.hostile.g, REACTION_COLORS.hostile.b)
+                        -- Hostile NPCs take the kind colours: boss red, rare
+                        -- yellow, elite blue, normal mobs violet.
+                        local tKind = "normal"
+                        if tClass == "worldboss" then
+                            tKind = "boss"
+                        elseif tClass == "rare" then
+                            tKind = "guardian"
+                        elseif tClass == "elite" or tClass == "rareelite" then
+                            tKind = "elite"
+                        end
+                        B:SetBarColor(tgt.hpBar, B:KindColor(tKind))
                     elseif reaction <= 4 then
                         B:SetBarColor(tgt.hpBar, REACTION_COLORS.neutral.r, REACTION_COLORS.neutral.g, REACTION_COLORS.neutral.b)
                     else
@@ -882,24 +1399,34 @@ function mod:Update(state)
                 end
             end
 
-            local tPctInt = math.floor(tPct * 100 + 0.5)
-            tgt.hpText:SetText(string.format("%s | %d%%", B:Short(tHp), tPctInt))
+            SetHealthTexts(tgt, tHp, tHpm, tPct, healthMode, shortNum)
+            if tgt.buiDot then tgt.buiDot:SetVertexColor(tgt.hpBar.buiR or 1, tgt.hpBar.buiG or 1, tgt.hpBar.buiB or 1) end
 
             -- Target Power
             local tpType = UnitPowerType("target") or 0
             local tpCur = UnitMana("target") or 0
             local tpMax = UnitManaMax("target") or 1
             if tpMax <= 0 then tpMax = 1 end
-            tgt.pBar:SetValue(B:Percent(tpCur, tpMax))
             local tpColor = POWER_COLORS[tpType] or POWER_COLORS[0]
-            B:SetBarColor(tgt.pBar, tpColor.r, tpColor.g, tpColor.b)
-            tgt.pBar:Show()
+            if Opt("showPowerBar", true) then
+                tgt.pBar:Show()
+                SetBarFill(tgt.pBar, B:Percent(tpCur, tpMax))
+                SetBarRGB(tgt.pBar, tpColor.r, tpColor.g, tpColor.b)
+            else
+                tgt.pBar:Hide()
+            end
         end
 
         -- Target Debuff Bars update (Cyberpunk Aura Bars with Tick Damage)
         if tgt.debuffBars then
             local shownCount = 0
-            if (state and state.demo) or (B.unlocked and not UnitExists("target")) then
+            local maxDebuffs = 0
+            if Opt("showDebuffs", true) then
+                maxDebuffs = math.floor(tonumber(Opt("maxDebuffs", MAX_TARGET_DEBUFFS)) or MAX_TARGET_DEBUFFS)
+            end
+            if maxDebuffs <= 0 then
+                for i = 1, MAX_TARGET_DEBUFFS do tgt.debuffBars[i]:Hide() end
+            elseif (state and state.demo) or (B.unlocked and not UnitExists("target")) then
                 local demoDebuffs = {
                     { name = "Rend", icon = "Interface\\Icons\\Ability_Gouge", left = 11.4, max = 15, tick = 450, color = { r = 0.85, g = 0.25, b = 0.20 } },
                     { name = "Deep Wounds", icon = "Interface\\Icons\\Ability_BackStab", left = 7.8, max = 12, tick = 890, color = { r = 0.95, g = 0.35, b = 0.15 } },
@@ -909,7 +1436,7 @@ function mod:Update(state)
                 shownCount = table.getn(demoDebuffs)
                 for i = 1, MAX_TARGET_DEBUFFS do
                     local r = tgt.debuffBars[i]
-                    if i <= shownCount then
+                    if i <= shownCount and i <= maxDebuffs then
                         local d = demoDebuffs[i]
                         r.icon:SetTexture(d.icon)
                         r.nameFs:SetText(d.name)
@@ -940,7 +1467,7 @@ function mod:Update(state)
                 for i = 1, MAX_TARGET_DEBUFFS do
                     local r = tgt.debuffBars[i]
                     local tex, count, debuffType = UnitDebuff("target", i)
-                    if tex then
+                    if tex and i <= maxDebuffs then
                         r.debuffIndex = i
                         r.icon:SetTexture(tex)
 
@@ -1002,8 +1529,8 @@ function mod:Update(state)
 
         -- Target of Target update
         if self.tot then
-            if UnitExists("targettarget") then
-                local totName = UnitName("targettarget") or "Unknown"
+            if UnitExists("targettarget") and Opt("showToT", true) then
+                local totName = UnitName("targettarget") or L["Unknown"]
                 local totHp = UnitHealth("targettarget") or 0
                 local totHpm = UnitHealthMax("targettarget") or 1
                 if totHpm <= 0 then totHpm = 1 end
@@ -1011,8 +1538,34 @@ function mod:Update(state)
 
                 self.tot.nameText:SetText(totName)
                 self.tot.hpBar:SetValue(totPctVal)
+                -- Same colours as the target: players by class, hostile NPCs
+                -- by kind, friendly ones green.
+                if UnitIsPlayer("targettarget") then
+                    local loc, cls = UnitClass("targettarget")
+                    local cc = B:ResolveClassColor(cls) or B:ResolveClassColor(loc)
+                    if cc then B:SetBarColor(self.tot.hpBar, cc.r, cc.g, cc.b) end
+                else
+                    local reaction = UnitReaction("targettarget", "player")
+                    if reaction and reaction > 4 then
+                        B:SetBarColor(self.tot.hpBar, REACTION_COLORS.friendly.r, REACTION_COLORS.friendly.g, REACTION_COLORS.friendly.b)
+                    else
+                        local c = UnitClassification("targettarget")
+                        local k = "normal"
+                        if c == "worldboss" then k = "boss"
+                        elseif c == "rare" then k = "guardian"
+                        elseif c == "elite" or c == "rareelite" then k = "elite" end
+                        B:SetBarColor(self.tot.hpBar, B:KindColor(k))
+                    end
+                end
                 local totPctInt = math.floor(totPctVal * 100 + 0.5)
                 self.tot.hpText:SetText(tostring(totPctInt) .. "%")
+                local totP = UnitMana("targettarget") or 0
+                local totPm = UnitManaMax("targettarget") or 1
+                if totPm <= 0 then totPm = 1 end
+                local totPType = UnitPowerType("targettarget") or 0
+                local totPColor = POWER_COLORS[totPType] or POWER_COLORS[0]
+                SetBarFill(self.tot.pBar, B:Percent(totP, totPm))
+                SetBarRGB(self.tot.pBar, totPColor.r, totPColor.g, totPColor.b)
                 self.tot:Show()
             else
                 self.tot:Hide()
@@ -1024,8 +1577,8 @@ function mod:Update(state)
     --  3. Update Pet Frame
     ---------------------------------------------------------------------------
     if self.pet then
-        if UnitExists("pet") then
-            local petName = UnitName("pet") or "Pet"
+        if UnitExists("pet") and Opt("showPet", true) then
+            local petName = UnitName("pet") or L["Pet"]
             local petHp = UnitHealth("pet") or 0
             local petHpm = UnitHealthMax("pet") or 1
             if petHpm <= 0 then petHpm = 1 end
@@ -1039,7 +1592,7 @@ function mod:Update(state)
             local petP = UnitMana("pet") or 0
             local petPm = UnitManaMax("pet") or 1
             if petPm <= 0 then petPm = 1 end
-            self.pet.pBar:SetValue(B:Percent(petP, petPm))
+            SetBarFill(self.pet.pBar, B:Percent(petP, petPm))
             self.pet:Show()
         else
             self.pet:Hide()
@@ -1083,11 +1636,19 @@ function mod:Update(state)
         enc:Show()
         enc.header.value:SetText(tostring(nBosses))
 
+        local maxRows = math.floor(tonumber(Opt("encMaxRows", MAX_ENCOUNTER_ROWS)) or MAX_ENCOUNTER_ROWS)
+        if maxRows > MAX_ENCOUNTER_ROWS then maxRows = MAX_ENCOUNTER_ROWS end
+        if maxRows < 1 then maxRows = 1 end
         local shownCount = nBosses
-        if shownCount > MAX_ENCOUNTER_ROWS then
-            shownCount = MAX_ENCOUNTER_ROWS
+        if shownCount > maxRows then
+            shownCount = maxRows
         end
-        enc:SetHeight(22 + shownCount * 21 + 4)
+        local rowStep = Opt("encRowHeight", 18) + 3
+        if self.round then
+            enc:SetHeight(26 + shownCount * rowStep - 3 + 8)
+        else
+            enc:SetHeight(22 + shownCount * rowStep + 4)
+        end
 
         -- Dynamic anchor below TimerFrame if not custom moved by user
         if not (B.db and B.db.positions and B.db.positions["encounters"]) then
@@ -1114,36 +1675,32 @@ function mod:Update(state)
 
                 r.bar:SetValue(bPct)
 
-                -- Kind Badge and Bar Color
+                -- Kind badge and bar colour from the shared kind colours; the
+                -- badge is a lighter tint so it reads on the coloured bar.
+                local badgeKey = "[ELITE]"
                 if bKind == "final" then
-                    r.badgeFs:SetText("[FINAL]")
-                    r.badgeFs:SetTextColor(1.0, 0.35, 0.45)
-                    B:SetBarColor(r.bar, 0.85, 0.15, 0.35)
+                    badgeKey = "[FINAL]"
                 elseif bKind == "boss" then
-                    r.badgeFs:SetText("[BOSS]")
-                    r.badgeFs:SetTextColor(1.0, 0.30, 0.30)
-                    B:SetBarColor(r.bar, 0.82, 0.18, 0.18)
+                    badgeKey = "[BOSS]"
                 elseif bKind == "guardian" then
-                    r.badgeFs:SetText("[GUARD]")
-                    r.badgeFs:SetTextColor(1.0, 0.78, 0.15)
-                    B:SetBarColor(r.bar, 0.88, 0.62, 0.12)
-                else -- elite
-                    r.badgeFs:SetText("[ELITE]")
-                    r.badgeFs:SetTextColor(0.35, 0.80, 1.0)
-                    B:SetBarColor(r.bar, 0.20, 0.55, 0.85)
+                    badgeKey = "[GUARD]"
+                else
+                    bKind = "elite"
                 end
+                local kr, kg, kb = B:KindColor(bKind)
+                r.badgeFs:SetText(L[badgeKey])
+                r.badgeFs:SetTextColor(kr + (1 - kr) * 0.55, kg + (1 - kg) * 0.55, kb + (1 - kb) * 0.55)
+                B:SetBarColor(r.bar, kr, kg, kb)
 
                 r.unitName = bData.name or "Elite"
                 r.unitHp = bHp
                 r.unitHpm = bHpm
                 r.unitPct = bPctInt
 
-                r.nameFs:SetText(bData.name or "Elite")
+                r.nameFs:SetText(bData.name or L["Elite"])
                 r.nameFs:SetTextColor(1, 1, 1)
 
-                local remHp = B:Short(bHp)
-                local maxHp = B:Short(bHpm)
-                r.hpFs:SetText(string.format("%s / %s (%d%%)", remHp, maxHp, bPctInt))
+                r.hpFs:SetText(FormatHealth(bHp, bHpm, bPct, Opt("encHealthText", "curmaxpct"), Opt("shortNumbers", true)))
                 r.hpFs:SetTextColor(1, 1, 1)
 
                 r:Show()
@@ -1162,6 +1719,10 @@ end
 function mod:UpdateParty(state)
     local root = self.partyRoot
     if not root then return end
+    if not Opt("showParty", true) then
+        root:Hide()
+        return
+    end
 
     local isDemo = (state and state.demo) or B.unlocked
     local nParty = (type(GetNumPartyMembers) == "function" and GetNumPartyMembers()) or 0
@@ -1185,8 +1746,8 @@ function mod:UpdateParty(state)
             local pctInt = math.floor(hpPct * 100 + 0.5)
             f.hpText:SetText(tostring(pctInt) .. "%")
             local pCol = POWER_COLORS[d.pType] or POWER_COLORS[0]
-            f.pBar:SetValue(d.mp / d.mpm)
-            B:SetBarColor(f.pBar, pCol.r, pCol.g, pCol.b)
+            SetBarFill(f.pBar, d.mp / d.mpm)
+            SetBarRGB(f.pBar, pCol.r, pCol.g, pCol.b)
             f:Show()
         end
         return
@@ -1207,7 +1768,7 @@ function mod:UpdateParty(state)
         local f = self.partyFrames[i]
         local unit = "party" .. i
         if i <= nParty and UnitExists(unit) then
-            local uName = UnitName(unit) or ("Party " .. i)
+            local uName = UnitName(unit) or string.format(L["Party %d"], i)
             f.nameText:SetText(uName)
 
             local loc, uClass = UnitClass(unit)
@@ -1220,15 +1781,15 @@ function mod:UpdateParty(state)
 
             if not isConn then
                 f.hpBar:SetValue(0)
-                f.hpText:SetText("|cff888888OFFLINE|r")
+                f.hpText:SetText("|cff888888" .. L["OFFLINE"] .. "|r")
                 B:SetBarColor(f.hpBar, 0.4, 0.4, 0.4)
             elseif isDead then
                 f.hpBar:SetValue(0)
-                f.hpText:SetText("|cffff2222DEAD|r")
+                f.hpText:SetText("|cffff2222" .. L["DEAD"] .. "|r")
                 B:SetBarColor(f.hpBar, 0.5, 0.15, 0.15)
             elseif isGhost then
                 f.hpBar:SetValue(0)
-                f.hpText:SetText("|cffaaaaaaGHOST|r")
+                f.hpText:SetText("|cffaaaaaa" .. L["GHOST"] .. "|r")
                 B:SetBarColor(f.hpBar, 0.3, 0.3, 0.3)
             else
                 local curHp = UnitHealth(unit) or 0
@@ -1244,21 +1805,21 @@ function mod:UpdateParty(state)
             local curP = UnitMana(unit) or 0
             local maxP = UnitManaMax(unit) or 1
             if maxP <= 0 then maxP = 1 end
-            f.pBar:SetValue(B:Percent(curP, maxP))
+            SetBarFill(f.pBar, B:Percent(curP, maxP))
             local pColor = POWER_COLORS[pType] or POWER_COLORS[0]
-            B:SetBarColor(f.pBar, pColor.r, pColor.g, pColor.b)
+            SetBarRGB(f.pBar, pColor.r, pColor.g, pColor.b)
 
             f:Show()
         elseif state and state.party and state.party[i + 1] then
             -- Fallback if server provides AZS_PARTY entries
             local pData = state.party[i + 1]
-            f.nameText:SetText(pData.name or ("Party " .. i))
+            f.nameText:SetText(pData.name or string.format(L["Party %d"], i))
             local cColor = B:ResolveClassColor(pData.class) or { r = 0.2, g = 0.8, b = 0.2 }
             B:SetBarColor(f.hpBar, cColor.r, cColor.g, cColor.b)
             f.hpBar:SetValue(1.0)
             f.hpText:SetText(B:Short(pData.dmg or 0))
-            f.pBar:SetValue(1.0)
-            B:SetBarColor(f.pBar, 0, 0.55, 1)
+            SetBarFill(f.pBar, 1.0)
+            SetBarRGB(f.pBar, 0, 0.55, 1)
             f:Show()
         else
             f:Hide()

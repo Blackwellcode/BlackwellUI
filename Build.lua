@@ -13,6 +13,7 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
+local L = B.L
 local mod = {}
 mod.label = "Build & Cooldowns"
 
@@ -22,6 +23,33 @@ local TILE_GAP = 2
 local MAX_BUFFS = 5
 local BUFF_WIDTH = 220
 local BUFF_HEIGHT = 16
+-- Buff rows built once; the "Max buff bars" option shows up to this many.
+local BUFF_POOL = 10
+local BUFF_GAP = 2
+
+mod.hint = "Your spells with cooldowns, ranks and upgrade tooltips."
+mod.options = {
+    { type = "section", label = "Spell tiles" },
+    { type = "range",  key = "tileSize", label = "Tile size", min = 24, max = 48, step = 2, default = 32, format = "%d px" },
+    { type = "range",  key = "tileGap", label = "Tile spacing", min = 0, max = 12, step = 1, default = 2, format = "%d px" },
+    { type = "range",  key = "tilesPerRow", label = "Tiles per row", min = 1, max = 8, step = 1, default = 8, format = "%d" },
+    { type = "choice", key = "rowGrowth", label = "Extra rows", default = "up",
+      values = { { value = "up", label = "Above the first row" }, { value = "down", label = "Below the first row" } } },
+    { type = "toggle", key = "showRank", label = "Show rank badge", default = true },
+    { type = "toggle", key = "showDots", label = "Show DoT counter", hint = "Active damage-over-time effects of the spell.", default = true },
+    { type = "toggle", key = "showSwipe", label = "Show cooldown swipe", default = true },
+    { type = "toggle", key = "showCdText", label = "Show cooldown numbers", default = true },
+    { type = "range",  key = "cdTextSize", label = "Cooldown text size", min = 8, max = 18, step = 1, default = 11, format = "%d", depends = "showCdText" },
+    { type = "section", label = "Buff bars" },
+    { type = "toggle", db = "showBuffBars", label = "Buff bars above the tiles", default = true },
+    { type = "range",  key = "maxBuffs", label = "Max buff bars", min = 1, max = 10, step = 1, default = 5, format = "%d" },
+    { type = "range",  key = "buffWidth", label = "Buff bar width", min = 120, max = 360, step = 10, default = 220, format = "%d px" },
+    { type = "range",  key = "buffHeight", label = "Buff bar height", min = 10, max = 28, step = 1, default = 16, format = "%d px", reload = true },
+    { type = "toggle", key = "showBuffIcons", label = "Show buff icons", default = true },
+    { type = "toggle", key = "showBuffTimers", label = "Show buff timers", default = true },
+    { type = "section", label = "Level-up button" },
+    { type = "toggle", key = "showLevelUp", label = "Show level-up button", hint = "Appears while level-up choices are stored.", default = true },
+}
 
 local spellIcons = {}
 local buffMax = {}
@@ -2042,6 +2070,91 @@ local function HighlightText(text, school, schoolColor)
     return text
 end
 
+-- The game writes its tooltips in the game language (B:TooltipLanguages):
+-- markers are compared in that language and in English.
+local function IsGameWord(id, text)
+    local langs = B:TooltipLanguages()
+    for i = 1, table.getn(langs) do
+        if text == B:GameString(id, langs[i]) then return true end
+    end
+    return false
+end
+
+local function MatchGame(id, text, fixed, anchored)
+    local langs = B:TooltipLanguages()
+    for i = 1, table.getn(langs) do
+        local values, pos = B:GameMatch(id, text, langs[i], fixed, anchored)
+        if values then return values, pos end
+    end
+    return nil
+end
+
+-- "Talents: a, b" -> "a, b" for a section prefix in any tooltip language.
+local function StripGamePrefix(id, text)
+    local langs = B:TooltipLanguages()
+    for i = 1, table.getn(langs) do
+        local prefix = B:GameString(id, langs[i])
+        if prefix then
+            prefix = string.gsub(prefix, "%s+$", "")
+            local len = string.len(prefix)
+            if len > 0 and string.sub(text, 1, len) == prefix then
+                return (string.gsub(string.sub(text, len + 1), "^%s+", ""))
+            end
+        end
+    end
+    return nil
+end
+
+-- Lists use the game's separator ("、" in Chinese and Japanese).
+local function SplitGameList(text)
+    local langs = B:TooltipLanguages()
+    for i = 1, table.getn(langs) do
+        local sep = B:GameString("list_sep", langs[i])
+        sep = sep and string.gsub(sep, "%s+", "")
+        if sep and sep ~= "" and sep ~= "," then
+            text = string.gsub(text, sep, ",")
+        end
+    end
+    return SplitCommaList(text)
+end
+
+local SCHOOL_NAMES = { "Physical", "Holy", "Fire", "Nature", "Frost", "Shadow", "Arcane" }
+
+-- Damage school named in a description line ("84 Fire damage"), as the
+-- English school key, or nil. The earliest mention in the line wins.
+local function FindDamageSchool(text)
+    local _, _, word = string.find(text, "(%a+) damage")
+    if word and SCHOOL_COLORS[word] then
+        return word
+    end
+    local game = B.GAME_LANG
+    if not game or game == "en" then return nil end
+    local best, bestPos = nil, nil
+    for i = 1, table.getn(SCHOOL_NAMES) do
+        local localized = B:GameString("school_" .. SCHOOL_NAMES[i], game)
+        if localized then
+            local values, pos = B:GameMatch("damage", text, game, { school = localized })
+            if values and (not bestPos or pos < bestPos) then
+                best, bestPos = SCHOOL_NAMES[i], pos
+            end
+        end
+    end
+    return best
+end
+
+-- Colours "30 yd" (or the game's own unit, e.g. "30 m") in a stats line.
+local function ColorDistances(text)
+    text = string.gsub(text, "([%d%.]+ yd)", "|cff99f2bf%1|r")
+    local unitTemplate = B:GameString("yards", B.GAME_LANG)
+    local unit = unitTemplate and string.gsub(string.gsub(unitTemplate, "{n}", ""), "^%s+", "")
+    if unit and unit ~= "" and unit ~= "yd" then
+        unit = string.gsub(unit, "([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1")
+        text = string.gsub(text .. " ", "([%d%.]+ " .. unit .. ")(%A)", "|cff99f2bf%1|r%2")
+        text = string.sub(text, 1, string.len(text) - 1)
+    end
+    return text
+end
+
 local function ReadTooltipData(tip)
     local count = GetTooltipNumLines(tip)
     if count < 2 then return nil end
@@ -2083,7 +2196,8 @@ local function ReadTooltipData(tip)
         local leftText = lFs and Plain(lFs:GetText()) or ""
         local rightText = (rFs and rFs:IsShown()) and Plain(rFs:GetText()) or ""
 
-        if string.find(rightText, "cooldown", 1, true) or leftText == "Automatic" or leftText == "Passive" or string.find(leftText, "cast", 1, true) or string.find(leftText, "Instant", 1, true) or string.find(leftText, "Channeled", 1, true) or string.find(leftText, "Ranged", 1, true) then
+        if string.find(rightText, "cooldown", 1, true) or leftText == "Automatic" or leftText == "Passive" or string.find(leftText, "cast", 1, true) or string.find(leftText, "Instant", 1, true) or string.find(leftText, "Channeled", 1, true) or string.find(leftText, "Ranged", 1, true)
+            or IsGameWord("automatic", leftText) or IsGameWord("passive", leftText) or (rightText ~= "" and MatchGame("cooldown", rightText)) then
             castLine = line
             ability.cast = (leftText ~= "") and leftText or "Instant"
             ability.cooldown = (rightText ~= "") and rightText or nil
@@ -2110,22 +2224,19 @@ local function ReadTooltipData(tip)
         for p = 1, table.getn(split) do
             local text = Plain(split[p])
             if text ~= "" then
-                local sUp, eUp = string.find(text, "^Upgrades: ")
-                local sBon, eBon = string.find(text, "^Your bonuses: ")
-                local sTal, eTal = string.find(text, "^Talents: ")
-                local sCr, eCr, cPct, dPct = string.find(text, "^(%d+%%) chance to crit for (%d+%%) damage")
+                local upgrades = StripGamePrefix("upgrades", text)
+                local bonuses = not upgrades and StripGamePrefix("bonuses", text)
+                local talents = not upgrades and not bonuses and StripGamePrefix("talents", text)
+                local critValues = MatchGame("crit", text, nil, true)
 
-                if sUp then
-                    local items = SplitCommaList(string.sub(text, eUp + 1))
-                    table.insert(ability.sections, { title = "Upgrades", color = { 1.00, 0.82, 0.30 }, items = items })
-                elseif sBon then
-                    local items = SplitCommaList(string.sub(text, eBon + 1))
-                    table.insert(ability.sections, { title = "Your bonuses", color = { 0.12, 1.00, 0.20 }, items = items })
-                elseif sTal then
-                    local items = SplitCommaList(string.sub(text, eTal + 1))
-                    table.insert(ability.sections, { title = "Talents", color = { 0.44, 0.84, 1.00 }, items = items })
-                elseif sCr then
-                    ability.crit = cPct .. " crit · " .. dPct .. " dmg"
+                if upgrades then
+                    table.insert(ability.sections, { title = "Upgrades", color = { 1.00, 0.82, 0.30 }, items = SplitGameList(upgrades) })
+                elseif bonuses then
+                    table.insert(ability.sections, { title = "Your bonuses", color = { 0.12, 1.00, 0.20 }, items = SplitGameList(bonuses) })
+                elseif talents then
+                    table.insert(ability.sections, { title = "Talents", color = { 0.44, 0.84, 1.00 }, items = SplitGameList(talents) })
+                elseif critValues and critValues.p and critValues.crit then
+                    ability.crit = string.format(L["%s crit · %s dmg"], critValues.p .. "%", critValues.crit .. "%")
                 else
                     table.insert(ability.description, text)
                 end
@@ -2136,7 +2247,20 @@ local function ReadTooltipData(tip)
     return ability
 end
 
-local function FormatBlackwellAbilityTooltip(tip, cdRest, cdMax)
+-- Ability name in the active game language (AbilityNames.lua) for display;
+-- lookups and matching keep using the English name. The game's tooltip title
+-- is in the game language, so this also applies when BlackwellUI is English.
+local function LocalizedAbilityName(key, fallback)
+    if key and key ~= "" and type(B.AbilityName) == "function" then
+        local localized = B:AbilityName(key)
+        if localized and localized ~= "" then
+            return localized
+        end
+    end
+    return fallback
+end
+
+local function FormatBlackwellAbilityTooltip(tip, cdRest, cdMax, abilityKey)
     local ability = ReadTooltipData(tip)
     if not ability then return false end
 
@@ -2144,38 +2268,42 @@ local function FormatBlackwellAbilityTooltip(tip, cdRest, cdMax)
     tip:ClearLines()
 
     local name = ability.title
-    local school = SCHOOL_OF[name] or "Physical"
+    local englishName = B:EnglishAbilityName(name)
+    local school = SCHOOL_OF[name] or (englishName and SCHOOL_OF[englishName]) or "Physical"
     for index = 1, table.getn(ability.description) do
-        local d = ability.description[index]
-        local s, e, word = string.find(d, "(%a+) damage")
-        if word and SCHOOL_COLORS[word] then
+        local word = FindDamageSchool(ability.description[index])
+        if word then
             school = word
             break
         end
     end
     local tint = SCHOOL_COLORS[school] or SCHOOL_COLORS["Physical"]
     local what = school .. " damage"
+    if B.LANG ~= "en" then
+        what = B:GameString("school_" .. school, B.LANG) or what
+    end
 
     -- Title & Rank
     local rankStr = ability.rank or ""
+    local shownName = LocalizedAbilityName(abilityKey, name)
     if rankStr ~= "" then
-        tip:AddDoubleLine(name, rankStr, tint[1], tint[2], tint[3], 0.60, 0.60, 0.60)
+        tip:AddDoubleLine(shownName, rankStr, tint[1], tint[2], tint[3], 0.60, 0.60, 0.60)
     else
-        tip:AddLine(name, tint[1], tint[2], tint[3])
+        tip:AddLine(shownName, tint[1], tint[2], tint[3])
     end
 
     -- Subtitle: School & Cast mode / Cooldown
     local castMode = ability.cast or "Instant"
     local cdText = ability.cooldown or ""
     if cdText ~= "" then
-        cdText = string.gsub(cdText, "^([%d%.]+ sec)", "|cff8cccff%1|r")
+        cdText = string.gsub(cdText, "([%d%.]+)", "|cff8cccff%1|r", 1)
     end
     tip:AddDoubleLine(Hex(tint) .. what .. "|r · " .. castMode, cdText, 0.65, 0.65, 0.65, 0.65, 0.65, 0.65)
 
     -- Stats: Range / Radius / Crits
     local statStr = table.concat(ability.stats, " · ")
     if statStr ~= "" then
-        statStr = string.gsub(statStr, "([%d%.]+ yd)", "|cff99f2bf%1|r")
+        statStr = ColorDistances(statStr)
     end
     local critStr = ability.crit or ""
     if critStr ~= "" then
@@ -2201,7 +2329,7 @@ local function FormatBlackwellAbilityTooltip(tip, cdRest, cdMax)
         local col = sec.color
         tip:AddLine(" ")
         AddRule(GetTooltipNumLines(tip), col)
-        tip:AddLine(sec.title, col[1], col[2], col[3])
+        tip:AddLine(L[sec.title], col[1], col[2], col[3])
         for it = 1, table.getn(sec.items) do
             local itemText = sec.items[it]
             local sVal, eVal, val, lbl = string.find(itemText, "^([%+%-]?[%d%.]+%%?) (.+)$")
@@ -2217,11 +2345,11 @@ local function FormatBlackwellAbilityTooltip(tip, cdRest, cdMax)
     if cdRest and cdRest > 0 then
         tip:AddLine(" ")
         AddRule(GetTooltipNumLines(tip), { 0.0, 0.90, 1.0 })
-        tip:AddLine(string.format("Cooldown remaining: %.1fs", cdRest), 0.0, 0.90, 1.0)
+        tip:AddLine(string.format(L["Cooldown remaining: %.1fs"], cdRest), 0.0, 0.90, 1.0)
     elseif cdMax and cdMax > 0 then
         tip:AddLine(" ")
         AddRule(GetTooltipNumLines(tip), { 0.60, 0.60, 0.60 })
-        tip:AddLine(string.format("Cooldown: %.1fs", cdMax), 0.60, 0.60, 0.60)
+        tip:AddLine(string.format(L["Cooldown: %.1fs"], cdMax), 0.60, 0.60, 0.60)
     end
 
     tip:Show()
@@ -2229,7 +2357,7 @@ local function FormatBlackwellAbilityTooltip(tip, cdRest, cdMax)
     return true
 end
 
-local function RenderFallbackTooltip(tip, nameOrId, rank, cdRest, cdMax)
+local function RenderFallbackTooltip(tip, nameOrId, rank, cdRest, cdMax, abilityKey)
     HideRules()
     tip:ClearLines()
 
@@ -2239,8 +2367,8 @@ local function RenderFallbackTooltip(tip, nameOrId, rank, cdRest, cdMax)
     local school = SCHOOL_OF[resolved] or "Physical"
     local tint = SCHOOL_COLORS[school] or SCHOOL_COLORS["Physical"]
 
-    local title = (info and info.name) or resolved or "Ability"
-    local rankStr = (rank and tonumber(rank) and tonumber(rank) > 0) and ("Rank " .. tostring(rank)) or nil
+    local title = LocalizedAbilityName(abilityKey, (info and info.name) or resolved or L["Ability"])
+    local rankStr = (rank and tonumber(rank) and tonumber(rank) > 0) and (B:GameFormat("rank", B.LANG, { n = rank }) or ("Rank " .. tostring(rank))) or nil
 
     if rankStr then
         tip:AddDoubleLine(title, rankStr, tint[1], tint[2], tint[3], 0.60, 0.60, 0.60)
@@ -2269,11 +2397,11 @@ local function RenderFallbackTooltip(tip, nameOrId, rank, cdRest, cdMax)
     if cdRest and cdRest > 0 then
         tip:AddLine(" ")
         AddRule(GetTooltipNumLines(tip), { 0.0, 0.90, 1.0 })
-        tip:AddLine(string.format("Cooldown remaining: %.1fs", cdRest), 0.0, 0.90, 1.0)
+        tip:AddLine(string.format(L["Cooldown remaining: %.1fs"], cdRest), 0.0, 0.90, 1.0)
     elseif cdMax and cdMax > 0 then
         tip:AddLine(" ")
         AddRule(GetTooltipNumLines(tip), { 0.60, 0.60, 0.60 })
-        tip:AddLine(string.format("Cooldown: %.1fs", cdMax), 0.60, 0.60, 0.60)
+        tip:AddLine(string.format(L["Cooldown: %.1fs"], cdMax), 0.60, 0.60, 0.60)
     end
 
     tip:Show()
@@ -2291,26 +2419,37 @@ function mod:Create()
     ---------------------------------------------------------------------------
     --  Spell Tiles (Cooldown Manager Style)
     ---------------------------------------------------------------------------
+    -- Round style: a rounded frame around a slightly inset icon. Sharp style:
+    -- the old flat square with a 1px black border and a 1px icon inset.
+    local round = B:IsRound()
+    self.round = round
+    local inset = (round and 3) or 1
+    self.tileInset = inset
+
     local tiles = {}
     for i = 1, MAX_TILES do
         local tile = CreateFrame("Button", nil, f)
         tile:SetWidth(TILE_SIZE)
         tile:SetHeight(TILE_SIZE)
         tile:EnableMouse(true)
-        B:Backdrop(tile, 0.90)
+        if round then
+            B:RoundPanel(tile, 6)
+        else
+            B:Backdrop(tile, 0.90)
+        end
 
         -- Icon texture (trimmed 0.08, 0.92, 0.08, 0.92 for clean flat square)
         local icon = tile:CreateTexture(nil, "ARTWORK")
-        icon:SetPoint("TOPLEFT", tile, "TOPLEFT", 1, -1)
-        icon:SetPoint("BOTTOMRIGHT", tile, "BOTTOMRIGHT", -1, 1)
+        icon:SetPoint("TOPLEFT", tile, "TOPLEFT", inset, -inset)
+        icon:SetPoint("BOTTOMRIGHT", tile, "BOTTOMRIGHT", -inset, inset)
         icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         tile.icon = icon
 
-        -- Cooldown dark overlay (covers tile from bottom up)
+        -- Cooldown dark overlay (covers the icon from bottom up)
         local cdOverlay = tile:CreateTexture(nil, "OVERLAY")
         B:Solid(cdOverlay, 0, 0, 0, 0.68)
-        cdOverlay:SetPoint("BOTTOMLEFT", tile, "BOTTOMLEFT", 1, 1)
-        cdOverlay:SetPoint("BOTTOMRIGHT", tile, "BOTTOMRIGHT", -1, 1)
+        cdOverlay:SetPoint("BOTTOMLEFT", tile, "BOTTOMLEFT", inset, inset)
+        cdOverlay:SetPoint("BOTTOMRIGHT", tile, "BOTTOMRIGHT", -inset, inset)
         cdOverlay:SetHeight(0)
         cdOverlay:Hide()
         tile.cdOverlay = cdOverlay
@@ -2358,9 +2497,9 @@ function mod:Create()
             end
 
             if hasActionData then
-                FormatBlackwellAbilityTooltip(GameTooltip, this.cdRest, this.cdMax)
+                FormatBlackwellAbilityTooltip(GameTooltip, this.cdRest, this.cdMax, this.spellKey)
             else
-                RenderFallbackTooltip(GameTooltip, this.spellName or this.spellKey, this.spellRank, this.cdRest, this.cdMax)
+                RenderFallbackTooltip(GameTooltip, this.spellName or this.spellKey, this.spellRank, this.cdRest, this.cdMax, this.spellKey)
             end
             GameTooltip:Show()
             writtenSignature = Signature()
@@ -2394,7 +2533,7 @@ function mod:Create()
         end
         local owner = activeBuildTile
         if owner and owner.isBUIBuildTile then
-            local ok = FormatBlackwellAbilityTooltip(GameTooltip, owner.cdRest, owner.cdMax)
+            local ok = FormatBlackwellAbilityTooltip(GameTooltip, owner.cdRest, owner.cdMax, owner.spellKey)
             if ok then
                 writtenSignature = Signature()
             end
@@ -2425,49 +2564,71 @@ function mod:Create()
     ---------------------------------------------------------------------------
     --  Buff Bars (stacked above the spell tiles with icons & spell colors)
     ---------------------------------------------------------------------------
+    -- Round style: pill bars with round caps (B:RoundBar) and an icon in a
+    -- small rounded frame. The pill height is fixed when it is built, so the
+    -- "Buff bar height" option needs /reload there.
+    local buffH = B:ModOpt(self.key, "buffHeight", BUFF_HEIGHT)
+    self.buffBuiltHeight = buffH
+
     local buffContainer = CreateFrame("Frame", nil, f)
     buffContainer:SetWidth(BUFF_WIDTH)
-    buffContainer:SetHeight(MAX_BUFFS * (BUFF_HEIGHT + 2))
+    buffContainer:SetHeight(MAX_BUFFS * (buffH + BUFF_GAP))
     buffContainer:SetPoint("BOTTOM", f, "TOP", 0, 4)
     f.buffContainer = buffContainer
 
     local buffBars = {}
-    for i = 1, MAX_BUFFS do
+    for i = 1, BUFF_POOL do
         local r = CreateFrame("Frame", nil, buffContainer)
         r:SetWidth(BUFF_WIDTH)
-        r:SetHeight(BUFF_HEIGHT)
-        r:SetPoint("BOTTOM", buffContainer, "BOTTOM", 0, (i - 1) * (BUFF_HEIGHT + 2))
+        r:SetHeight(buffH)
+        r:SetPoint("BOTTOM", buffContainer, "BOTTOM", 0, (i - 1) * (buffH + BUFF_GAP))
 
-        -- Square Icon tile on the left (16x16)
+        -- Icon tile on the left (square, bar height)
         local iconFrame = CreateFrame("Frame", nil, r)
-        iconFrame:SetWidth(BUFF_HEIGHT)
-        iconFrame:SetHeight(BUFF_HEIGHT)
+        iconFrame:SetWidth(buffH)
+        iconFrame:SetHeight(buffH)
         iconFrame:SetPoint("LEFT", r, "LEFT", 0, 0)
-        B:Border(iconFrame, 0, 0, 0, 1)
+        r.iconFrame = iconFrame
 
         local icon = iconFrame:CreateTexture(nil, "ARTWORK")
-        icon:SetAllPoints(iconFrame)
+        if round then
+            B:RoundPanel(iconFrame, 4)
+            icon:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", 2, -2)
+            icon:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", -2, 2)
+        else
+            B:Border(iconFrame, 0, 0, 0, 1)
+            icon:SetAllPoints(iconFrame)
+        end
         icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         r.icon = icon
 
-        -- Status bar on the right of the icon
-        local bar = B:Bar(r, nil)
+        -- Bar on the right of the icon
+        local bar
+        if round then
+            bar = B:RoundBar(r, buffH)
+        else
+            bar = B:Bar(r, nil)
+        end
         bar:ClearAllPoints()
         bar:SetPoint("TOPLEFT", iconFrame, "TOPRIGHT", 2, 0)
         bar:SetPoint("BOTTOMRIGHT", r, "BOTTOMRIGHT", 0, 0)
         r.bar = bar
+        r.isRound = round
 
-        local nameFs = B:Font(bar, 9, "LEFT")
-        nameFs:SetPoint("LEFT", bar, "LEFT", 4, 0)
-        nameFs:SetWidth(150)
-        nameFs:SetHeight(12)
-        r.nameFs = nameFs
+        local textInset = (round and math.floor(buffH / 2)) or 4
+        r.textInset = textInset
 
         local timeFs = B:Font(bar, 9, "RIGHT")
-        timeFs:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
+        timeFs:SetPoint("RIGHT", bar, "RIGHT", -textInset, 0)
         timeFs:SetWidth(44)
         timeFs:SetHeight(12)
         r.timeFs = timeFs
+
+        local nameFs = B:Font(bar, 9, "LEFT")
+        nameFs:SetPoint("LEFT", bar, "LEFT", textInset, 0)
+        nameFs:SetPoint("RIGHT", timeFs, "LEFT", -2, 0)
+        nameFs:SetHeight(12)
+        r.nameFs = nameFs
 
         r:Hide()
         buffBars[i] = r
@@ -2481,11 +2642,25 @@ function mod:Create()
     lvlUpBtn:SetWidth(180)
     lvlUpBtn:SetHeight(22)
     lvlUpBtn:SetPoint("BOTTOM", f, "TOP", 0, 4)
-    B:Backdrop(lvlUpBtn, 0.92)
-    B:Border(lvlUpBtn, 1.0, 0.82, 0.10, 1)
-
-    local lvlUpFs = B:Font(lvlUpBtn, 10, "CENTER")
-    lvlUpFs:SetPoint("CENTER", lvlUpBtn, "CENTER", 0, 0)
+    local lvlUpFs
+    if round then
+        -- Round style: pill-shaped panel with a gold tint instead of a frame;
+        -- hover turns the tint cyan. The text sits on the tint's frame so the
+        -- tint never covers it.
+        B:RoundPanel(lvlUpBtn, 11)
+        local pill = B:RoundBar(lvlUpBtn, 22)
+        pill:SetAllPoints(lvlUpBtn)
+        pill:SetTrackColor(1.0, 0.82, 0.10, 0.22)
+        pill:SetFill(0)
+        lvlUpBtn.pill = pill
+        lvlUpFs = B:Font(pill, 10, "CENTER")
+        lvlUpFs:SetPoint("CENTER", pill, "CENTER", 0, 0)
+    else
+        B:Backdrop(lvlUpBtn, 0.92)
+        B:Border(lvlUpBtn, 1.0, 0.82, 0.10, 1)
+        lvlUpFs = B:Font(lvlUpBtn, 10, "CENTER")
+        lvlUpFs:SetPoint("CENTER", lvlUpBtn, "CENTER", 0, 0)
+    end
     lvlUpFs:SetTextColor(1.0, 0.88, 0.30)
     lvlUpBtn.fs = lvlUpFs
 
@@ -2499,16 +2674,26 @@ function mod:Create()
         end
     end)
     lvlUpBtn:SetScript("OnEnter", function()
-        B:Border(this, 0.0, 0.90, 1.0, 1)
+        if this.pill then
+            this.pill:SetTrackColor(0.0, 0.90, 1.0, 0.28)
+            this.pill:SetFill(0)
+        else
+            B:Border(this, 0.0, 0.90, 1.0, 1)
+        end
         this.fs:SetTextColor(0.0, 0.90, 1.0)
         GameTooltip:SetOwner(this, "ANCHOR_TOP")
         GameTooltip:ClearLines()
-        GameTooltip:AddLine("Level Up Choices Ready", 1.0, 0.82, 0.10)
-        GameTooltip:AddLine("Click or press [Y] to choose your talent cards.", 0.85, 0.85, 0.85)
+        GameTooltip:AddLine(L["Level Up Choices Ready"], 1.0, 0.82, 0.10)
+        GameTooltip:AddLine(L["Click or press [Y] to choose your talent cards."], 0.85, 0.85, 0.85)
         GameTooltip:Show()
     end)
     lvlUpBtn:SetScript("OnLeave", function()
-        B:Border(this, 1.0, 0.82, 0.10, 1)
+        if this.pill then
+            this.pill:SetTrackColor(1.0, 0.82, 0.10, 0.22)
+            this.pill:SetFill(0)
+        else
+            B:Border(this, 1.0, 0.82, 0.10, 1)
+        end
         this.fs:SetTextColor(1.0, 0.88, 0.30)
         GameTooltip:Hide()
     end)
@@ -2516,24 +2701,115 @@ function mod:Create()
     f.lvlUpBtn = lvlUpBtn
 
     -- Perfectly centered horizontally between Player (-240) and Target (+240) at Y = 140
-    B:RegisterMover(f, "build", "Build & Cooldowns", "BOTTOM", "BOTTOM", 0, 140)
+    B:RegisterMover(f, "build", L["Build & Cooldowns"], "BOTTOM", "BOTTOM", 0, 140)
+end
+
+-- Reads the module settings into self.opt and applies sizes, fonts and the
+-- buff bar layout. Called after Create and after every option change.
+function mod:ApplyOptions()
+    local f = self.frame
+    if not f then return end
+    local key = self.key
+    local o = self.opt or {}
+    self.opt = o
+
+    o.size = math.floor(tonumber(B:ModOpt(key, "tileSize", 32)) or TILE_SIZE)
+    o.gap = math.floor(tonumber(B:ModOpt(key, "tileGap", 2)) or TILE_GAP)
+    local perRow = math.floor(tonumber(B:ModOpt(key, "tilesPerRow", 8)) or MAX_TILES)
+    if perRow < 1 then perRow = 1 end
+    if perRow > MAX_TILES then perRow = MAX_TILES end
+    o.perRow = perRow
+    o.growth = B:ModOpt(key, "rowGrowth", "up")
+    o.showRank = B:ModOpt(key, "showRank", true)
+    o.showDots = B:ModOpt(key, "showDots", true)
+    o.showSwipe = B:ModOpt(key, "showSwipe", true)
+    o.showCdText = B:ModOpt(key, "showCdText", true)
+    local maxBuffs = math.floor(tonumber(B:ModOpt(key, "maxBuffs", 5)) or MAX_BUFFS)
+    if maxBuffs < 1 then maxBuffs = 1 end
+    if maxBuffs > BUFF_POOL then maxBuffs = BUFF_POOL end
+    o.maxBuffs = maxBuffs
+    o.showLevelUp = B:ModOpt(key, "showLevelUp", true)
+
+    -- Spell tiles
+    local size = o.size
+    local cdSize = math.floor(tonumber(B:ModOpt(key, "cdTextSize", 11)) or 11)
+    for i = 1, MAX_TILES do
+        local tile = f.tiles[i]
+        tile:SetWidth(size)
+        tile:SetHeight(size)
+        tile.cdFs.buiSize = cdSize
+        B:ApplyFont(tile.cdFs)
+        if not o.showRank then tile.rankFs:Hide() end
+        if not o.showDots then tile.dotFs:Hide() end
+        if not o.showSwipe then tile.cdOverlay:Hide() end
+        if not o.showCdText then tile.cdFs:Hide() end
+    end
+
+    -- Buff bars. The round pill keeps the height it was built with.
+    local bw = math.floor(tonumber(B:ModOpt(key, "buffWidth", 220)) or BUFF_WIDTH)
+    local bh = math.floor(tonumber(B:ModOpt(key, "buffHeight", 16)) or BUFF_HEIGHT)
+    if self.round and self.buffBuiltHeight then bh = self.buffBuiltHeight end
+    local showIcons = B:ModOpt(key, "showBuffIcons", true)
+    local showTimers = B:ModOpt(key, "showBuffTimers", true)
+    f.buffContainer:SetWidth(bw)
+    f.buffContainer:SetHeight(maxBuffs * (bh + BUFF_GAP))
+    for i = 1, BUFF_POOL do
+        local r = f.buffBars[i]
+        r:SetWidth(bw)
+        r:SetHeight(bh)
+        r:ClearAllPoints()
+        r:SetPoint("BOTTOM", f.buffContainer, "BOTTOM", 0, (i - 1) * (bh + BUFF_GAP))
+        r.iconFrame:SetWidth(bh)
+        r.iconFrame:SetHeight(bh)
+        r.bar:ClearAllPoints()
+        if showIcons then
+            r.iconFrame:Show()
+            r.bar:SetPoint("TOPLEFT", r.iconFrame, "TOPRIGHT", 2, 0)
+        else
+            r.iconFrame:Hide()
+            r.bar:SetPoint("TOPLEFT", r, "TOPLEFT", 0, 0)
+        end
+        r.bar:SetPoint("BOTTOMRIGHT", r, "BOTTOMRIGHT", 0, 0)
+        r.nameFs:ClearAllPoints()
+        r.nameFs:SetPoint("LEFT", r.bar, "LEFT", r.textInset, 0)
+        if showTimers then
+            r.timeFs:Show()
+            r.nameFs:SetPoint("RIGHT", r.timeFs, "LEFT", -2, 0)
+        else
+            r.timeFs:Hide()
+            r.nameFs:SetPoint("RIGHT", r.bar, "RIGHT", -r.textInset, 0)
+        end
+        if i > maxBuffs then r:Hide() end
+    end
+
+    if not o.showLevelUp and f.lvlUpBtn then f.lvlUpBtn:Hide() end
 end
 
 function mod:Update(state)
     local f = self.frame
+    if not self.opt then self:ApplyOptions() end
+    local o = self.opt
+    local size = o.size
+    local gap = o.gap
+    local perRow = o.perRow
     local spells = state.spells or {}
     local nSpells = table.getn(spells)
     if nSpells > MAX_TILES then nSpells = MAX_TILES end
 
     local spellsAge = state.spellsAge or 0
 
-    -- Adjust width and position tiles centered
-    local totalW = nSpells * TILE_SIZE + (nSpells > 1 and (nSpells - 1) * TILE_GAP or 0)
+    -- Tiles in rows of perRow, each row centred. Row 1 sits at the bottom
+    -- edge (extra rows above) or at the top edge (extra rows below).
+    local nRows = math.ceil(nSpells / perRow)
+    if nRows < 1 then nRows = 1 end
+    local firstRow = nSpells
+    if firstRow > perRow then firstRow = perRow end
+    local totalW = firstRow * size + (firstRow > 1 and (firstRow - 1) * gap or 0)
     if totalW < 100 then totalW = 100 end
     f:SetWidth(totalW)
-    f:SetHeight(TILE_SIZE)
-
-    local startX = -totalW / 2 + TILE_SIZE / 2
+    f:SetHeight(nRows * size + (nRows - 1) * gap)
+    local growDown = (o.growth == "down")
+    local inner = size - 2 * (self.tileInset or 1)
 
     for i = 1, MAX_TILES do
         local tile = f.tiles[i]
@@ -2547,13 +2823,22 @@ function mod:Update(state)
             tile.spellRank = sp.rank
             tile.actionSlot = FindSpellActionSlot(i, rawKey, resolvedName, nSpells)
 
+            local rowIdx = math.floor((i - 1) / perRow)
+            local col = i - 1 - rowIdx * perRow
+            local inRow = nSpells - rowIdx * perRow
+            if inRow > perRow then inRow = perRow end
+            local rowW = inRow * size + (inRow - 1) * gap
+            local offsetX = -rowW / 2 + size / 2 + col * (size + gap)
             tile:ClearAllPoints()
-            local offsetX = startX + (i - 1) * (TILE_SIZE + TILE_GAP)
-            tile:SetPoint("BOTTOM", f, "BOTTOM", offsetX, 0)
+            if growDown then
+                tile:SetPoint("TOP", f, "TOP", offsetX, -rowIdx * (size + gap))
+            else
+                tile:SetPoint("BOTTOM", f, "BOTTOM", offsetX, rowIdx * (size + gap))
+            end
             tile:Show()
 
             -- Rank badge in bottom-right corner
-            if sp.rank and tonumber(sp.rank) and tonumber(sp.rank) > 0 then
+            if o.showRank and sp.rank and tonumber(sp.rank) and tonumber(sp.rank) > 0 then
                 tile.rankFs:SetText(tostring(sp.rank))
                 tile.rankFs:Show()
             else
@@ -2578,7 +2863,7 @@ function mod:Update(state)
             -- DoT / Active Debuff Counter badge in top-right corner
             local normName = NormalizeName(resolvedName)
             local dotCount = GetActiveDotCount(normName)
-            if dotCount > 0 then
+            if o.showDots and dotCount > 0 then
                 tile.dotFs:SetText(tostring(dotCount))
                 local dotCol = GetSpellColor(resolvedName)
                 tile.dotFs:SetTextColor(dotCol.r, dotCol.g, dotCol.b)
@@ -2595,19 +2880,26 @@ function mod:Update(state)
             tile.cdRest = rest
 
             if rest > 0 then
-                -- Dark swipe height
-                if cdmax > 0 then
-                    local pct = rest / cdmax
-                    if pct > 1 then pct = 1 end
-                    local h = math.floor(pct * (TILE_SIZE - 2) + 0.5)
-                    tile.cdOverlay:SetHeight(h)
+                -- Dark swipe height (over the icon area only)
+                if o.showSwipe then
+                    if cdmax > 0 then
+                        local pct = rest / cdmax
+                        if pct > 1 then pct = 1 end
+                        local h = math.floor(pct * inner + 0.5)
+                        tile.cdOverlay:SetHeight(h)
+                    else
+                        tile.cdOverlay:SetHeight(inner)
+                    end
+                    tile.cdOverlay:Show()
                 else
-                    tile.cdOverlay:SetHeight(TILE_SIZE - 2)
+                    tile.cdOverlay:Hide()
                 end
-                tile.cdOverlay:Show()
 
                 -- Countdown format
-                if rest >= 60 then
+                if not o.showCdText then
+                    tile.cdFs:SetText("")
+                    tile.cdFs:Hide()
+                elseif rest >= 60 then
                     local m = math.floor(rest / 60)
                     local s = math.floor(math.mod(rest, 60))
                     tile.cdFs:SetText(string.format("%d:%02d", m, s))
@@ -2616,7 +2908,7 @@ function mod:Update(state)
                 else
                     tile.cdFs:SetText(string.format("%.1f", rest))
                 end
-                tile.cdFs:Show()
+                if o.showCdText then tile.cdFs:Show() end
             else
                 tile.cdOverlay:Hide()
                 tile.cdFs:Hide()
@@ -2634,18 +2926,18 @@ function mod:Update(state)
     local nBuffs = table.getn(buffs)
     local buffsAge = state.buffsAge or 0
 
-    local maxRows = MAX_BUFFS
+    local maxRows = o.maxBuffs or MAX_BUFFS
     if nBuffs < maxRows then maxRows = nBuffs end
 
     if not showBuffs then
         if f.buffContainer then f.buffContainer:Hide() end
-        for i = 1, MAX_BUFFS do
+        for i = 1, BUFF_POOL do
             local r = f.buffBars[i]
             if r then r:Hide() end
         end
     else
         if f.buffContainer then f.buffContainer:Show() end
-        for i = 1, MAX_BUFFS do
+        for i = 1, BUFF_POOL do
             local r = f.buffBars[i]
             local b = (i <= maxRows) and buffs[i]
             if b and type(b) == "table" then
@@ -2663,21 +2955,26 @@ function mod:Update(state)
 
                 local pct = left / bMax
                 if pct > 1 then pct = 1 end
-                r.bar:SetValue(pct)
 
                 -- Set the matching color of the spell on the whole bar and dark tint on background
-                B:SetBarColor(r.bar, color.r, color.g, color.b)
-                local bg = r.bar.buiBg
-                if bg then
-                    bg:SetVertexColor(color.r * 0.25, color.g * 0.25, color.b * 0.25)
-                    bg:SetAlpha(0.85)
+                if r.isRound then
+                    r.bar:SetFillColor(color.r, color.g, color.b, 1)
+                    r.bar:SetTrackColor(color.r * 0.25, color.g * 0.25, color.b * 0.25, 0.85)
+                else
+                    r.bar:SetValue(pct)
+                    B:SetBarColor(r.bar, color.r, color.g, color.b)
+                    local bg = r.bar.buiBg
+                    if bg then
+                        bg:SetVertexColor(color.r * 0.25, color.g * 0.25, color.b * 0.25)
+                        bg:SetAlpha(0.85)
+                    end
                 end
 
                 -- Set icon texture
                 r.icon:SetTexture(iconTex)
 
                 -- Set clean spell name and duration text
-                r.nameFs:SetText(spName)
+                r.nameFs:SetText(LocalizedAbilityName(NormalizeName(spName), spName))
                 if left >= 60 then
                     local m = math.floor(left / 60)
                     local s = math.floor(math.mod(left, 60))
@@ -2687,6 +2984,9 @@ function mod:Update(state)
                 end
 
                 r:Show()
+                -- Round pill: SetFill also redoes the cap layout, so it runs
+                -- once the row is shown and sized.
+                if r.isRound then r.bar:SetFill(pct) end
             else
                 r:Hide()
             end
@@ -2696,8 +2996,8 @@ function mod:Update(state)
     -- Update Stored Level-Ups Button
     if f.lvlUpBtn then
         local stored = (AZS_GetStoredLevels and tonumber(AZS_GetStoredLevels())) or 0
-        if stored > 0 then
-            f.lvlUpBtn.fs:SetText(string.format("LEVEL UP READY (%d) [Y]", stored))
+        if stored > 0 and o.showLevelUp then
+            f.lvlUpBtn.fs:SetText(string.format(L["LEVEL UP READY (%d) [Y]"], math.floor(stored)))
             if showBuffs and maxRows > 0 and f.buffBars[1] and f.buffBars[1]:IsShown() then
                 f.lvlUpBtn:ClearAllPoints()
                 f.lvlUpBtn:SetPoint("BOTTOM", f.buffContainer, "TOP", 0, 4)
