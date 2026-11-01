@@ -1,5 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Loot.lua
+--  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
 --  Cyberpunk Loot Drop Telemetry Log:
 --  - Real-time drop logger for Azeroth Survivors equipment and chests
 --  - Parses CHAT_MSG_LOOT with item quality detection and run timestamps

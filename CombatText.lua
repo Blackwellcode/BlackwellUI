@@ -1,5 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  CombatText.lua
+--  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
 --  Scrolling Battle Text Engine (MSBT Style) for WoW 1.12.1.
 --  Features:
 --    - 4 Draggable Zones: Incoming (Left), Outgoing (Right), Static (Top), Alerts (Bottom)
@@ -166,7 +167,7 @@ function mod:AddOutgoing(spellName, amount, isCrit, school)
     f.text:SetText(colorHex .. tostring(amount) .. "|r")
 
     local fontSize = isCrit and 17 or 14
-    f.text:SetFont(B.FONTS["Expressway Bold"] or B:GetFontPath(), fontSize, "OUTLINE")
+    f.text:SetFont(B.FONTS["Barlow Bold"] or B:GetFontPath(), fontSize, "OUTLINE")
 
     f:ClearAllPoints()
     f:SetPoint("CENTER", anchorOutgoing, "CENTER", 0, 0)
@@ -194,7 +195,7 @@ function mod:AddIncoming(sourceName, amount, isCrit, missType)
     end
 
     local fontSize = isCrit and 16 or 13
-    f.text:SetFont(B.FONTS["Expressway Bold"] or B:GetFontPath(), fontSize, "OUTLINE")
+    f.text:SetFont(B.FONTS["Barlow Bold"] or B:GetFontPath(), fontSize, "OUTLINE")
 
     f:ClearAllPoints()
     f:SetPoint("CENTER", anchorIncoming, "CENTER", 0, 0)
@@ -226,7 +227,7 @@ function mod:AddAura(name, isDebuff, isFade)
         -- Golden Yellow
         f.text:SetText("|cffffd100[" .. name .. "]|r")
     end
-    f.text:SetFont(B.FONTS["Expressway Bold"] or B:GetFontPath(), 13, "OUTLINE")
+    f.text:SetFont(B.FONTS["Barlow Bold"] or B:GetFontPath(), 13, "OUTLINE")
 
     f:ClearAllPoints()
     f:SetPoint("CENTER", anchorStatic, "CENTER", 0, 0)
@@ -261,7 +262,7 @@ function mod:AddAlert(spellName, alertType)
     else
         f.text:SetText("|cffff2020" .. string.upper(spellName) .. "!|r")
     end
-    f.text:SetFont(B.FONTS["Expressway Bold"] or B:GetFontPath(), 16, "OUTLINE")
+    f.text:SetFont(B.FONTS["Barlow Bold"] or B:GetFontPath(), 16, "OUTLINE")
 
     f:ClearAllPoints()
     f:SetPoint("CENTER", anchorAlerts, "CENTER", 0, 0)

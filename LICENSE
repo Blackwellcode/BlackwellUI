@@ -1,0 +1,72 @@
+BlackwellUI
+Copyright (c) 2026 Pierre ("Blackwellcode", https://github.com/Blackwellcode)
+All rights reserved.
+
+
+1. Scope
+
+This license covers every file in the BlackwellUI repository and in every
+BlackwellUI release archive (source code, the generated data file
+SpellIcons.lua and its generator output format, textures, images, layout,
+names and documentation), except the third-party components listed in
+THIRD-PARTY-NOTICES.md, which remain under their own licenses.
+
+
+2. What you may do
+
+You may, free of charge:
+
+  a) download BlackwellUI from its official sources
+     (https://github.com/Blackwellcode/BlackwellUI and its releases page);
+  b) install and use it for your own, non-commercial play of the game
+     Azeroth Survivors;
+  c) read the source code and change your own local settings and
+     saved variables;
+  d) keep private backup copies for your own use;
+  e) show BlackwellUI in screenshots, videos and streams.
+
+
+3. What you may not do without prior written permission
+
+Without the copyright holder's prior written permission you may not:
+
+  a) redistribute BlackwellUI or any part of it, including re-uploads,
+     mirrors, addon packs, launchers or bundles;
+  b) publish, distribute or share modified versions or derivative works;
+  c) copy code, data, textures or other assets into another project;
+  d) sell, rent or otherwise commercially exploit BlackwellUI;
+  e) remove or alter this notice, the copyright lines in the files or the
+     author credit, or present BlackwellUI or parts of it as your own work;
+  f) use the name "BlackwellUI" or its logo for another product.
+
+Requests for permission: open an issue at
+https://github.com/Blackwellcode/BlackwellUI/issues
+
+
+4. Contributions
+
+By submitting code, data, artwork or text to this project (for example
+through a pull request or an issue), you confirm that you have the right to
+do so, and you grant the copyright holder a perpetual, worldwide,
+royalty-free, irrevocable right to use, modify, relicense and distribute
+your contribution as part of BlackwellUI.
+
+
+5. No warranty
+
+BlackwellUI is provided "as is", without warranty of any kind, express or
+implied, including the warranties of merchantability, fitness for a
+particular purpose and non-infringement. In no event shall the copyright
+holder be liable for any claim, damages or other liability arising from the
+use of BlackwellUI, to the extent permitted by applicable law.
+
+
+6. Trademarks and game content
+
+World of Warcraft and Blizzard Entertainment are trademarks or registered
+trademarks of Blizzard Entertainment, Inc. Azeroth Survivors belongs to its
+developers. BlackwellUI is an independent project and is not affiliated
+with, endorsed or sponsored by Blizzard Entertainment or the developers of
+Azeroth Survivors. Game textures, fonts and other game content that
+BlackwellUI references at runtime are part of the game client, are not
+included in BlackwellUI and are not covered by this license.

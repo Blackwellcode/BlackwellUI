@@ -1,5 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Character.lua
+--  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
 --  Complete Retail/Dragonflight-style Redesign for Character Info ('C' Key):
 --  - 775x460 Single Unified Blackwell Cyberpunk Glass Window
 --  - Left: 3D PaperDoll Character Model with interactive mouse rotation

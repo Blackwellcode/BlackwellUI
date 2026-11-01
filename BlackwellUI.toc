@@ -2,14 +2,15 @@
 ## Title: |cff00e5ffBlackwell|rUI |cff9a9a9a(Azeroth Survivors)|r
 ## Notes: Cyberpunk-grade HUD & Analytics Engine for Azeroth Survivors (WoW 1.12.1).
 ## Author: Pierre (Blackwellcode)
-## Version: 2.7.1-azs
+## Version: 2.7.2-azs
 ## SavedVariables: BlackwellUIDB
 ## URL: https://github.com/Blackwellcode/BlackwellUI
 ## X-Website: https://github.com/Blackwellcode/BlackwellUI
+## X-Copyright: Copyright (c) 2026 Pierre (Blackwellcode)
+## X-License: All Rights Reserved
 
-Icons.lua
-SpellNames.lua
 Core.lua
+SpellIcons.lua
 ActionBars.lua
 Minimap.lua
 Pins.lua

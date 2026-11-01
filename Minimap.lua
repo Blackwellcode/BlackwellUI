@@ -1,5 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Minimap.lua
+--  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
 --  Authentic Minimap:
 --  - Clean 140 x 140 square minimap with 1px black border
 --  - Bottom zone banner strip (locationMode="inside", locationPosition="bottom")

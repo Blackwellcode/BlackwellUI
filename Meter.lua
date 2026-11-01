@@ -1,5 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Meter.lua
+--  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
 --  Consolidated Cyberpunk Combat Meter & Multiplayer Party Drilldown:
 --  - Single unified window with 5 modes: Damage, Healing, Boss, Taken, Party
 --  - Full Multiplayer / Party mode: tracks all party members with class colors,

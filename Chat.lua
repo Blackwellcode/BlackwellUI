@@ -1,5 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Chat.lua
+--  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
 --  Clean 1px chat frame, mousewheel scrolling, styled EditBox, hides scroll buttons.
 --  Lua 5.0 / WoW 1.12.1: no '#', no '%', no string methods.
 -------------------------------------------------------------------------------
