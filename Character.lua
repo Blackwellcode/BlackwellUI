@@ -16,6 +16,8 @@ local B = BlackwellUI
 local mod = {}
 mod.label = "Character"
 mod.alwaysActive = true
+-- Replaces PaperDoll stat functions; turning it off takes a /reload.
+mod.reloadOnToggle = true
 
 local modFunc = math.mod or math.fmod
 
@@ -660,7 +662,11 @@ local function UpdateCharacterFrame()
     local pName = (type(UnitName) == "function" and UnitName("player")) or "Hero"
     local pLvl = (type(UnitLevel) == "function" and UnitLevel("player")) or 60
     local pRace = (type(UnitRace) == "function" and UnitRace("player")) or "Human"
-    local pClass, pClassToken = (type(UnitClass) == "function" and UnitClass("player")) or "Warrior", "WARRIOR"
+    -- Lua 5.0 truncates `f() or x, y` to one value from f(): unpack the call first.
+    local pClass, pClassToken
+    if type(UnitClass) == "function" then pClass, pClassToken = UnitClass("player") end
+    pClass = pClass or "Warrior"
+    pClassToken = pClassToken or "WARRIOR"
 
     if CharacterNameText then
         CharacterNameText:SetText(pName)
@@ -820,7 +826,12 @@ local function UpdateCharacterFrame()
         end
 
         -- Armor / DR
-        local _, effArm = (type(UnitArmor) == "function" and UnitArmor("player")) or 0, 0
+        local effArm
+        if type(UnitArmor) == "function" then
+            local _
+            _, effArm = UnitArmor("player")
+        end
+        effArm = tonumber(effArm) or 0
         local dr = 0
         if effArm > 0 then
             dr = effArm / (effArm + 400 + 85 * pLvl) * 100

@@ -9,6 +9,8 @@ local E = BlackwellUI
 local mod = {}
 mod.label = "Chat"
 mod.alwaysActive = true
+-- ChatFrame1 is reparented into the panel; turning it off takes a /reload.
+mod.reloadOnToggle = true
 
 local CHAT_WIDTH = 380
 local CHAT_HEIGHT = 140

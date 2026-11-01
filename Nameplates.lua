@@ -216,6 +216,21 @@ local function HideAllPlates()
     end
 end
 
+local function IsOwnColor(sb, r, g, b)
+    if not sb.buiR then return false end
+    return math.abs(r - sb.buiR) < 0.01 and math.abs(g - sb.buiG) < 0.01 and math.abs(b - sb.buiB) < 0.01
+end
+
+-- Blizzard reaction colours: red hostile, yellow neutral, green/blue friendly, grey tapped.
+local function ClassifyReaction(r, g, b)
+    if r > 0.8 and g < 0.2 and b < 0.2 then return "hostile" end
+    if r > 0.8 and g > 0.8 and b < 0.2 then return "neutral" end
+    if g > 0.7 and r < 0.2 then return "friendly" end
+    if b > 0.8 and r < 0.2 and g < 0.2 then return "friendly" end
+    if r > 0.4 and r < 0.6 and g > 0.4 and g < 0.6 and b > 0.4 and b < 0.6 then return "tapped" end
+    return "hostile"
+end
+
 local function UpdatePlate(plate)
     if not plate or not plate.buiSkinned then return end
 
@@ -313,23 +328,19 @@ local function UpdatePlate(plate)
         if kind == "boss" or kind == "guardian" or kind == "elite" then
             B:SetBarColor(healthBar, cfg.color[1], cfg.color[2], cfg.color[3])
         else
+            -- Once recoloured, GetStatusBarColor returns our own colour. Classify
+            -- only a colour the engine wrote and keep that reaction otherwise.
             local r, g, b = healthBar:GetStatusBarColor()
-            if r and g and b then
-                if r > 0.8 and g < 0.2 and b < 0.2 then
-                    -- Hostile: Neon Red
-                    B:SetBarColor(healthBar, cfg.color[1], cfg.color[2], cfg.color[3])
-                elseif r > 0.8 and g > 0.8 and b < 0.2 then
-                    -- Neutral: Cyber Gold
-                    B:SetBarColor(healthBar, 0.95, 0.78, 0.12)
-                elseif g > 0.7 and r < 0.2 then
-                    -- Friendly: Cyber Green
-                    B:SetBarColor(healthBar, 0.15, 0.85, 0.35)
-                elseif r > 0.4 and r < 0.6 and g > 0.4 and g < 0.6 and b > 0.4 and b < 0.6 then
-                    -- Tapped / Gray
-                    B:SetBarColor(healthBar, 0.50, 0.50, 0.50)
-                else
-                    B:SetBarColor(healthBar, cfg.color[1], cfg.color[2], cfg.color[3])
-                end
+            if r and g and b and not IsOwnColor(healthBar, r, g, b) then
+                healthBar.buiReaction = ClassifyReaction(r, g, b)
+            end
+            local reaction = healthBar.buiReaction
+            if reaction == "neutral" then
+                B:SetBarColor(healthBar, 0.95, 0.78, 0.12)
+            elseif reaction == "friendly" then
+                B:SetBarColor(healthBar, 0.15, 0.85, 0.35)
+            elseif reaction == "tapped" then
+                B:SetBarColor(healthBar, 0.50, 0.50, 0.50)
             else
                 B:SetBarColor(healthBar, cfg.color[1], cfg.color[2], cfg.color[3])
             end
@@ -578,6 +589,11 @@ function mod:Update(state)
     if not B:IsEnabled("nameplates") or not NAMEPLATES_ON then
         HideAllPlates()
     end
+end
+
+-- Unit kinds are keyed by name; names from the previous run must not leak.
+function mod:OnRunStart()
+    for k in pairs(liveKinds) do liveKinds[k] = nil end
 end
 
 B:RegisterModule("nameplates", mod)

@@ -38,7 +38,8 @@ lootWatcher:SetScript("OnEvent", function()
 
     local msg = arg1 or ""
     -- "You receive loot: |cffa335ee|Hitem:19019:0:0:0|h[Thunderfury, Blessed Blade of the Windseeker]|h|r."
-    local _, _, hexColor, itemLink, itemName = string.find(msg, "You receive loot: |c(%x+)|H(item:[%d:]+)|h%[(.-)%]|h|r")
+    -- |cAARRGGBB: skip the alpha byte so the 6-digit RGB matches QUALITY_COLORS.
+    local _, _, hexColor, itemLink, itemName = string.find(msg, "You receive loot: |c%x%x(%x%x%x%x%x%x)|H(item:[%d:]+)|h%[(.-)%]|h|r")
     if not itemName then
         _, _, itemLink, itemName = string.find(msg, "You receive loot: |H(item:[%d:]+)|h%[(.-)%]|h|r")
     end

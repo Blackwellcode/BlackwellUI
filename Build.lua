@@ -25,6 +25,7 @@ local BUFF_HEIGHT = 16
 
 local spellIcons = {}
 local buffMax = {}
+local SPELL_BUFF_DB -- assigned below; forward-declared so GetAbilityIcon binds the local
 
 local function NormalizeName(str)
     if not str or str == "" then return "" end
@@ -1027,7 +1028,7 @@ end
 -------------------------------------------------------------------------------
 --  Aura Buff Master Database (Spell IDs, Names, Icons, and Matching Colors)
 -------------------------------------------------------------------------------
-local SPELL_BUFF_DB = {
+SPELL_BUFF_DB = {
     -- Shrines
     ["shrine_of_haste"] = { name = "Shrine of Haste", icon = "Interface\\Icons\\Spell_Nature_BloodLust", color = { r = 1.00, g = 0.82, b = 0.00 } },
     ["shrine of haste"] = { name = "Shrine of Haste", icon = "Interface\\Icons\\Spell_Nature_BloodLust", color = { r = 1.00, g = 0.82, b = 0.00 } },
@@ -1683,7 +1684,7 @@ end
 -------------------------------------------------------------------------------
 --  Live Spellbook Scanner
 -------------------------------------------------------------------------------
-local spellIcons = {}
+-- spellIcons is the file-level table from the top: GetAbilityIcon reads it.
 local spellBookIds = {}
 
 local function ScanSpellbook()
@@ -2717,6 +2718,12 @@ function mod:Update(state)
             f.lvlUpBtn:Hide()
         end
     end
+end
+
+-- Buff peaks and DoT tick history belong to one run; a new run starts empty.
+function mod:OnRunStart()
+    for k in pairs(buffMax) do buffMax[k] = nil end
+    for k in pairs(dotTicks) do dotTicks[k] = nil end
 end
 
 B:RegisterModule("build", mod)

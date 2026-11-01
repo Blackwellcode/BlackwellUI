@@ -14,6 +14,10 @@ local E = BlackwellUI
 local mod = {}
 mod.label = "Minimap"
 mod.alwaysActive = true
+-- Minimap is reparented and BuffFrame/ToggleMinimap are stubbed; off takes a /reload.
+mod.reloadOnToggle = true
+
+local function Noop() end
 
 local MAP_SIZE = 140
 local FOOTER_HEIGHT = 18
@@ -62,7 +66,7 @@ function mod:HideBlizzardArt()
         MinimapNorthTag:SetAlpha(0)
     end
 
-    ToggleMinimap = function() end
+    ToggleMinimap = Noop
 end
 
 local function SuppressBuffFrame()
@@ -72,10 +76,10 @@ local function SuppressBuffFrame()
         BuffFrame:ClearAllPoints()
         BuffFrame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 5000, 5000)
         BuffFrame:UnregisterAllEvents()
-        BuffFrame.Show = function() end
+        BuffFrame.Show = Noop
     end
     if type(BuffFrame_Update) == "function" then
-        BuffFrame_Update = function() end
+        BuffFrame_Update = Noop
     end
     for i = 0, 23 do
         local btn = getglobal("BuffButton" .. i)
@@ -84,7 +88,7 @@ local function SuppressBuffFrame()
             btn:SetAlpha(0)
             btn:ClearAllPoints()
             btn:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 5000, 5000)
-            btn.Show = function() end
+            btn.Show = Noop
         end
     end
     for i = 1, 2 do
@@ -94,7 +98,7 @@ local function SuppressBuffFrame()
             te:SetAlpha(0)
             te:ClearAllPoints()
             te:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 5000, 5000)
-            te.Show = function() end
+            te.Show = Noop
         end
     end
 end

@@ -43,6 +43,20 @@ local TABS = {
     { key = "party",   label = "Party",   r = 0.30, g = 0.75, b = 1.00 },
 }
 
+-- Spell names that contain ": " themselves; they are not "Item: Spell" procs.
+local COLON_SPELL_PREFIXES = {
+    ["power word"] = true,
+    ["shadow word"] = true,
+    ["holy word"] = true,
+}
+
+local function SplitProcName(sName)
+    local _, _, itemPrefix, spellSuffix = string.find(sName, "^(.-): (.+)$")
+    if not itemPrefix or itemPrefix == "" or not spellSuffix or spellSuffix == "" then return nil end
+    if COLON_SPELL_PREFIXES[string.lower(itemPrefix)] then return nil end
+    return itemPrefix, spellSuffix
+end
+
 B.meterOffsets = { done = {}, boss = {}, healing = {}, taken = {}, party = {}, baseTime = 0, active = false }
 B.biggestCrits = {}
 B.meterPartySpells = {} -- [playerName][spellName] = { dmg = total, hits = count, crits = count }
@@ -992,8 +1006,8 @@ function mod:Update(state)
                 if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
                     totalAmt = totalAmt + d
                     if B.db.mergeItemProcs then
-                        local _, _, itemPrefix, spellSuffix = string.find(sName, "^(.-): (.+)$")
-                        if itemPrefix and spellSuffix and itemPrefix ~= "" and spellSuffix ~= "" then
+                        local itemPrefix, spellSuffix = SplitProcName(sName)
+                        if itemPrefix then
                             local k = string.lower(spellSuffix)
                             local existing = mergedMap[k]
                             if existing then
@@ -1104,8 +1118,8 @@ function mod:Update(state)
                 if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
                     totalAmt = totalAmt + d
                     if B.db.mergeItemProcs then
-                        local _, _, itemPrefix, spellSuffix = string.find(sName, "^(.-): (.+)$")
-                        if itemPrefix and spellSuffix and itemPrefix ~= "" and spellSuffix ~= "" then
+                        local itemPrefix, spellSuffix = SplitProcName(sName)
+                        if itemPrefix then
                             local k = string.lower(spellSuffix)
                             local existing = mergedMap[k]
                             if existing then
@@ -1286,6 +1300,11 @@ function mod:Update(state)
     local finalH = 60 + shownRows * (ROW_HEIGHT + ROW_GAP) + 6
     if finalH < 62 then finalH = 62 end
     f:SetHeight(finalH)
+end
+
+-- Session offsets, drilldown spells and crit records are per run.
+function mod:OnRunStart()
+    B:ResetMeter(true)
 end
 
 B:RegisterModule("meter", mod)

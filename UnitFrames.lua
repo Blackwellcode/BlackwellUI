@@ -16,6 +16,8 @@ local E = BlackwellUI
 local mod = {}
 mod.label = "Unit Frames"
 mod.alwaysActive = true
+-- Blizzard unit frames are suppressed via OnShow; turning it off takes a /reload.
+mod.reloadOnToggle = true
 
 local MAX_ENCOUNTER_ROWS = 20
 local ENC_WIDTH = 260

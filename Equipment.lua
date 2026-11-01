@@ -14,11 +14,11 @@ local B = BlackwellUI
 local mod = {}
 mod.label = "Equipment"
 
-local MAX_SLOTS = 14
 local TILE_SIZE = 28
 local TILE_GAP = 4
 local COLS = 7
-local ROWS = 2
+local ROWS = 3 -- 21 tiles: all 17 equipment slots fit, weapons included
+local MAX_SLOTS = COLS * ROWS
 
 -- Standard WoW Equipment Slot IDs
 local INVENTORY_SLOTS = {
@@ -204,6 +204,7 @@ function mod:Update(state)
     if type(GetInventoryItemTexture) == "function" then
         local nSlots = table.getn(INVENTORY_SLOTS)
         for i = 1, nSlots do
+            if nItems >= MAX_SLOTS then break end
             local slotId = INVENTORY_SLOTS[i]
             local tex = GetInventoryItemTexture("player", slotId)
             if tex and tex ~= "" then

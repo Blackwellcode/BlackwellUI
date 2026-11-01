@@ -271,7 +271,23 @@ function mod:Create()
     end)
 end
 
+-- The mover overlay is a child of the bar, which is hidden between casts:
+-- while unlocked, keep a preview bar up so the mover can be grabbed.
 function mod:Update(state)
+    local castBar = self.castBar
+    if not castBar then return end
+    if B.unlocked then
+        if not castBar:IsShown() then
+            castBar.buiPreview = true
+            castBar.nameFs:SetText("Player Cast Bar")
+            castBar.timeFs:SetText("")
+            castBar.bar:SetValue(0.5)
+            castBar:Show()
+        end
+    elseif castBar.buiPreview then
+        castBar.buiPreview = nil
+        castBar:Hide()
+    end
 end
 
 B:RegisterModule("castbar", mod)
