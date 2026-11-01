@@ -1,10 +1,11 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Build.lua
+--  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
 --  Cyberpunk Cooldown Manager / Active Build Spells & Aura Buff Tracker.
 --  - Centered layout between Hero and Target frames
 --  - 36x36 crisp square tiles with 1px black border
 --  - Trimmed icons (0.08, 0.92, 0.08, 0.92) eliminating Blizzard borders
---  - Dark swipe cooldown overlay with bold Expressway countdown timer in center
+--  - Dark swipe cooldown overlay with a bold countdown timer in the centre
 --  - Stack / Rank number in bottom-right corner
 --  - Full dictionary matching all Azeroth Survivors abilities
 --  - Aura Buff Bars with square spell icons and full spell-color matching bars
@@ -1649,17 +1650,10 @@ local function ResolveBuffInfo(rawSpell, timeLeft)
         end
     end
 
-    -- 7. Universal spell database lookup (SpellNames.lua / Icons.lua)
-    if AZSSpellMeterName and AZSSpellMeterName[key] then
-        local eng = AZSSpellMeterName[key]
-        local ic = (AZSSpellMeterIcon and AZSSpellMeterIcon[eng]) or GetAbilityIcon(eng)
-        if ic and not string.find(ic, "\\", 1, true) then ic = "Interface\\Icons\\" .. ic end
-        return eng, ic, GetSpellColor(eng)
-    end
-    if AZSSpellMeterIcon and AZSSpellMeterIcon[key] then
-        local ic = AZSSpellMeterIcon[key]
-        if ic and not string.find(ic, "\\", 1, true) then ic = "Interface\\Icons\\" .. ic end
-        return key, ic, GetSpellColor(key)
+    -- 7. Spell icon table generated from the client's Spell.dbc (SpellIcons.lua)
+    local dbIcon = B:SpellIconPath(key)
+    if dbIcon then
+        return key, dbIcon, GetSpellColor(key)
     end
 
     -- 8. Ability icon lookup fallback
@@ -2321,7 +2315,7 @@ function mod:Create()
         cdOverlay:Hide()
         tile.cdOverlay = cdOverlay
 
-        -- Cooldown countdown text (Expressway Bold, centered, size 11, outline)
+        -- Cooldown countdown text (bold, centred, size 11, outline)
         local cdFs = B:Font(tile, 11, "CENTER")
         cdFs:SetPoint("CENTER", tile, "CENTER", 0, 0)
         cdFs:SetTextColor(1, 1, 1)

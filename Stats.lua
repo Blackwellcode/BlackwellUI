@@ -1,9 +1,10 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Stats.lua
+--  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
 --  Active Player Multipliers & Run Stats panel (Left Side).
 --  - Sleek dark translucent window (0.05, 0.05, 0.05, 0.88) with 1px border
 --  - Real-time multipliers parsed from AZS_STATS (Damage, CDR, Crit, Area, etc.)
---  - Expressway typography with gold/accent stat values
+--  - Gold/accent stat values
 --  - Movable via /bui unlock (default TOPLEFT, 12, -140)
 --  Lua 5.0 / WoW 1.12.1: no '#', no '%', no string methods.
 -------------------------------------------------------------------------------

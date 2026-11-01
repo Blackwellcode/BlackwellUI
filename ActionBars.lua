@@ -1,5 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  ActionBars.lua
+--  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
 --  Clean suppression of Blizzard action bars, bags, and micro menu.
 --  In Azeroth Survivors spells auto-cast; action bars & bags are not used.
 --  Uses hidden-parent reparenting (standard 1.12 foolproof suppression).

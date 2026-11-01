@@ -1,5 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Options.lua
+--  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
 --  Control center (/bw): sidebar with pages, plain-language settings with a
 --  one-line hint each; dependent settings are indented and disabled while
 --  their module is off.

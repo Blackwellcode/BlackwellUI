@@ -1,5 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Core.lua
+--  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
 --  Cyberpunk-grade HUD & Analytics Engine for Azeroth Survivors (WoW 1.12.1).
 --  Lua 5.0 strict: no '#', no '%', no string methods, no '...'.
 --  Script handlers use the 1.12 globals this / event / arg1.
@@ -13,7 +14,7 @@ BlackwellUI = {}
 local B = BlackwellUI
 BlackwallUI = BlackwellUI -- Backwards compatibility alias
 
-B.version = "2.7.1-azs"
+B.version = "2.7.2-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -65,14 +66,17 @@ B.BAR_TEXTURES = {
 }
 B.BAR_TEXTURE_ORDER = { "Melli", "Flat", "Pixels", "Gradient", "Blizzard" }
 
+-- Bundled fonts are SIL OFL 1.1 (license texts next to them in media/fonts);
+-- Friz Quadrata is the game client's own font and is not shipped.
 B.FONTS = {
-    ["Expressway"]      = "Interface\\AddOns\\BlackwellUI\\media\\fonts\\Expressway.TTF",
-    ["Expressway Bold"] = "Interface\\AddOns\\BlackwellUI\\media\\fonts\\Expressway Bold.ttf",
-    ["Fira Sans"]       = "Interface\\AddOns\\BlackwellUI\\media\\fonts\\FiraSans Medium.ttf",
-    ["Homespun"]        = "Interface\\AddOns\\BlackwellUI\\media\\fonts\\Homespun.ttf",
-    ["Friz Quadrata"]   = "Fonts\\FRIZQT__.TTF",
+    ["Barlow"]        = "Interface\\AddOns\\BlackwellUI\\media\\fonts\\BarlowSemiCondensed-Medium.ttf",
+    ["Barlow Bold"]   = "Interface\\AddOns\\BlackwellUI\\media\\fonts\\BarlowSemiCondensed-SemiBold.ttf",
+    ["Fira Sans"]     = "Interface\\AddOns\\BlackwellUI\\media\\fonts\\FiraSans Medium.ttf",
+    ["Friz Quadrata"] = "Fonts\\FRIZQT__.TTF",
 }
-B.FONT_ORDER = { "Expressway", "Expressway Bold", "Fira Sans", "Homespun", "Friz Quadrata" }
+B.FONT_ORDER = { "Barlow", "Barlow Bold", "Fira Sans", "Friz Quadrata" }
+-- Fonts removed in 2.7.2 (not redistributable) and their replacements.
+B.FONT_RENAMED = { ["Expressway"] = "Barlow", ["Expressway Bold"] = "Barlow Bold", ["Homespun"] = "Barlow" }
 
 B.CLASS_COLORS = {
     WARRIOR = { r = 0.78, g = 0.61, b = 0.43 },
@@ -129,7 +133,7 @@ local DEFAULTS = {
     customAccent = { r = 0/255, g = 229/255, b = 255/255 },
     backdropAlpha = 0.85,
     barTexture = "Melli",
-    font = "Expressway",
+    font = "Barlow",
     fontScaleMod = 0,
     chatFontSize = 12,
     scale = 1.0,
@@ -238,6 +242,7 @@ function B:InitDB()
     end
     if not self.THEMES[self.db.theme] then self.db.theme = DEFAULTS.theme end
     if not self.BAR_TEXTURES[self.db.barTexture] then self.db.barTexture = DEFAULTS.barTexture end
+    if self.FONT_RENAMED[self.db.font] then self.db.font = self.FONT_RENAMED[self.db.font] end
     if not self.FONTS[self.db.font] then self.db.font = DEFAULTS.font end
     if type(self.db.scale) ~= "number" or self.db.scale < 0.5 or self.db.scale > 2 then
         self.db.scale = 1.0
@@ -949,6 +954,29 @@ local function ScanCarriedItems()
     end
 end
 
+-- Spell name -> "Interface\\Icons\\<file>" from SpellIcons.lua (generated from
+-- the client's Spell.dbc). Exact name first, then a case-insensitive match;
+-- the lower-case index is built once, on the first miss.
+function B:SpellIconPath(name)
+    if type(name) ~= "string" or type(self.SPELL_ICON_INDEX) ~= "table" then return nil end
+    local idx = self.SPELL_ICON_INDEX[name]
+    if not idx then
+        if not self.spellIconLower then
+            local map = {}
+            for k, v in pairs(self.SPELL_ICON_INDEX) do
+                map[string.lower(k)] = v
+            end
+            self.spellIconLower = map
+        end
+        idx = self.spellIconLower[string.lower(name)]
+    end
+    local file = idx and self.SPELL_ICON_FILES[idx]
+    if file then
+        return "Interface\\Icons\\" .. file
+    end
+    return nil
+end
+
 function B:GetAbilityIcon(nameOrId)
     if not nameOrId or nameOrId == "" then
         return "Interface\\Icons\\INV_Misc_QuestionMark"
@@ -1012,21 +1040,10 @@ function B:GetAbilityIcon(nameOrId)
         end
     end
 
-    -- 1e. Universal Spell Icon lookup (Icons.lua & SpellNames.lua from DBC)
-    if AZSSpellMeterIcon then
-        local rawIc = AZSSpellMeterIcon[nameOrId]
-        if not rawIc and AZSSpellMeterName and AZSSpellMeterName[nameOrId] then
-            rawIc = AZSSpellMeterIcon[AZSSpellMeterName[nameOrId]]
-        end
-        if not rawIc and AZSSpellMeterIcon[norm] then
-            rawIc = AZSSpellMeterIcon[norm]
-        end
-        if rawIc then
-            if string.find(rawIc, "\\", 1, true) then
-                return rawIc
-            end
-            return "Interface\\Icons\\" .. rawIc
-        end
+    -- 1e. Spell icon table generated from the client's Spell.dbc (SpellIcons.lua)
+    local dbIcon = self:SpellIconPath(nameOrId) or self:SpellIconPath(norm)
+    if dbIcon then
+        return dbIcon
     end
 
     -- 1f. Compound spell names (e.g. "Pendant of the Plague: Moonfire")
@@ -1151,7 +1168,7 @@ function B:GetBarTexture()
 end
 
 function B:GetFontPath()
-    return self.FONTS[(self.db and self.db.font) or "Expressway"] or self.FALLBACK_FONT
+    return self.FONTS[(self.db and self.db.font) or "Barlow"] or self.FALLBACK_FONT
 end
 B.GetFont = B.GetFontPath
 
