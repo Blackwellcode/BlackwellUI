@@ -94,7 +94,13 @@ function mod:Update(state)
     end
     local s = (type(AZS_STATS) == "table" and AZS_STATS) or nil
 
-    if not s or (state and state.demo) or B.unlocked then
+    -- Sample values only for preview; a live run without AZS_STATS shows nothing
+    -- instead of numbers that look real.
+    if not s and not ((state and state.demo) or B.unlocked) then
+        f:Hide()
+        return
+    end
+    if (state and state.demo) or B.unlocked then
         s = {
             dmg = 1.25,
             cd = 0.15,

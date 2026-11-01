@@ -11,6 +11,8 @@ local E = BlackwellUI
 local mod = {}
 mod.label = "Action Bars"
 mod.alwaysActive = false
+-- Reparents Blizzard frames to a hidden sink; turning it off takes a /reload.
+mod.reloadOnToggle = true
 
 -- Hidden sink frame: anything parented here is permanently invisible
 local hiddenSink = CreateFrame("Frame", "BUI_HiddenSink", UIParent)
@@ -98,7 +100,9 @@ end
 local suppressor = CreateFrame("Frame")
 suppressor:RegisterEvent("PLAYER_ENTERING_WORLD")
 suppressor:SetScript("OnEvent", function()
-    mod:HideBlizzardArt()
+    if B.db and B:IsEnabled("actionbars") then
+        mod:HideBlizzardArt()
+    end
 end)
 
 function mod:Create()

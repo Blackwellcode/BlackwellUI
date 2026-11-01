@@ -708,10 +708,9 @@ function mod:Create()
     self.frame = driver
 end
 
+-- Stock combat text is synced by Core (SyncHud every 5 s and on module changes),
+-- not from this 10 Hz update.
 function mod:Update(state)
-    if B.SyncCombatText then
-        B:SyncCombatText()
-    end
     if not B:IsEnabled("combattext") then
         local hidePool = function(pool)
             local n = table.getn(pool)

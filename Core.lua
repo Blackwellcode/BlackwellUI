@@ -58,15 +58,15 @@ B.THEMES = {
 B.THEME_ORDER = { "Blackwell", "Crimson", "Amber", "Emerald", "Violet", "Monolith", "Class Colored", "Custom" }
 
 -- Only power-of-two textures: the 1.12 renderer rejects other sizes.
+-- (atrocity.tga is 256x40 and was dropped; InitDB falls back to the default.)
 B.BAR_TEXTURES = {
     ["Melli"]    = "Interface\\AddOns\\BlackwellUI\\media\\textures\\melli.tga",
-    ["Atrocity"] = "Interface\\AddOns\\BlackwellUI\\media\\textures\\atrocity.tga",
     ["Flat"]     = "Interface\\Buttons\\WHITE8X8",
     ["Pixels"]   = "Interface\\AddOns\\BlackwellUI\\media\\textures\\pixels-fill.tga",
     ["Gradient"] = "Interface\\AddOns\\BlackwellUI\\media\\textures\\gradient-light.tga",
     ["Blizzard"] = "Interface\\TargetingFrame\\UI-StatusBar",
 }
-B.BAR_TEXTURE_ORDER = { "Melli", "Atrocity", "Flat", "Pixels", "Gradient", "Blizzard" }
+B.BAR_TEXTURE_ORDER = { "Melli", "Flat", "Pixels", "Gradient", "Blizzard" }
 
 B.FONTS = {
     ["Expressway"]      = "Interface\\AddOns\\BlackwellUI\\media\\fonts\\Expressway.TTF",
@@ -141,7 +141,7 @@ local DEFAULTS = {
     replaceHud = true,
     hideBanners = false,
     hideLoot = false,
-    meterMode = "done",
+    meterMode = "damage",
     mergeItemProcs = false,
     colorHealthByClass = true,
     showBuffBars = true,
@@ -152,7 +152,7 @@ local DEFAULTS = {
     pinEdge = "clamp",
     filterChatSpam = true,
     modules = {
-        actionbars = false,
+        actionbars = true,
         minimap = true,
         pins = true,
         unitframes = true,
@@ -171,6 +171,10 @@ local DEFAULTS = {
         equipment = true,
     },
     positions = {},
+    -- Original values of every stock CVar / option global the addon overrides
+    -- (see "Managed stock state"); empty while nothing is overridden.
+    stockCVars = {},
+    stockGlobals = {},
 }
 
 local function MergeDefaults(src, dst)
@@ -194,6 +198,7 @@ function B:InitDB()
             BlackwellUIDB = EllesmereUIDB
         end
     end
+    local isUpgrade = (BlackwellUIDB ~= nil)
     BlackwellUIDB = MergeDefaults(DEFAULTS, BlackwellUIDB)
     self.db = BlackwellUIDB
     if not self.db.layoutVersion or self.db.layoutVersion < 12 then
@@ -213,6 +218,19 @@ function B:InitDB()
         end
         self.db.replaceHud = true
         self.db.layoutVersion = 12
+    end
+    -- v14 repeats the v13 seeding: a v13 test build cleared the snapshot at
+    -- logout while the client kept the zeroed CVars.
+    if self.db.layoutVersion < 14 then
+        if isUpgrade then
+            -- Up to 2.6.7 the Blizzard bars were hidden whatever the toggle said,
+            -- and stock CVars were zeroed without a snapshot. Keep the bars hidden
+            -- now that the toggle works, and seed the snapshot so the next restore
+            -- brings zeroed values back to the client default once.
+            self.db.modules.actionbars = true
+            self:SeedLegacyStockSnapshot()
+        end
+        self.db.layoutVersion = 14
     end
     if self.db.autoScale == nil then
         self.db.autoScale = true
@@ -1561,6 +1579,136 @@ function B:ApplyScale()
 end
 
 -------------------------------------------------------------------------------
+--  Error reporting: one chat line per distinct error (not 10/s from the
+--  ticker), forwarded once to the installed error handler (BugGrabber).
+-------------------------------------------------------------------------------
+function B:ReportError(key, err)
+    if not self.reportedErrors then self.reportedErrors = {} end
+    local msg = tostring(err)
+    if self.reportedErrors[key] == msg then return end
+    self.reportedErrors[key] = msg
+    self:Print("|cffff5555[" .. tostring(key) .. "]|r " .. msg)
+    if type(geterrorhandler) == "function" then
+        local handler = geterrorhandler()
+        if type(handler) == "function" then
+            handler("BlackwellUI [" .. tostring(key) .. "]: " .. msg)
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
+--  Managed stock state. Every stock CVar / option global the addon overrides
+--  is snapshotted once into BlackwellUIDB before the first write and written
+--  back on restore. Restore touches only what was overridden, so a disabled
+--  module, a logout or an uninstall leaves the client as the player had it.
+-------------------------------------------------------------------------------
+local NIL_SENTINEL = "__nil"
+
+function B:SetManagedCVar(cv, value)
+    if type(GetCVar) ~= "function" or type(SetCVar) ~= "function" then return end
+    local ok, cur = pcall(GetCVar, cv)
+    if not ok then
+        self:ReportError("cvar " .. cv, cur)
+        return
+    end
+    if cur == nil or cur == value then return end
+    if self.db.stockCVars[cv] == nil then
+        self.db.stockCVars[cv] = cur
+    end
+    local okSet, err = pcall(SetCVar, cv, value)
+    if not okSet then self:ReportError("cvar " .. cv, err) end
+end
+
+-- keepSnapshot: write the original back but keep it recorded (logout path,
+-- where the client may not persist the write; see RestoreAllStock).
+function B:RestoreManagedCVar(cv, keepSnapshot)
+    local orig = self.db.stockCVars[cv]
+    if orig == nil then return end
+    if not keepSnapshot then self.db.stockCVars[cv] = nil end
+    if type(GetCVar) ~= "function" or type(SetCVar) ~= "function" then return end
+    local ok, cur = pcall(GetCVar, cv)
+    if not ok then
+        self:ReportError("cvar " .. cv, cur)
+        return
+    end
+    if cur ~= orig then
+        local okSet, err = pcall(SetCVar, cv, orig)
+        if not okSet then self:ReportError("cvar " .. cv, err) end
+    end
+end
+
+function B:SetManagedGlobal(name, value)
+    local cur = _G[name]
+    if cur == value then return end
+    if self.db.stockGlobals[name] == nil then
+        if cur == nil then
+            self.db.stockGlobals[name] = NIL_SENTINEL
+        else
+            self.db.stockGlobals[name] = cur
+        end
+    end
+    _G[name] = value
+end
+
+function B:RestoreManagedGlobal(name, keepSnapshot)
+    local orig = self.db.stockGlobals[name]
+    if orig == nil then return end
+    if not keepSnapshot then self.db.stockGlobals[name] = nil end
+    if orig == NIL_SENTINEL then
+        _G[name] = nil
+    else
+        _G[name] = orig
+    end
+end
+
+-- Logout / reload: hand every overridden value back so the client can save
+-- the player's own settings. The snapshot is kept: benilla was observed not
+-- to rewrite config.toml after PLAYER_LOGOUT (in-game test 2026-11-01), so the
+-- zeroed values may come back next session and must stay restorable.
+function B:RestoreAllStock()
+    if not self.db then return end
+    for cv in pairs(self.db.stockCVars) do
+        self:RestoreManagedCVar(cv, true)
+    end
+    for name in pairs(self.db.stockGlobals) do
+        self:RestoreManagedGlobal(name, true)
+    end
+    -- HUD parts without a known CVar (banners, loot) go through the game API.
+    if type(AZS_SetHudShown) == "function" and type(AZS_IsHudShown) == "function" then
+        for i = 1, table.getn(self.HUD_PARTS) do
+            local part = self.HUD_PARTS[i]
+            if not self.HUD_CVARS[part] and AZS_IsHudShown(part) == false then
+                AZS_SetHudShown(part, true)
+            end
+        end
+    end
+end
+
+-- 2.6.7 and older zeroed CVars without a snapshot; for values that are "0"
+-- now, assume the client default "1" as the original (one-time migration).
+function B:SeedLegacyStockSnapshot()
+    if type(GetCVar) ~= "function" then return end
+    local list = {}
+    for i = 1, table.getn(self.STOCK_COMBAT_CVARS) do
+        table.insert(list, self.STOCK_COMBAT_CVARS[i])
+    end
+    for _, cv in pairs(self.HUD_CVARS) do
+        table.insert(list, cv)
+    end
+    for i = 1, table.getn(list) do
+        local cv = list[i]
+        if self.db.stockCVars[cv] == nil then
+            local ok, cur = pcall(GetCVar, cv)
+            if not ok then
+                self:ReportError("cvar " .. cv, cur)
+            elseif cur == "0" then
+                self.db.stockCVars[cv] = "1"
+            end
+        end
+    end
+end
+
+-------------------------------------------------------------------------------
 --  Stock Combat Text & Floating Numbers Management
 -------------------------------------------------------------------------------
 B.STOCK_COMBAT_CVARS = {
@@ -1568,6 +1716,32 @@ B.STOCK_COMBAT_CVARS = {
     "CombatLogPeriodicSpells",
     "PetMeleeDamage",
     "PetSpellDamage",
+}
+
+B.STOCK_COMBAT_GLOBALS = {
+    "SHOW_COMBAT_TEXT",
+    "SHOW_COMBAT_STATE",
+    "COMBAT_TEXT_SHOW_LOW_HEALTH_MANA",
+    "COMBAT_TEXT_SHOW_AURAS",
+    "COMBAT_TEXT_SHOW_AURA_FADE",
+    "COMBAT_TEXT_SHOW_COMBAT_STATE",
+    "COMBAT_TEXT_SHOW_DODGE_PARRY_MISS",
+    "COMBAT_TEXT_SHOW_RESISTANCES",
+    "COMBAT_TEXT_SHOW_REPUTATION",
+    "COMBAT_TEXT_SHOW_REACTIVES",
+    "COMBAT_TEXT_SHOW_FRIENDLY_NAMES",
+    "COMBAT_TEXT_SHOW_COMBO_POINTS",
+    "COMBAT_TEXT_SHOW_MANA",
+    "COMBAT_TEXT_SHOW_HONOR_GAINED",
+}
+
+B.STOCK_COMBAT_EVENTS = {
+    "COMBAT_TEXT_UPDATE",
+    "UNIT_HEALTH",
+    "UNIT_MANA",
+    "PLAYER_REGEN_DISABLED",
+    "PLAYER_REGEN_ENABLED",
+    "PLAYER_ENTERING_WORLD",
 }
 
 function B:SuppressStockCombatText()
@@ -1592,52 +1766,33 @@ function B:SuppressStockCombatText()
         self.dummyCombatText_UpdateDisplayedMessages = function() end
     end
 
-    -- 1. Silence Blizzard CombatText frame
-    if CombatText then
+    -- 1. Silence Blizzard CombatText frame once per frame instance (it can
+    --    appear late if Blizzard_CombatText loads on demand); later calls
+    --    only re-hide it.
+    if CombatText and self.silencedCombatText ~= CombatText then
         if type(CombatText.UnregisterAllEvents) == "function" then
-            pcall(CombatText.UnregisterAllEvents, CombatText)
-        end
-        if type(CombatText.Hide) == "function" then
-            pcall(CombatText.Hide, CombatText)
+            CombatText:UnregisterAllEvents()
         end
         if type(CombatText.SetScript) == "function" then
             CombatText:SetScript("OnUpdate", nil)
             CombatText:SetScript("OnEvent", nil)
         end
+        self.silencedCombatText = CombatText
+    end
+    if CombatText and type(CombatText.IsShown) == "function" and CombatText:IsShown() then
+        CombatText:Hide()
     end
     CombatText_AddMessage = self.dummyCombatText_AddMessage
     CombatText_OnUpdate = self.dummyCombatText_OnUpdate
     CombatText_OnEvent = self.dummyCombatText_OnEvent
     CombatText_UpdateDisplayedMessages = self.dummyCombatText_UpdateDisplayedMessages
 
-    -- 2. Clear stock Lua option globals
-    if _G then
-        _G.SHOW_COMBAT_TEXT = "0"
-        _G.SHOW_COMBAT_STATE = "0"
-        _G.COMBAT_TEXT_SHOW_LOW_HEALTH_MANA = "0"
-        _G.COMBAT_TEXT_SHOW_AURAS = "0"
-        _G.COMBAT_TEXT_SHOW_AURA_FADE = "0"
-        _G.COMBAT_TEXT_SHOW_COMBAT_STATE = "0"
-        _G.COMBAT_TEXT_SHOW_DODGE_PARRY_MISS = "0"
-        _G.COMBAT_TEXT_SHOW_RESISTANCES = "0"
-        _G.COMBAT_TEXT_SHOW_REPUTATION = "0"
-        _G.COMBAT_TEXT_SHOW_REACTIVES = "0"
-        _G.COMBAT_TEXT_SHOW_FRIENDLY_NAMES = "0"
-        _G.COMBAT_TEXT_SHOW_COMBO_POINTS = "0"
-        _G.COMBAT_TEXT_SHOW_MANA = "0"
-        _G.COMBAT_TEXT_SHOW_HONOR_GAINED = "0"
+    -- 2. Stock option globals and CVars: snapshotted, written only on change
+    for i = 1, table.getn(self.STOCK_COMBAT_GLOBALS) do
+        self:SetManagedGlobal(self.STOCK_COMBAT_GLOBALS[i], "0")
     end
-
-    -- 3. Zero-out stock CVars (protected with pcall to prevent host-registered panics)
-    if type(GetCVar) == "function" and type(SetCVar) == "function" then
-        local n = table.getn(self.STOCK_COMBAT_CVARS)
-        for i = 1, n do
-            local cv = self.STOCK_COMBAT_CVARS[i]
-            local ok, val = pcall(GetCVar, cv)
-            if ok and val and val ~= "0" then
-                pcall(SetCVar, cv, "0")
-            end
-        end
+    for i = 1, table.getn(self.STOCK_COMBAT_CVARS) do
+        self:SetManagedCVar(self.STOCK_COMBAT_CVARS[i], "0")
     end
 end
 
@@ -1656,54 +1811,32 @@ function B:RestoreStockCombatText()
         CombatText_UpdateDisplayedMessages = self.origCombatText_UpdateDisplayedMessages
     end
 
-    -- 2. Restore CombatText frame and events
-    if CombatText then
+    -- 2. Restore CombatText frame and events, only if we silenced it
+    if CombatText and self.silencedCombatText == CombatText then
+        self.silencedCombatText = nil
         if self.origCombatText_OnEvent and type(CombatText.SetScript) == "function" then
             CombatText:SetScript("OnEvent", self.origCombatText_OnEvent)
             CombatText:SetScript("OnUpdate", self.origCombatText_OnUpdate)
         end
         if type(CombatText.RegisterEvent) == "function" then
-            pcall(CombatText.RegisterEvent, CombatText, "COMBAT_TEXT_UPDATE")
-            pcall(CombatText.RegisterEvent, CombatText, "UNIT_HEALTH")
-            pcall(CombatText.RegisterEvent, CombatText, "UNIT_MANA")
-            pcall(CombatText.RegisterEvent, CombatText, "PLAYER_REGEN_DISABLED")
-            pcall(CombatText.RegisterEvent, CombatText, "PLAYER_REGEN_ENABLED")
-            pcall(CombatText.RegisterEvent, CombatText, "PLAYER_ENTERING_WORLD")
-        end
-        if type(CombatText.Show) == "function" then
-            pcall(CombatText.Show, CombatText)
-        end
-    end
-
-    -- 3. Restore stock Lua option globals
-    if _G then
-        _G.SHOW_COMBAT_TEXT = "1"
-        _G.SHOW_COMBAT_STATE = "1"
-        _G.COMBAT_TEXT_SHOW_LOW_HEALTH_MANA = "1"
-        _G.COMBAT_TEXT_SHOW_AURAS = "1"
-        _G.COMBAT_TEXT_SHOW_AURA_FADE = "1"
-        _G.COMBAT_TEXT_SHOW_COMBAT_STATE = "1"
-        _G.COMBAT_TEXT_SHOW_DODGE_PARRY_MISS = "1"
-        _G.COMBAT_TEXT_SHOW_RESISTANCES = "1"
-        _G.COMBAT_TEXT_SHOW_REPUTATION = "1"
-        _G.COMBAT_TEXT_SHOW_REACTIVES = "1"
-        _G.COMBAT_TEXT_SHOW_FRIENDLY_NAMES = "1"
-        _G.COMBAT_TEXT_SHOW_COMBO_POINTS = "1"
-        _G.COMBAT_TEXT_SHOW_MANA = "1"
-        _G.COMBAT_TEXT_SHOW_HONOR_GAINED = "1"
-    end
-
-    -- 4. Enable stock CVars
-    if type(GetCVar) == "function" and type(SetCVar) == "function" then
-        local n = table.getn(self.STOCK_COMBAT_CVARS)
-        for i = 1, n do
-            local cv = self.STOCK_COMBAT_CVARS[i]
-            local ok, val = pcall(GetCVar, cv)
-            if ok and val and val ~= "1" then
-                pcall(SetCVar, cv, "1")
+            for i = 1, table.getn(self.STOCK_COMBAT_EVENTS) do
+                local ev = self.STOCK_COMBAT_EVENTS[i]
+                local ok, err = pcall(CombatText.RegisterEvent, CombatText, ev)
+                if not ok then self:ReportError("combattext " .. ev, err) end
             end
         end
-        pcall(SetCVar, "SHOW_COMBAT_TEXT", "1")
+        if type(CombatText.Show) == "function" then
+            CombatText:Show()
+        end
+    end
+
+    -- 3. Stock option globals and CVars back to the player's own values.
+    --    (SHOW_COMBAT_TEXT is an option global, not a CVar: never SetCVar it.)
+    for i = 1, table.getn(self.STOCK_COMBAT_GLOBALS) do
+        self:RestoreManagedGlobal(self.STOCK_COMBAT_GLOBALS[i])
+    end
+    for i = 1, table.getn(self.STOCK_COMBAT_CVARS) do
+        self:RestoreManagedCVar(self.STOCK_COMBAT_CVARS[i])
     end
 end
 
@@ -1729,6 +1862,17 @@ B.HUD_REPLACED_BY = {
     flag = "pins",
     levels = "build",
 }
+-- CVars behind the stock HUD parts (from config.toml); banners/loot are
+-- reached only through AZS_SetHudShown.
+B.HUD_CVARS = {
+    clock = "hudClock",
+    bosses = "hudBosses",
+    tally = "hudTally",
+    build = "hudBuild",
+    meter = "hudMeter",
+    flag = "hudFlag",
+    levels = "hudLevels",
+}
 
 function B:WantStockHud(part)
     local mod = self.HUD_REPLACED_BY[part]
@@ -1744,33 +1888,18 @@ function B:SyncHud()
     if not self.db then return end
     self:SyncCombatText()
 
-    -- Direct CVar enforcement for the stock AZS HUD parts
-    if self.db.replaceHud then
-        if self:IsEnabled("unitframes") then
-            local ok, val = pcall(GetCVar, "hudBosses")
-            if ok and val ~= "0" then pcall(SetCVar, "hudBosses", "0") end
-        end
-        if self:IsEnabled("timer") then
-            local ok, val = pcall(GetCVar, "hudClock")
-            if ok and val ~= "0" then pcall(SetCVar, "hudClock", "0") end
-        end
-        if self:IsEnabled("databar") then
-            local ok, val = pcall(GetCVar, "hudTally")
-            if ok and val ~= "0" then pcall(SetCVar, "hudTally", "0") end
-        end
-        if self:IsEnabled("build") then
-            local ok, val = pcall(GetCVar, "hudBuild")
-            if ok and val ~= "0" then pcall(SetCVar, "hudBuild", "0") end
-            local okL, valL = pcall(GetCVar, "hudLevels")
-            if okL and valL ~= "0" then pcall(SetCVar, "hudLevels", "0") end
-        end
-        if self:IsEnabled("meter") then
-            local ok, val = pcall(GetCVar, "hudMeter")
-            if ok and val ~= "0" then pcall(SetCVar, "hudMeter", "0") end
-        end
-        if self:IsEnabled("pins") or self.db.replaceHud then
-            local ok, val = pcall(GetCVar, "hudFlag")
-            if ok and val ~= "0" then pcall(SetCVar, "hudFlag", "0") end
+    -- Stock HUD CVars follow WantStockHud exactly (hidden part -> "0", shown
+    -- part -> the player's snapshotted value), so they never disagree with
+    -- AZS_SetHudShown below.
+    for i = 1, table.getn(self.HUD_PARTS) do
+        local part = self.HUD_PARTS[i]
+        local cv = self.HUD_CVARS[part]
+        if cv then
+            if self:WantStockHud(part) then
+                self:RestoreManagedCVar(cv)
+            else
+                self:SetManagedCVar(cv, "0")
+            end
         end
     end
 
@@ -1932,6 +2061,52 @@ local function Age(stamp, phase)
     return a
 end
 
+local RUN_TABLE_KEYS = {
+    "zone", "run", "bosses", "guardians", "elites", "units", "schedule", "upcoming",
+    "spells", "buffs", "meter", "bossMeter", "healing", "party", "taken", "lairs", "revive",
+}
+
+local function ClearRunState(s)
+    for i = 1, table.getn(RUN_TABLE_KEYS) do
+        s[RUN_TABLE_KEYS[i]] = {}
+    end
+    s.target = { kind = "none" }
+    s.time = 0
+    s.meterTotal, s.meterDps = 0, 0
+    s.bossMeterTotal, s.bossMeterDps = 0, 0
+    s.healingTotal, s.healingDps = 0, 0
+    s.partyTotal, s.partyDps = 0, 0
+    s.lairsUpdated = nil
+end
+
+-- A run starts when play begins from no run / lobby / victory, when the run
+-- clock jumps back, or after a death when the clock is near zero (a revive
+-- keeps the clock running and is not a new run).
+function B:DetectRunStart(phase, t)
+    local prevPhase, prevTime = self.runPhase, self.runTime
+    self.runPhase, self.runTime = phase, t
+    if phase ~= "playing" and phase ~= "choosing" and phase ~= "paused" then return end
+    local started = false
+    if prevPhase == nil or prevPhase == "ready" or prevPhase == "victory" then
+        started = true
+    elseif prevTime and t + 2 < prevTime then
+        started = true
+    elseif prevPhase == "dead" and t < 5 then
+        started = true
+    end
+    if started then self:FireRunStart() end
+end
+
+function B:FireRunStart()
+    for i = 1, table.getn(self.moduleOrder) do
+        local mod = self.modules[self.moduleOrder[i]]
+        if type(mod.OnRunStart) == "function" then
+            local ok, err = pcall(mod.OnRunStart, mod)
+            if not ok then self:ReportError(mod.key, err) end
+        end
+    end
+end
+
 function B:HasApi()
     if type(AZS_GetPhase) == "function" or type(AZS_PHASE) == "string" then
         return true
@@ -1962,9 +2137,18 @@ function B:GetState()
     end
     s.phase = phase
     s.active = (phase ~= nil)
-    if not s.active then return s end
+    if not s.active then
+        -- Leaving a run: drop its data once so always-active modules do not
+        -- keep drawing the last run's units, target and party.
+        if self.runPhase ~= nil then
+            ClearRunState(s)
+            self.runPhase = nil
+        end
+        return s
+    end
 
     s.time = (type(AZS_GetRunTime) == "function" and AZS_GetRunTime()) or (AZS_RUN and tonumber(AZS_RUN.t)) or 0
+    self:DetectRunStart(phase, tonumber(s.time) or 0)
     s.length = (type(AZS_GetRunLength) == "function" and AZS_GetRunLength()) or (AZS_RUN and tonumber(AZS_RUN.dur)) or 900
     s.zone = AZS_ZONE or {}
     s.run = AZS_RUN or {}
@@ -2040,10 +2224,23 @@ function B:BuildModules()
     for i = 1, table.getn(self.moduleOrder) do
         local mod = self.modules[self.moduleOrder[i]]
         if self:IsEnabled(mod.key) and not mod.frame then
-            mod:Create()
+            local ok, err = pcall(mod.Create, mod)
+            if not ok then
+                self:ReportError(mod.key, err)
+            else
+                mod.created = true
+            end
             if mod.frame then mod.frame:Hide() end
         end
     end
+end
+
+-- Modules that take over Blizzard frames (reloadOnToggle) stay as they were
+-- built until /reload: hiding them at runtime would leave the player with no
+-- chat / minimap / unit frames at all.
+function B:IsModuleActive(mod)
+    if mod.reloadOnToggle then return mod.created == true end
+    return self:IsEnabled(mod.key)
 end
 
 function B:Tick()
@@ -2059,15 +2256,22 @@ function B:Tick()
         end
     end
 
-    local s = self:GetState()
+    -- Each module runs isolated: one failing module (or a failing AZS_* getter)
+    -- reports once and no longer stops every module after it.
+    local okState, s = pcall(self.GetState, self)
+    if not okState then
+        self:ReportError("state", s)
+        return
+    end
     for i = 1, table.getn(self.moduleOrder) do
         local mod = self.modules[self.moduleOrder[i]]
         if mod.frame then
-            local shouldShow = self:IsEnabled(mod.key) and (s.active or mod.alwaysActive)
+            local shouldShow = self:IsModuleActive(mod) and (s.active or mod.alwaysActive)
             if shouldShow then
                 if not mod.frame:IsShown() then mod.frame:Show() end
                 if type(mod.Update) == "function" then
-                    mod:Update(s)
+                    local ok, err = pcall(mod.Update, mod, s)
+                    if not ok then self:ReportError(mod.key, err) end
                 end
             elseif mod.frame:IsShown() then
                 mod.frame:Hide()
@@ -2076,16 +2280,46 @@ function B:Tick()
     end
 end
 
+StaticPopupDialogs = StaticPopupDialogs or {}
+StaticPopupDialogs["BLACKWELLUI_RELOAD"] = {
+    text = "BlackwellUI: this module replaces Blizzard frames. Reload the UI to restore them now?",
+    button1 = "Reload",
+    button2 = "Later",
+    OnAccept = function() ReloadUI() end,
+    timeout = 0,
+    whileDead = 1,
+    hideOnEscape = 1,
+}
+
 function B:OnModulesChanged()
-    if self:IsEnabled("nameplates") then
-        if type(ShowNameplates) == "function" then ShowNameplates() end
-    else
-        if type(HideNameplates) == "function" then HideNameplates() end
+    -- Touch nameplate visibility only when the module toggle itself changed:
+    -- 'V' (NAMEPLATES_ON) belongs to the player.
+    local wantPlates = self:IsEnabled("nameplates")
+    if self.lastNameplatesWanted ~= nil and self.lastNameplatesWanted ~= wantPlates then
+        if wantPlates then
+            if type(ShowNameplates) == "function" then ShowNameplates() end
+        else
+            if type(HideNameplates) == "function" then HideNameplates() end
+        end
     end
-    local sct = self.modules["combattext"]
-    if sct and type(sct.Update) == "function" then
-        sct:Update()
+    self.lastNameplatesWanted = wantPlates
+
+    local needsReload = false
+    for i = 1, table.getn(self.moduleOrder) do
+        local mod = self.modules[self.moduleOrder[i]]
+        if mod.reloadOnToggle and mod.created and not self:IsEnabled(mod.key) and not mod.reloadPrompted then
+            mod.reloadPrompted = true
+            needsReload = true
+        end
     end
+    if needsReload then
+        if type(StaticPopup_Show) == "function" then
+            StaticPopup_Show("BLACKWELLUI_RELOAD")
+        else
+            self:Print("Type /reload to restore the Blizzard frames of the disabled module.")
+        end
+    end
+
     self:BuildModules()
     self:SyncHud()
     self:Tick()
@@ -2224,6 +2458,7 @@ boot:RegisterEvent("VARIABLES_LOADED")
 boot:RegisterEvent("PLAYER_ENTERING_WORLD")
 boot:RegisterEvent("DISPLAY_SIZE_CHANGED")
 boot:RegisterEvent("UI_SCALE_CHANGED")
+boot:RegisterEvent("PLAYER_LOGOUT")
 
 local function Build()
     B:InitDB()
@@ -2233,9 +2468,7 @@ local function Build()
         B:RefreshTheme()
         B:InitTooltip()
         B:CheckResolution()
-    end
-    if not B:IsEnabled("nameplates") then
-        if type(HideNameplates) == "function" then HideNameplates() end
+        B.lastNameplatesWanted = B:IsEnabled("nameplates")
     end
     B:SyncHud()
     B:Tick()
@@ -2250,10 +2483,10 @@ boot:SetScript("OnEvent", function()
         B:SyncHud()
     elseif event == "PLAYER_ENTERING_WORLD" then
         Build()
-        B:SyncCombatText()
-        B:SyncHud()
     elseif event == "DISPLAY_SIZE_CHANGED" or event == "UI_SCALE_CHANGED" then
         B:CheckResolution()
+    elseif event == "PLAYER_LOGOUT" then
+        B:RestoreAllStock()
     end
 end)
 

@@ -23,18 +23,26 @@ local function UpdateGuardianGoal(runTime)
     end
     lastRunResetTime = runTime
 
-    local lairs = (type(AZS_GetLairs) == "function" and AZS_GetLairs()) or {}
+    local lairs = (type(AZS_GetLairs) == "function" and AZS_GetLairs()) or (type(AZS_LAIRS) == "table" and AZS_LAIRS) or {}
     local nLairs = table.getn(lairs)
     for i = 1, nLairs do
         local lair = lairs[i]
-        local idx = lair.index or i
-        local isActive = (lair.active == true or lair.active == 1 or (lair.awake and tonumber(lair.awake) > 0))
-        if guardianLairStatus[idx] == true and not isActive then
-            if runTime <= 480 then
-                guardiansSlainBefore8 = guardiansSlainBefore8 + 1
+        if type(lair) == "table" then
+            local idx = lair.index or i
+            -- Lairs report state = "awake" | "asleep" | "empty" (as read by Pins and
+            -- RareTimers); active/awake are older field shapes kept as fallback.
+            local awakeNum = tonumber(lair.awake)
+            local isActive = (lair.state == "awake" or lair.active == true or lair.active == 1
+                or lair.awake == true or (awakeNum ~= nil and awakeNum > 0))
+            -- A kill empties the lair; awake -> asleep is a reset, not a kill.
+            local slain = (lair.state == nil or lair.state == "empty")
+            if guardianLairStatus[idx] == true and not isActive and slain then
+                if runTime <= 480 then
+                    guardiansSlainBefore8 = guardiansSlainBefore8 + 1
+                end
             end
+            guardianLairStatus[idx] = isActive
         end
-        guardianLairStatus[idx] = isActive
     end
 
     return guardiansSlainBefore8
