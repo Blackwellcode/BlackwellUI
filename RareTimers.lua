@@ -10,7 +10,6 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
-local E = BlackwellUI
 local mod = {}
 mod.label = "Rare Spawn Timers"
 
@@ -22,7 +21,6 @@ local SKULL_ICON = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
 
 function mod:Create()
     local f = CreateFrame("Frame", "BUI_RareTimers", UIParent)
-    EUI_RareTimers = f -- Compatibility alias
     self.frame = f
 
     f:SetWidth(RARE_FRAME_WIDTH)

@@ -9,7 +9,6 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
-local E = BlackwellUI
 local mod = {}
 mod.label = "Multipliers"
 
@@ -37,7 +36,6 @@ local STAT_DEFS = {
 
 function mod:Create()
     local f = CreateFrame("Frame", "BUI_StatsFrame", UIParent)
-    EUI_StatsFrame = f -- Compatibility alias
     f:SetWidth(PANEL_WIDTH)
     f:SetHeight(120)
     B:Backdrop(f, 0.88)

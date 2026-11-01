@@ -5,7 +5,6 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
-local E = BlackwellUI
 local mod = {}
 mod.label = "Cast Bar"
 mod.alwaysActive = true
@@ -23,7 +22,6 @@ end
 
 function mod:Create()
     local root = CreateFrame("Frame", "BUI_CastBarModule", UIParent)
-    EUI_CastBarModule = root -- Compatibility alias
     root:SetAllPoints(UIParent)
     self.frame = root
 
@@ -33,7 +31,6 @@ function mod:Create()
     --  CastBar Container (210 x 16) - Seamlessly docked above Hero Frame
     ---------------------------------------------------------------------------
     local castBar = CreateFrame("Frame", "BUI_PlayerCastBar", root)
-    EUI_PlayerCastBar = castBar -- Compatibility alias
     castBar:SetWidth(BAR_WIDTH)
     castBar:SetHeight(BAR_HEIGHT)
     B:Backdrop(castBar, 0.85)

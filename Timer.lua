@@ -5,7 +5,6 @@
 -------------------------------------------------------------------------------
 
 local B = BlackwellUI
-local E = BlackwellUI
 local mod = {}
 mod.label = "Run Timer"
 
@@ -50,7 +49,6 @@ end
 
 function mod:Create()
     local f = CreateFrame("Frame", "BUI_TimerFrame", UIParent)
-    EUI_TimerFrame = f -- Compatibility alias
     f:SetWidth(TIMER_WIDTH)
     f:SetHeight(120)
     B:Backdrop(f, 0.85)
