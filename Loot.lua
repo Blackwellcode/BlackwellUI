@@ -177,11 +177,9 @@ function mod:Create()
     B:RegisterMover(f, "loot", "Loot Drop Log", "TOPLEFT", "TOPLEFT", 12, -180)
 end
 
+-- hideLoot hides the game's own loot pop-ups (Core:WantStockHud); this log is
+-- controlled by its module toggle only.
 function mod:Update(state)
-    if B.db and B.db.hideLoot then
-        if self.frame then self.frame:Hide() end
-        return
-    end
     self:UpdateRows()
 end
 

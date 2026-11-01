@@ -1,6 +1,8 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Options.lua
---  Control center: Cyberpunk styling, ColorPicker, font scaling, module toggles.
+--  Control center (/bw): sidebar with pages, plain-language settings with a
+--  one-line hint each; dependent settings are indented and disabled while
+--  their module is off.
 --  Lua 5.0 / WoW 1.12.1: no '#', no '%', no string methods.
 -------------------------------------------------------------------------------
 
@@ -8,109 +10,509 @@ local B = BlackwellUI
 local E = BlackwellUI
 local optionsFrame = nil
 
-local function CycleValue(list, current)
+local FRAME_W, FRAME_H = 640, 500
+local NAV_W = 150
+local HEADER_H = 28
+local FOOTER_H = 44
+local CONTENT_X = NAV_W + 20
+local CONTENT_W = FRAME_W - CONTENT_X - 20
+
+local TEXT = { 0.92, 0.92, 0.92 }
+local MUTED = { 0.55, 0.55, 0.55 }
+local DIM = { 0.38, 0.38, 0.38 }
+
+-- step = 1 forward, -1 backward
+local function CycleValue(list, current, step)
     local n = table.getn(list)
     for i = 1, n do
         if list[i] == current then
-            local nextIdx = i + 1
-            if nextIdx > n then nextIdx = 1 end
-            return list[nextIdx]
+            local idx = i + (step or 1)
+            if idx > n then idx = 1 end
+            if idx < 1 then idx = n end
+            return list[idx]
         end
     end
     return list[1]
 end
 
-local function CreateCheckbox(parent, x, y, label, getFn, setFn)
-    local btn = CreateFrame("Button", nil, parent)
-    btn:SetWidth(240)
-    btn:SetHeight(20)
-    btn:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
-    btn:EnableMouse(true)
-
-    local box = CreateFrame("Frame", nil, btn)
-    box:SetWidth(14)
-    box:SetHeight(14)
-    box:SetPoint("LEFT", btn, "LEFT", 0, 0)
-    local boxBg = box:CreateTexture(nil, "BACKGROUND")
-    B:Solid(boxBg, 0.08, 0.08, 0.08, 0.95)
-    boxBg:SetAllPoints(box)
-    B:Border(box, 0.35, 0.35, 0.35, 1)
-
-    local check = box:CreateTexture(nil, "ARTWORK")
-    check:SetPoint("TOPLEFT", box, "TOPLEFT", 2, -2)
-    check:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", -2, 2)
-    check:SetTexture(B.WHITE)
-    B:Accent(check, "tex", 0.95)
-    btn.check = check
-
-    local textFs = B:Font(btn, 10, "LEFT")
-    textFs:SetPoint("LEFT", box, "RIGHT", 6, 0)
-    textFs:SetTextColor(0.9, 0.9, 0.9)
-    textFs:SetText(label)
-    btn.textFs = textFs
-
-    function btn:Refresh()
-        local val = getFn()
-        if val then
-            self.check:Show()
-            self.textFs:SetTextColor(1, 1, 1)
-        else
-            self.check:Hide()
-            self.textFs:SetTextColor(0.6, 0.6, 0.6)
-        end
-    end
-
-    btn:SetScript("OnClick", function()
-        local cur = getFn()
-        setFn(not cur)
-        this:Refresh()
-    end)
-
-    btn:Refresh()
-    return btn
+local function SetColor(fs, c)
+    fs:SetTextColor(c[1], c[2], c[3])
 end
 
-local function CreateSimpleButton(parent, w, h, text, onClick)
+-------------------------------------------------------------------------------
+--  Widgets
+-------------------------------------------------------------------------------
+local function CreateButton(parent, w, h, text, onClick)
     local btn = CreateFrame("Button", nil, parent)
     btn:SetWidth(w)
     btn:SetHeight(h)
     btn:EnableMouse(true)
 
     local bg = btn:CreateTexture(nil, "BACKGROUND")
-    B:Solid(bg, 0.12, 0.11, 0.10, 0.95)
+    B:Solid(bg, 0.10, 0.10, 0.10, 0.95)
     bg:SetAllPoints(btn)
     btn.bg = bg
-    B:Border(btn, 0.25, 0.25, 0.25, 1)
+    B:Border(btn, 0.22, 0.22, 0.22, 1)
 
     local fs = B:Font(btn, 10, "CENTER")
     fs:SetPoint("CENTER", btn, "CENTER", 0, 0)
-    fs:SetTextColor(0.92, 0.92, 0.92)
+    SetColor(fs, TEXT)
     fs:SetText(text)
     btn.label = fs
 
     btn:SetScript("OnEnter", function()
         local ar, ag, ab = B:GetAccent()
-        B:SetBorderColor(this, ar, ag, ab, 0.85)
-        this.label:SetTextColor(1, 1, 1)
+        B:SetBorderColor(this, ar, ag, ab, 0.9)
     end)
     btn:SetScript("OnLeave", function()
-        B:SetBorderColor(this, 0.25, 0.25, 0.25, 1)
-        this.label:SetTextColor(0.92, 0.92, 0.92)
+        B:SetBorderColor(this, 0.22, 0.22, 0.22, 1)
     end)
-    if onClick then
-        btn:SetScript("OnClick", onClick)
-    end
+    if onClick then btn:SetScript("OnClick", onClick) end
     return btn
 end
 
+-- A page lays its controls out top-down from a cursor.
+local function NewPage(parent)
+    local page = CreateFrame("Frame", nil, parent)
+    page:SetPoint("TOPLEFT", parent, "TOPLEFT", CONTENT_X, -(HEADER_H + 14))
+    page:SetWidth(CONTENT_W)
+    page:SetHeight(FRAME_H - HEADER_H - FOOTER_H - 20)
+    page.y = 0
+    page.controls = {}
+    page:Hide()
+    return page
+end
+
+local function AddSection(page, title)
+    if page.y < 0 then page.y = page.y - 8 end
+    local fs = B:Font(page, 9, "LEFT")
+    fs:SetPoint("TOPLEFT", page, "TOPLEFT", 0, page.y)
+    SetColor(fs, MUTED)
+    fs:SetText(string.upper(title))
+    local rule = page:CreateTexture(nil, "ARTWORK")
+    rule:SetHeight(1)
+    rule:SetPoint("TOPLEFT", page, "TOPLEFT", 0, page.y - 14)
+    rule:SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, page.y - 14)
+    B:Solid(rule, 1, 1, 1, 0.08)
+    page.y = page.y - 22
+end
+
+local function AddNote(page, text)
+    local fs = B:Font(page, 9, "LEFT")
+    fs:SetPoint("TOPLEFT", page, "TOPLEFT", 0, page.y)
+    fs:SetWidth(CONTENT_W)
+    fs:SetHeight(26)
+    fs:SetJustifyV("TOP")
+    SetColor(fs, MUTED)
+    fs:SetText(text)
+    page.y = page.y - 30
+end
+
+-- opts: indent (bool), depends (function -> bool: parent setting is on)
+local function AddToggle(page, label, hint, getFn, setFn, opts)
+    opts = opts or {}
+    local x = (opts.indent and 20) or 0
+    local h = (hint and 32) or 22
+    local row = CreateFrame("Button", nil, page)
+    row:SetPoint("TOPLEFT", page, "TOPLEFT", x, page.y)
+    row:SetWidth(CONTENT_W - x)
+    row:SetHeight(h - 4)
+    row:EnableMouse(true)
+
+    local box = CreateFrame("Frame", nil, row)
+    box:SetWidth(12)
+    box:SetHeight(12)
+    box:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -2)
+    local boxBg = box:CreateTexture(nil, "BACKGROUND")
+    B:Solid(boxBg, 0.06, 0.06, 0.06, 1)
+    boxBg:SetAllPoints(box)
+    B:Border(box, 0.30, 0.30, 0.30, 1)
+    local check = box:CreateTexture(nil, "ARTWORK")
+    check:SetPoint("TOPLEFT", box, "TOPLEFT", 2, -2)
+    check:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", -2, 2)
+    check:SetTexture(B.WHITE)
+    B:Accent(check, "tex", 1)
+
+    local labelFs = B:Font(row, 11, "LEFT")
+    labelFs:SetPoint("TOPLEFT", box, "TOPRIGHT", 8, 1)
+    labelFs:SetText(label)
+
+    local hintFs
+    if hint then
+        hintFs = B:Font(row, 9, "LEFT")
+        hintFs:SetPoint("TOPLEFT", labelFs, "BOTTOMLEFT", 0, -3)
+        hintFs:SetWidth(CONTENT_W - x - 24)
+        hintFs:SetText(hint)
+    end
+
+    function row:Refresh()
+        local enabled = (not opts.depends) or opts.depends()
+        local on = getFn() and true or false
+        if on then check:Show() else check:Hide() end
+        if not enabled then
+            SetColor(labelFs, DIM)
+            if hintFs then SetColor(hintFs, DIM) end
+            check:SetAlpha(0.35)
+        else
+            SetColor(labelFs, (on and TEXT) or { 0.72, 0.72, 0.72 })
+            if hintFs then SetColor(hintFs, MUTED) end
+            check:SetAlpha(1)
+        end
+        self.enabled = enabled
+    end
+
+    row:SetScript("OnClick", function()
+        if not this.enabled then return end
+        setFn(not getFn())
+        if page.RefreshAll then page:RefreshAll() end
+    end)
+
+    table.insert(page.controls, row)
+    page.y = page.y - h
+    return row
+end
+
+-- Label on the left, "<  value  >" on the right.
+local function AddCycler(page, label, getText, onStep)
+    local row = CreateFrame("Frame", nil, page)
+    row:SetPoint("TOPLEFT", page, "TOPLEFT", 0, page.y)
+    row:SetWidth(CONTENT_W)
+    row:SetHeight(22)
+
+    local labelFs = B:Font(row, 11, "LEFT")
+    labelFs:SetPoint("LEFT", row, "LEFT", 0, 0)
+    SetColor(labelFs, TEXT)
+    labelFs:SetText(label)
+
+    local nextBtn = CreateButton(row, 22, 20, ">", function() onStep(1) page:RefreshAll() end)
+    nextBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+    local valueFs = B:Font(row, 10, "CENTER")
+    valueFs:SetPoint("RIGHT", nextBtn, "LEFT", -4, 0)
+    valueFs:SetWidth(130)
+    SetColor(valueFs, TEXT)
+    local prevBtn = CreateButton(row, 22, 20, "<", function() onStep(-1) page:RefreshAll() end)
+    prevBtn:SetPoint("RIGHT", valueFs, "LEFT", -4, 0)
+
+    function row:Refresh() valueFs:SetText(getText()) end
+    table.insert(page.controls, row)
+    page.y = page.y - 28
+    return row
+end
+
+-- Label on the left, "-  value  +" on the right, optional extra button.
+local function AddStepper(page, label, getText, onStep, extra)
+    local row = CreateFrame("Frame", nil, page)
+    row:SetPoint("TOPLEFT", page, "TOPLEFT", 0, page.y)
+    row:SetWidth(CONTENT_W)
+    row:SetHeight(22)
+
+    local labelFs = B:Font(row, 11, "LEFT")
+    labelFs:SetPoint("LEFT", row, "LEFT", 0, 0)
+    SetColor(labelFs, TEXT)
+    labelFs:SetText(label)
+
+    local anchor = row
+    local anchorPoint = "RIGHT"
+    local xoff = 0
+    if extra then
+        local eb = CreateButton(row, 54, 20, extra.text, function() extra.onClick() page:RefreshAll() end)
+        eb:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+        row.extraBtn = eb
+        anchor, anchorPoint, xoff = eb, "LEFT", -8
+    end
+    local plusBtn = CreateButton(row, 22, 20, "+", function() onStep(1) page:RefreshAll() end)
+    plusBtn:SetPoint("RIGHT", anchor, anchorPoint, xoff, 0)
+    local valueFs = B:Font(row, 10, "CENTER")
+    valueFs:SetPoint("RIGHT", plusBtn, "LEFT", -4, 0)
+    valueFs:SetWidth(70)
+    SetColor(valueFs, TEXT)
+    local minusBtn = CreateButton(row, 22, 20, "-", function() onStep(-1) page:RefreshAll() end)
+    minusBtn:SetPoint("RIGHT", valueFs, "LEFT", -4, 0)
+
+    function row:Refresh()
+        valueFs:SetText(getText())
+        if extra and extra.getText then row.extraBtn.label:SetText(extra.getText()) end
+    end
+    table.insert(page.controls, row)
+    page.y = page.y - 28
+    return row
+end
+
+local function AddActionButton(page, text, w, onClick)
+    local btn = CreateButton(page, w or 180, 22, text, onClick)
+    btn:SetPoint("TOPLEFT", page, "TOPLEFT", 0, page.y)
+    page.y = page.y - 30
+    return btn
+end
+
+-------------------------------------------------------------------------------
+--  Setting helpers
+-------------------------------------------------------------------------------
+local function ModuleToggle(key)
+    return function() return B:IsEnabled(key) end,
+        function(val)
+            B.db.modules[key] = val
+            B:OnModulesChanged()
+        end
+end
+
+local function ModuleOn(key)
+    return function() return B:IsEnabled(key) end
+end
+
+local function DbToggle(key, default, after)
+    return function()
+            local v = B.db[key]
+            if v == nil then return default end
+            return v
+        end,
+        function(val)
+            B.db[key] = val
+            if after then after(val) end
+        end
+end
+
+local function Clamp(v, lo, hi)
+    if v < lo then return lo end
+    if v > hi then return hi end
+    return v
+end
+
+StaticPopupDialogs = StaticPopupDialogs or {}
+StaticPopupDialogs["BLACKWELLUI_RESET_LAYOUT"] = {
+    text = "BlackwellUI: move every frame back to its default position?",
+    button1 = "Reset",
+    button2 = "Cancel",
+    OnAccept = function() B:ResetPositions() end,
+    timeout = 0,
+    whileDead = 1,
+    hideOnEscape = 1,
+}
+
+-------------------------------------------------------------------------------
+--  Pages
+-------------------------------------------------------------------------------
+local function BuildGeneral(page)
+    AddSection(page, "Stock game interface")
+    local get, set = DbToggle("replaceHud", true, function() B:SyncHud() end)
+    AddToggle(page, "Replace the stock run HUD",
+        "Hides the game's own clock, meter and boss bars where BlackwellUI shows them.", get, set)
+    get, set = DbToggle("hideBanners", false, function() B:SyncHud() end)
+    AddToggle(page, "Hide boss banners",
+        "Removes the large boss announcements and boss emotes in chat.", get, set)
+    get, set = DbToggle("hideLoot", false, function() B:SyncHud() end)
+    AddToggle(page, "Hide loot pop-ups",
+        "Removes the game's loot prompts. The BlackwellUI loot log stays.", get, set)
+
+    AddSection(page, "Layout")
+    get, set = DbToggle("demo", false, function() B:Tick() end)
+    AddToggle(page, "Preview mode",
+        "Fills every panel with sample data, handy while arranging the layout.", get, set)
+    get, set = DbToggle("showGrid", true, function()
+        if B.SetAlignmentGridShown then B:SetAlignmentGridShown(B.unlocked) end
+    end)
+    AddToggle(page, "Alignment grid in edit mode",
+        "32 px grid with centre lines while frames are unlocked.", get, set)
+
+    AddSection(page, "Troubleshooting")
+    AddActionButton(page, "Open script error log", 200, function()
+        if type(BenillaScriptLog_Toggle) == "function" then
+            BenillaScriptLog_Toggle()
+        else
+            B:Print("No script log available in this client.")
+        end
+    end)
+    AddNote(page, "Before uninstalling, untick Combat text (Combat page) and Replace the stock run HUD here, so the game gets its own settings back.")
+end
+
+local function BuildAppearance(page, refreshOwner)
+    AddSection(page, "Colour")
+    AddCycler(page, "Theme",
+        function() return tostring(B.db.theme) end,
+        function(step)
+            B.db.theme = CycleValue(B.THEME_ORDER, B.db.theme, step)
+            B:RefreshTheme()
+            refreshOwner()
+        end)
+    AddActionButton(page, "Pick custom colour", 180, function()
+        if not ColorPickerFrame then return end
+        local cur = B.db.customAccent or { r = 0, g = 0.9, b = 1 }
+        local prev = { r = cur.r, g = cur.g, b = cur.b, theme = B.db.theme }
+        ColorPickerFrame.hasOpacity = nil
+        ColorPickerFrame.opacityFunc = nil
+        ColorPickerFrame.func = nil
+        if ColorPickerFrame.SetColorRGB then
+            ColorPickerFrame:SetColorRGB(cur.r, cur.g, cur.b)
+        end
+        ColorPickerFrame.func = function()
+            local r, g, b = ColorPickerFrame:GetColorRGB()
+            B.db.customAccent = { r = r, g = g, b = b }
+            B.db.theme = "Custom"
+            B:RefreshTheme()
+            refreshOwner()
+        end
+        ColorPickerFrame.cancelFunc = function()
+            B.db.customAccent = { r = prev.r, g = prev.g, b = prev.b }
+            B.db.theme = prev.theme
+            B:RefreshTheme()
+            refreshOwner()
+        end
+        ColorPickerFrame:Show()
+    end)
+
+    AddSection(page, "Style")
+    AddCycler(page, "Bar texture",
+        function() return tostring(B.db.barTexture) end,
+        function(step)
+            B.db.barTexture = CycleValue(B.BAR_TEXTURE_ORDER, B.db.barTexture, step)
+            B:RefreshTheme()
+        end)
+    AddCycler(page, "Font",
+        function() return tostring(B.db.font) end,
+        function(step)
+            B.db.font = CycleValue(B.FONT_ORDER, B.db.font, step)
+            B:RefreshTheme()
+        end)
+    AddStepper(page, "Text size",
+        function() return string.format("%+d", math.floor(B.db.fontScaleMod or 0)) end,
+        function(step)
+            B.db.fontScaleMod = Clamp((B.db.fontScaleMod or 0) + step, -3, 5)
+            B:RefreshTheme()
+        end)
+    AddStepper(page, "Background opacity",
+        function() return string.format("%d%%", math.floor((B.db.backdropAlpha or 0.85) * 100 + 0.5)) end,
+        function(step)
+            local v = Clamp((B.db.backdropAlpha or 0.85) + step * 0.05, 0.30, 1.0)
+            B.db.backdropAlpha = math.floor(v * 100 + 0.5) / 100
+            B:RefreshTheme()
+        end)
+
+    AddSection(page, "Size")
+    AddStepper(page, "UI scale",
+        function() return string.format("%.2f", B.db.scale or 1.0) end,
+        function(step)
+            B.db.autoScale = false
+            local v = Clamp((B.db.scale or 1.0) + step * 0.05, 0.5, 2.0)
+            B.db.scale = math.floor(v * 100 + 0.5) / 100
+            B:ApplyScale()
+        end,
+        {
+            getText = function() return (B.db.autoScale and "Auto") or "Fixed" end,
+            onClick = function()
+                B.db.autoScale = not B.db.autoScale
+                if B.db.autoScale then
+                    B.db.scale = B:GetOptimalScale()
+                    B:ApplyScale()
+                end
+            end,
+        })
+end
+
+local function BuildHud(page)
+    AddSection(page, "Player")
+    local get, set = ModuleToggle("unitframes")
+    AddToggle(page, "Unit frames",
+        "Hero, target, target of target and the elites & bosses list.", get, set)
+    get, set = DbToggle("colorHealthByClass", true, function() B:RefreshTheme() end)
+    AddToggle(page, "Class-coloured health", nil, get, set, { indent = true, depends = ModuleOn("unitframes") })
+    get, set = ModuleToggle("castbar")
+    AddToggle(page, "Cast bar", nil, get, set)
+    get, set = ModuleToggle("build")
+    AddToggle(page, "Spell tiles",
+        "Your spells with cooldowns, ranks and upgrade tooltips.", get, set)
+    get, set = DbToggle("showBuffBars", true, function() B:Tick() end)
+    AddToggle(page, "Buff bars above the tiles", nil, get, set, { indent = true, depends = ModuleOn("build") })
+
+    AddSection(page, "Panels")
+    get, set = ModuleToggle("stats")
+    AddToggle(page, "Multipliers",
+        "Damage, cooldown, crit, area and the other run multipliers.", get, set)
+    get, set = DbToggle("statsGrowUp", false, function()
+        local m = B.modules["stats"]
+        if m and type(m.ApplyGrowth) == "function" then m:ApplyGrowth() end
+    end)
+    AddToggle(page, "Grow upwards (bottom edge stays in place)", nil, get, set, { indent = true, depends = ModuleOn("stats") })
+    get, set = ModuleToggle("equipment")
+    AddToggle(page, "Equipment", nil, get, set)
+    get, set = ModuleToggle("databar")
+    AddToggle(page, "Data bar",
+        "Level, XP, kills per minute, gold, lives, damage and FPS along the bottom.", get, set)
+    get, set = ModuleToggle("actionbars")
+    AddToggle(page, "Hide action bars and bags",
+        "Spells cast themselves in Azeroth Survivors. Needs /reload to bring them back.", get, set)
+end
+
+local function BuildCombat(page)
+    AddSection(page, "Damage meter")
+    local get, set = ModuleToggle("meter")
+    AddToggle(page, "Damage meter",
+        "Damage, healing, boss, taken and party tabs with per-spell breakdown.", get, set)
+    get, set = DbToggle("mergeItemProcs", false, function() B:Tick() end)
+    AddToggle(page, "Merge item procs into their spell", nil, get, set, { indent = true, depends = ModuleOn("meter") })
+
+    AddSection(page, "Combat text")
+    get, set = ModuleToggle("combattext")
+    AddToggle(page, "Combat text",
+        "Replaces Blizzard's floating numbers. Turning it off restores them at once.", get, set)
+    get, set = DbToggle("sctAlerts", false)
+    AddToggle(page, "Ability alerts",
+        "Ready, Overpower and Execute prompts. They do not check your class.", get, set, { indent = true, depends = ModuleOn("combattext") })
+
+    AddSection(page, "Nameplates")
+    get, set = ModuleToggle("nameplates")
+    AddToggle(page, "Nameplates",
+        "Coloured by reaction and unit kind. Show or hide them with V.", get, set)
+end
+
+local function BuildMap(page)
+    AddSection(page, "Minimap")
+    local get, set = ModuleToggle("minimap")
+    AddToggle(page, "Square minimap with coordinates", nil, get, set)
+    get, set = ModuleToggle("pins")
+    AddToggle(page, "Radar pins",
+        "Pins stay on the minimap edge when the target is out of range.", get, set)
+    get, set = DbToggle("pinCaches", true)
+    AddToggle(page, "Caches", nil, get, set, { indent = true, depends = ModuleOn("pins") })
+    get, set = DbToggle("pinLairs", true)
+    AddToggle(page, "Guardian lairs", nil, get, set, { indent = true, depends = ModuleOn("pins") })
+
+    AddSection(page, "Run")
+    get, set = ModuleToggle("timer")
+    AddToggle(page, "Run clock",
+        "Time, next boss, boss schedule and the 4 Guardians before 8:00 goal.", get, set)
+    get, set = ModuleToggle("rares")
+    AddToggle(page, "Rare spawn timers", nil, get, set)
+    get, set = ModuleToggle("loot")
+    AddToggle(page, "Loot log", nil, get, set)
+
+    AddSection(page, "Chat and character")
+    get, set = ModuleToggle("chat")
+    AddToggle(page, "Chat panel", nil, get, set)
+    get, set = DbToggle("filterChatSpam", true)
+    AddToggle(page, "Filter level-up spam", nil, get, set, { indent = true, depends = ModuleOn("chat") })
+    get, set = ModuleToggle("character")
+    AddToggle(page, "Character window restyle", nil, get, set)
+end
+
+local PAGES = {
+    { key = "general",    label = "General",    build = BuildGeneral },
+    { key = "appearance", label = "Appearance", build = BuildAppearance },
+    { key = "hud",        label = "HUD",        build = BuildHud },
+    { key = "combat",     label = "Combat",     build = BuildCombat },
+    { key = "map",        label = "Map & Run",  build = BuildMap },
+}
+
+-------------------------------------------------------------------------------
+--  Frame
+-------------------------------------------------------------------------------
 local function BuildOptionsFrame()
     if optionsFrame then return optionsFrame end
 
     local f = CreateFrame("Frame", "BlackwellUIOptionsFrame", UIParent)
     BlackwallUIOptionsFrame = f -- Compatibility alias
     EllesmereUIOptionsFrame = f -- Compatibility alias
-    f:SetWidth(540)
-    f:SetHeight(585)
+    f:SetWidth(FRAME_W)
+    f:SetHeight(FRAME_H)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
     f:SetFrameStrata("DIALOG")
     f:SetMovable(true)
@@ -119,433 +521,140 @@ local function BuildOptionsFrame()
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", function() this:StartMoving() end)
     f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    B:Backdrop(f, 0.96)
+    -- Own opaque background: B:Backdrop follows the HUD opacity setting, and a
+    -- see-through settings window is hard to read over the HUD.
+    local frameBg = f:CreateTexture(nil, "BACKGROUND")
+    B:Solid(frameBg, 0.045, 0.045, 0.05, 0.97)
+    frameBg:SetAllPoints(f)
+    B:Border(f, 0, 0, 0, 1)
     table.insert(UISpecialFrames, "BlackwellUIOptionsFrame")
 
-    -- Header
-    local hdr = B:Header(f, "BLACKWELL UI  -  AZEROTH SURVIVORS", 24)
-    hdr.value:SetText("v" .. B.version)
+    -- Title bar
+    local title = B:Font(f, 13, "LEFT")
+    title:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -9)
+    SetColor(title, TEXT)
+    title:SetText("BlackwellUI")
+    local ver = B:Font(f, 9, "LEFT")
+    ver:SetPoint("LEFT", title, "RIGHT", 8, -1)
+    SetColor(ver, MUTED)
+    ver:SetText("v" .. B.version)
+    local closeBtn = CreateButton(f, 22, 20, "x", function() f:Hide() end)
+    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -5)
+    local titleRule = f:CreateTexture(nil, "ARTWORK")
+    titleRule:SetHeight(1)
+    titleRule:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -HEADER_H)
+    titleRule:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -HEADER_H)
+    B:Solid(titleRule, 1, 1, 1, 0.08)
 
-    local closeBtn = CreateSimpleButton(hdr, 20, 18, "X", function()
-        f:Hide()
-    end)
-    closeBtn:SetPoint("RIGHT", hdr, "RIGHT", -4, 0)
-    hdr.value:ClearAllPoints()
-    hdr.value:SetPoint("RIGHT", closeBtn, "LEFT", -8, 0)
+    -- Sidebar
+    local nav = CreateFrame("Frame", nil, f)
+    nav:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -(HEADER_H + 1))
+    nav:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 1)
+    nav:SetWidth(NAV_W)
+    local navBg = nav:CreateTexture(nil, "BACKGROUND")
+    B:Solid(navBg, 0, 0, 0, 0.30)
+    navBg:SetAllPoints(nav)
+    local navRule = nav:CreateTexture(nil, "ARTWORK")
+    navRule:SetWidth(1)
+    navRule:SetPoint("TOPRIGHT", nav, "TOPRIGHT", 0, 0)
+    navRule:SetPoint("BOTTOMRIGHT", nav, "BOTTOMRIGHT", 0, 0)
+    B:Solid(navRule, 1, 1, 1, 0.08)
 
-    -- Appearance Section (Top)
-    local secApp = B:Font(f, 10, "LEFT")
-    secApp:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -32)
-    secApp:SetTextColor(0.65, 0.65, 0.65)
-    secApp:SetText("COLORS & TYPOGRAPHY")
+    local pages, navButtons = {}, {}
+    local current = nil
 
-    -- Row 1: Themes, ColorPicker Swatch, Bars, Font, Scale
-    local themeBtn = CreateSimpleButton(f, 130, 22, "Theme", nil)
-    themeBtn:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -48)
-
-    local swatchBtn = CreateFrame("Button", nil, f)
-    swatchBtn:SetWidth(42)
-    swatchBtn:SetHeight(22)
-    swatchBtn:SetPoint("LEFT", themeBtn, "RIGHT", 6, 0)
-    swatchBtn:EnableMouse(true)
-    local swatchBg = swatchBtn:CreateTexture(nil, "BACKGROUND")
-    swatchBg:SetAllPoints(swatchBtn)
-    swatchBtn.bg = swatchBg
-    B:Border(swatchBtn, 0.25, 0.25, 0.25, 1)
-    local swatchFs = B:Font(swatchBtn, 9, "CENTER")
-    swatchFs:SetPoint("CENTER", swatchBtn, "CENTER", 0, 0)
-    swatchFs:SetText("RGB")
-    swatchBtn.fs = swatchFs
-    f.swatchBtn = swatchBtn
-
-    local barBtn = CreateSimpleButton(f, 110, 22, "Bars", nil)
-    barBtn:SetPoint("LEFT", swatchBtn, "RIGHT", 6, 0)
-
-    local fontBtn = CreateSimpleButton(f, 120, 22, "Font", nil)
-    fontBtn:SetPoint("LEFT", barBtn, "RIGHT", 6, 0)
-
-    -- Scale controls
-    local scaleLbl = B:Font(f, 10, "LEFT")
-    scaleLbl:SetPoint("LEFT", fontBtn, "RIGHT", 8, 0)
-    scaleLbl:SetTextColor(0.8, 0.8, 0.8)
-
-    local scaleDown = CreateSimpleButton(f, 18, 22, "-", function()
-        B.db.autoScale = false
-        local cur = B.db.scale or 1.0
-        cur = cur - 0.05
-        if cur < 0.5 then cur = 0.5 end
-        B.db.scale = math.floor(cur * 100 + 0.5) / 100
-        B:ApplyScale()
-        scaleLbl:SetText(string.format("x%.2f", B.db.scale))
-    end)
-    scaleDown:SetPoint("LEFT", scaleLbl, "RIGHT", 4, 0)
-
-    local scaleUp = CreateSimpleButton(f, 18, 22, "+", function()
-        B.db.autoScale = false
-        local cur = B.db.scale or 1.0
-        cur = cur + 0.05
-        if cur > 2.0 then cur = 2.0 end
-        B.db.scale = math.floor(cur * 100 + 0.5) / 100
-        B:ApplyScale()
-        scaleLbl:SetText(string.format("x%.2f", B.db.scale))
-    end)
-    scaleUp:SetPoint("LEFT", scaleDown, "RIGHT", 3, 0)
-
-    local autoScaleBtn = CreateSimpleButton(f, 44, 22, "Auto", function()
-        B.db.autoScale = not B.db.autoScale
-        if B.db.autoScale then
-            B.db.scale = B:GetOptimalScale()
-            B:ApplyScale()
-        end
-        scaleLbl:SetText(string.format("x%.2f%s", B.db.scale, B.db.autoScale and " (A)" or ""))
-    end)
-    autoScaleBtn:SetPoint("LEFT", scaleUp, "RIGHT", 3, 0)
-
-    -- Row 2: Backdrop Opacity, HUD Font Size, Chat Font Size
-    local bgAlphaLbl = B:Font(f, 10, "LEFT")
-    bgAlphaLbl:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -78)
-    bgAlphaLbl:SetTextColor(0.8, 0.8, 0.8)
-
-    local bgDown = CreateSimpleButton(f, 18, 20, "-", function()
-        local cur = B.db.backdropAlpha or 0.85
-        cur = cur - 0.05
-        if cur < 0.30 then cur = 0.30 end
-        B.db.backdropAlpha = math.floor(cur * 100 + 0.5) / 100
-        B:RefreshTheme()
-        bgAlphaLbl:SetText(string.format("Backdrop: %d%%", math.floor(B.db.backdropAlpha * 100 + 0.5)))
-    end)
-    bgDown:SetPoint("LEFT", bgAlphaLbl, "RIGHT", 4, 0)
-
-    local bgUp = CreateSimpleButton(f, 18, 20, "+", function()
-        local cur = B.db.backdropAlpha or 0.85
-        cur = cur + 0.05
-        if cur > 1.0 then cur = 1.0 end
-        B.db.backdropAlpha = math.floor(cur * 100 + 0.5) / 100
-        B:RefreshTheme()
-        bgAlphaLbl:SetText(string.format("Backdrop: %d%%", math.floor(B.db.backdropAlpha * 100 + 0.5)))
-    end)
-    bgUp:SetPoint("LEFT", bgDown, "RIGHT", 3, 0)
-
-    -- HUD Font Scale Modifier (-2 to +4)
-    local fontModLbl = B:Font(f, 10, "LEFT")
-    fontModLbl:SetPoint("LEFT", bgUp, "RIGHT", 24, 0)
-    fontModLbl:SetTextColor(0.8, 0.8, 0.8)
-
-    local fontModDown = CreateSimpleButton(f, 18, 20, "-", function()
-        local cur = B.db.fontScaleMod or 0
-        cur = cur - 1
-        if cur < -3 then cur = -3 end
-        B.db.fontScaleMod = cur
-        B:RefreshTheme()
-        fontModLbl:SetText(string.format("HUD Font: %+d", B.db.fontScaleMod))
-    end)
-    fontModDown:SetPoint("LEFT", fontModLbl, "RIGHT", 4, 0)
-
-    local fontModUp = CreateSimpleButton(f, 18, 20, "+", function()
-        local cur = B.db.fontScaleMod or 0
-        cur = cur + 1
-        if cur > 5 then cur = 5 end
-        B.db.fontScaleMod = cur
-        B:RefreshTheme()
-        fontModLbl:SetText(string.format("HUD Font: %+d", B.db.fontScaleMod))
-    end)
-    fontModUp:SetPoint("LEFT", fontModDown, "RIGHT", 3, 0)
-
-    -- Chat Font Size (10 to 18pt)
-    local chatFontLbl = B:Font(f, 10, "LEFT")
-    chatFontLbl:SetPoint("LEFT", fontModUp, "RIGHT", 24, 0)
-    chatFontLbl:SetTextColor(0.8, 0.8, 0.8)
-
-    local chatFontDown = CreateSimpleButton(f, 18, 20, "-", function()
-        local cur = B.db.chatFontSize or 12
-        cur = cur - 1
-        if cur < 9 then cur = 9 end
-        B.db.chatFontSize = cur
-        if ChatFrame1 and type(ChatFrame1.SetFont) == "function" then
-            ChatFrame1:SetFont(B:GetFontPath(), B.db.chatFontSize)
-        end
-        chatFontLbl:SetText(string.format("Chat: %dpt", B.db.chatFontSize))
-    end)
-    chatFontDown:SetPoint("LEFT", chatFontLbl, "RIGHT", 4, 0)
-
-    local chatFontUp = CreateSimpleButton(f, 18, 20, "+", function()
-        local cur = B.db.chatFontSize or 12
-        cur = cur + 1
-        if cur > 20 then cur = 20 end
-        B.db.chatFontSize = cur
-        if ChatFrame1 and type(ChatFrame1.SetFont) == "function" then
-            ChatFrame1:SetFont(B:GetFontPath(), B.db.chatFontSize)
-        end
-        chatFontLbl:SetText(string.format("Chat: %dpt", B.db.chatFontSize))
-    end)
-    chatFontUp:SetPoint("LEFT", chatFontDown, "RIGHT", 3, 0)
-
-    local function UpdateVisualLabels()
-        themeBtn.label:SetText("Theme: " .. tostring(B.db.theme))
+    local function RefreshNav()
         local ar, ag, ab = B:GetAccent()
-        B:Solid(swatchBg, ar, ag, ab, 0.95)
-        if (ar * 0.299 + ag * 0.587 + ab * 0.114) > 0.55 then
-            swatchFs:SetTextColor(0, 0, 0)
+        for i = 1, table.getn(navButtons) do
+            local nb = navButtons[i]
+            if nb.key == current then
+                nb.bar:SetVertexColor(ar, ag, ab)
+                nb.bar:Show()
+                B:Solid(nb.bg, 1, 1, 1, 0.05)
+                SetColor(nb.label, TEXT)
+            else
+                nb.bar:Hide()
+                B:Solid(nb.bg, 1, 1, 1, 0)
+                SetColor(nb.label, MUTED)
+            end
+        end
+    end
+
+    local function ShowPage(key)
+        current = key
+        for k, p in pairs(pages) do
+            if k == key then
+                p:RefreshAll()
+                p:Show()
+            else
+                p:Hide()
+            end
+        end
+        RefreshNav()
+    end
+    f.ShowPage = ShowPage
+
+    for i = 1, table.getn(PAGES) do
+        local def = PAGES[i]
+        local nb = CreateFrame("Button", nil, nav)
+        nb:SetWidth(NAV_W - 1)
+        nb:SetHeight(28)
+        nb:SetPoint("TOPLEFT", nav, "TOPLEFT", 0, -10 - (i - 1) * 30)
+        nb:EnableMouse(true)
+        nb.key = def.key
+        local bg = nb:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints(nb)
+        nb.bg = bg
+        local bar = nb:CreateTexture(nil, "ARTWORK")
+        bar:SetTexture(B.WHITE)
+        bar:SetWidth(2)
+        bar:SetPoint("TOPLEFT", nb, "TOPLEFT", 0, 0)
+        bar:SetPoint("BOTTOMLEFT", nb, "BOTTOMLEFT", 0, 0)
+        nb.bar = bar
+        local fs = B:Font(nb, 11, "LEFT")
+        fs:SetPoint("LEFT", nb, "LEFT", 16, 0)
+        fs:SetText(def.label)
+        nb.label = fs
+        nb:SetScript("OnClick", function() ShowPage(this.key) end)
+        table.insert(navButtons, nb)
+
+        local page = NewPage(f)
+        function page:RefreshAll()
+            for j = 1, table.getn(self.controls) do
+                self.controls[j]:Refresh()
+            end
+        end
+        def.build(page, RefreshNav)
+        pages[def.key] = page
+    end
+
+    -- Footer
+    local footRule = f:CreateTexture(nil, "ARTWORK")
+    footRule:SetHeight(1)
+    footRule:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", NAV_W, FOOTER_H)
+    footRule:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, FOOTER_H)
+    B:Solid(footRule, 1, 1, 1, 0.08)
+
+    local reloadBtn = CreateButton(f, 96, 24, "Reload UI", function() ReloadUI() end)
+    reloadBtn:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 10)
+    local resetBtn = CreateButton(f, 110, 24, "Reset layout", function()
+        if type(StaticPopup_Show) == "function" then
+            StaticPopup_Show("BLACKWELLUI_RESET_LAYOUT")
         else
-            swatchFs:SetTextColor(1, 1, 1)
+            B:ResetPositions()
         end
-        barBtn.label:SetText("Bars: " .. tostring(B.db.barTexture))
-        fontBtn.label:SetText("Font: " .. tostring(B.db.font))
-        scaleLbl:SetText(string.format("x%.2f%s", B.db.scale or 1.0, B.db.autoScale and " (A)" or ""))
-        bgAlphaLbl:SetText(string.format("Backdrop: %d%%", math.floor((B.db.backdropAlpha or 0.85) * 100 + 0.5)))
-        fontModLbl:SetText(string.format("HUD Font: %+d", B.db.fontScaleMod or 0))
-        chatFontLbl:SetText(string.format("Chat: %dpt", B.db.chatFontSize or 12))
-    end
-
-    themeBtn:SetScript("OnClick", function()
-        B.db.theme = CycleValue(B.THEME_ORDER, B.db.theme)
-        B:RefreshTheme()
-        UpdateVisualLabels()
     end)
-
-    -- Native ColorPickerFrame integration
-    swatchBtn:SetScript("OnClick", function()
-        if not ColorPickerFrame then return end
-        local cur = B.db.customAccent or { r = 0, g = 0.9, b = 1 }
-        ColorPickerFrame.func = function()
-            local r, g, b = ColorPickerFrame:GetColorRGB()
-            B.db.customAccent = { r = r, g = g, b = b }
-            B.db.theme = "Custom"
-            B:RefreshTheme()
-            UpdateVisualLabels()
-        end
-        ColorPickerFrame.cancelFunc = function()
-            -- do nothing on cancel
-        end
-        if ColorPickerFrame.SetColorRGB then
-            ColorPickerFrame:SetColorRGB(cur.r, cur.g, cur.b)
-        end
-        ColorPickerFrame:Show()
-    end)
-
-    barBtn:SetScript("OnClick", function()
-        B.db.barTexture = CycleValue(B.BAR_TEXTURE_ORDER, B.db.barTexture)
-        B:RefreshTheme()
-        UpdateVisualLabels()
-    end)
-
-    fontBtn:SetScript("OnClick", function()
-        B.db.font = CycleValue(B.FONT_ORDER, B.db.font)
-        B:RefreshTheme()
-        UpdateVisualLabels()
-    end)
-
-    -- Left Column: Modules
-    local secMod = B:Font(f, 10, "LEFT")
-    secMod:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -108)
-    secMod:SetTextColor(0.65, 0.65, 0.65)
-    secMod:SetText("MODULES")
-
-    local checkList = {}
-
-    local modDefs = {
-        { key = "actionbars", label = "Action Bars & Buttons" },
-        { key = "minimap",    label = "Square Minimap & Coords" },
-        { key = "pins",       label = "Minimap Radar Pins" },
-        { key = "unitframes", label = "Hero, Target & Encounters" },
-        { key = "chat",       label = "Chat Window & EditBox" },
-        { key = "castbar",    label = "Player Cast Bar" },
-        { key = "build",      label = "Build Spells & Cooldowns" },
-        { key = "meter",      label = "Combat Damage & Boss Meter" },
-        { key = "timer",      label = "Run Clock, Goal & Schedule" },
-        { key = "databar",    label = "Bottom Telemetry Data Bar" },
-        { key = "stats",      label = "Left Multipliers & Stats" },
-        { key = "nameplates", label = "Cyberpunk Nameplates" },
-        { key = "combattext", label = "Combat Text (MSBT Style)" },
-        { key = "character",  label = "Character Matrix ('C' Key)" },
-        { key = "equipment",  label = "Picked Items & Equipment HUD" },
-        { key = "loot",       label = "Loot Drop Telemetry Log" },
-        { key = "rares",      label = "Rare Spawn Timers" },
-    }
-
-    for i = 1, table.getn(modDefs) do
-        local def = modDefs[i]
-        local cb = CreateCheckbox(f, 16, -126 - (i - 1) * 21, def.label,
-            function() return B:IsEnabled(def.key) end,
-            function(val)
-                B.db.modules[def.key] = val
-                B:OnModulesChanged()
-                if def.key == "combattext" and B.SyncCombatText then
-                    B:SyncCombatText()
-                end
-            end
-        )
-        table.insert(checkList, cb)
-    end
-
-    -- Right Column: Stock Game HUD control & Color Options
-    local secHud = B:Font(f, 10, "LEFT")
-    secHud:SetPoint("TOPLEFT", f, "TOPLEFT", 280, -108)
-    secHud:SetTextColor(0.65, 0.65, 0.65)
-    secHud:SetText("STOCK GAME HUD & RADAR OPTIONS")
-
-    local cbReplace = CreateCheckbox(f, 280, -126, "Replace Stock Run HUD",
-        function() return B.db.replaceHud end,
-        function(val)
-            B.db.replaceHud = val
-            B:SyncHud()
-        end
-    )
-    table.insert(checkList, cbReplace)
-
-    local cbBanners = CreateCheckbox(f, 280, -148, "Hide Stock Boss Banners",
-        function() return B.db.hideBanners end,
-        function(val)
-            B.db.hideBanners = val
-            B:SyncHud()
-        end
-    )
-    table.insert(checkList, cbBanners)
-
-    local cbLoot = CreateCheckbox(f, 280, -170, "Hide Stock Loot Prompts",
-        function() return B.db.hideLoot end,
-        function(val)
-            B.db.hideLoot = val
-            B:SyncHud()
-        end
-    )
-    table.insert(checkList, cbLoot)
-
-    local cbDemo = CreateCheckbox(f, 280, -192, "Demo / Preview Mode",
-        function() return B.db.demo end,
-        function(val)
-            B.db.demo = val
-            B:Tick()
-        end
-    )
-    table.insert(checkList, cbDemo)
-
-    local cbClassHp = CreateCheckbox(f, 280, -214, "Class Colored Health Bars",
-        function() return B.db.colorHealthByClass ~= false end,
-        function(val)
-            B.db.colorHealthByClass = val
-            B:RefreshTheme()
-        end
-    )
-    table.insert(checkList, cbClassHp)
-
-    local cbChatSpam = CreateCheckbox(f, 280, -236, "Filter Chat Level-Up Spam",
-        function() return B.db.filterChatSpam ~= false end,
-        function(val)
-            B.db.filterChatSpam = val
-        end
-    )
-    table.insert(checkList, cbChatSpam)
-
-    local cbPinCaches = CreateCheckbox(f, 280, -258, "Radar: Show Caches",
-        function() return B.db.pinCaches ~= false end,
-        function(val)
-            B.db.pinCaches = val
-        end
-    )
-    table.insert(checkList, cbPinCaches)
-
-    local cbPinLairs = CreateCheckbox(f, 280, -280, "Radar: Show Guardian Lairs",
-        function() return B.db.pinLairs ~= false end,
-        function(val)
-            B.db.pinLairs = val
-        end
-    )
-    table.insert(checkList, cbPinLairs)
-
-    local cbMergeProcs = CreateCheckbox(f, 280, -302, "Meter: Merge Legendary Neck/Procs",
-        function() return B.db.mergeItemProcs == true end,
-        function(val)
-            B.db.mergeItemProcs = val
-            B:Tick()
-        end
-    )
-    table.insert(checkList, cbMergeProcs)
-
-    local cbBuffBars = CreateCheckbox(f, 280, -324, "Build: Show Buff & Alert Bars",
-        function() return B.db.showBuffBars ~= false end,
-        function(val)
-            B.db.showBuffBars = val
-            B:Tick()
-        end
-    )
-    table.insert(checkList, cbBuffBars)
-
-    local cbGrid = CreateCheckbox(f, 280, -346, "Edit Mode: Alignment Grid",
-        function() return B.db.showGrid ~= false end,
-        function(val)
-            B.db.showGrid = val
-            if B.SetAlignmentGridShown then
-                B:SetAlignmentGridShown(B.unlocked)
-            end
-        end
-    )
-    table.insert(checkList, cbGrid)
-
-    local cbSctAlerts = CreateCheckbox(f, 280, -368, "Combat Text: Ability Alerts",
-        function() return B.db.sctAlerts ~= false end,
-        function(val)
-            B.db.sctAlerts = val
-        end
-    )
-    table.insert(checkList, cbSctAlerts)
-
-    -- Warning note about CVars
-    local noteFs = B:Font(f, 9, "LEFT")
-    noteFs:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -446)
-    noteFs:SetWidth(508)
-    noteFs:SetHeight(28)
-    noteFs:SetTextColor(0.55, 0.55, 0.55)
-    noteFs:SetText("Note: Stock HUD toggles are persistent game CVars. Disabling Combat Text immediately restores standard Blizzard flying damage numbers.")
-
-    -- Action Buttons (Bottom)
-    local unlockBtn = CreateSimpleButton(f, 160, 24, "Unlock / Move UI", function()
+    resetBtn:SetPoint("RIGHT", reloadBtn, "LEFT", -8, 0)
+    local editBtn = CreateButton(f, 120, 24, "Edit layout", function()
         B:SetUnlocked(not B.unlocked)
-        if B.unlocked then
-            this.label:SetText("Lock UI Positions")
-        else
-            this.label:SetText("Unlock / Move UI")
-        end
+        this.label:SetText((B.unlocked and "Done editing") or "Edit layout")
     end)
-    unlockBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 50)
-    f.unlockBtn = unlockBtn
-
-    local resetBtn = CreateSimpleButton(f, 160, 24, "Reset Positions", function()
-        B:ResetPositions()
-    end)
-    resetBtn:SetPoint("LEFT", unlockBtn, "RIGHT", 14, 0)
-
-    local hudToggleBtn = CreateSimpleButton(f, 160, 24, "Toggle Stock HUD", function()
-        B.db.replaceHud = not B.db.replaceHud
-        B:SyncHud()
-        cbReplace:Refresh()
-    end)
-    hudToggleBtn:SetPoint("LEFT", resetBtn, "RIGHT", 14, 0)
-
-    local errBtn = CreateSimpleButton(f, 246, 24, "Open Error Log (/err)", function()
-        if type(BenillaScriptLog_Toggle) == "function" then
-            BenillaScriptLog_Toggle()
-        else
-            B:Print("No script log frame found.")
-        end
-    end)
-    errBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 18)
-
-    local reloadBtn = CreateSimpleButton(f, 246, 24, "Reload UI (/reload)", function()
-        ReloadUI()
-    end)
-    reloadBtn:SetPoint("LEFT", errBtn, "RIGHT", 16, 0)
+    editBtn:SetPoint("RIGHT", resetBtn, "LEFT", -8, 0)
+    f.editBtn = editBtn
 
     f:SetScript("OnShow", function()
-        UpdateVisualLabels()
-        for i = 1, table.getn(checkList) do
-            checkList[i]:Refresh()
-        end
-        if B.unlocked then
-            f.unlockBtn.label:SetText("Lock UI Positions")
-        else
-            f.unlockBtn.label:SetText("Unlock / Move UI")
-        end
+        f.editBtn.label:SetText((B.unlocked and "Done editing") or "Edit layout")
+        ShowPage(current or "general")
     end)
 
     f:Hide()
