@@ -5,7 +5,7 @@ BlackwellUI ist eine modulare Cyberpunk/Sci-Fi HUD- und Analytics-Engine für **
 
 * **Repository:** `c:\Git\wenilla\benilla-config\AddOns\BlackwellUI`
 * **Sync-Pfad Client:** `C:\Users\Pierre\Documents\AzerothSurvivors\benilla-config\AddOns\BlackwellUI`
-* **Aktuelle Version:** 2.8.0-azs
+* **Aktuelle Version:** 2.8.1-azs
 * **TOC:** `BlackwellUI.toc` (Interface 11200, SavedVariables `BlackwellUIDB`)
 * **Global Namespace:** `B` bzw. `BlackwellUI`
 

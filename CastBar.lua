@@ -40,7 +40,15 @@ mod.options = {
     { type = "color", key = "castColor", label = "Custom cast colour", default = { r = 0.00, g = 0.90, b = 1.00 } },
     { type = "color", key = "channelColor", label = "Channel colour", default = { r = 0.20, g = 0.70, b = 1.00 } },
     { type = "color", key = "interruptColor", label = "Interrupted colour", default = { r = 0.85, g = 0.20, b = 0.20 } },
+    { type = "section", label = "Revive bar" },
+    { type = "note", label = "Party runs: shows how far a friend is bringing you back, or how far you are bringing a friend back." },
+    { type = "toggle", key = "showRevive", label = "Show revive bar", hint = "Replaces the game's own revive bar.", default = true },
+    { type = "range", key = "reviveWidth", label = "Revive bar width", min = 120, max = 400, step = 10, default = 240, format = "%d px", depends = "showRevive" },
+    { type = "color", key = "reviveColor", label = "Revive colour", default = { r = 0.30, g = 0.90, b = 0.45 }, depends = "showRevive" },
 }
+
+local REVIVE_HEIGHT = 18
+local REVIVE_COLOR = { r = 0.30, g = 0.90, b = 0.45 }
 
 local function Opt(key, default)
     return B:ModOpt("castbar", key, default)
@@ -362,6 +370,100 @@ function mod:Create()
             castBar:Hide()
         end
     end)
+
+    self:CreateReviveBar(root)
+end
+
+-- Party revive bar: same look as the cast bar, driven by AZS_REVIVE.
+function mod:CreateReviveBar(root)
+    local f = CreateFrame("Frame", "BUI_ReviveBar", root)
+    f:SetWidth(Opt("reviveWidth", 240))
+    f:SetHeight(REVIVE_HEIGHT)
+    local pad = 0
+    if self.round then
+        local rad = (B.db and B.db.cornerRadius) or 10
+        local cap = math.floor(REVIVE_HEIGHT / 2)
+        if rad > cap then rad = cap end
+        B:Panel(f, rad)
+        pad = 2
+    else
+        B:Backdrop(f, 0.85)
+    end
+
+    local bar = B:Bar(f, nil)
+    bar:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -pad)
+    bar:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -pad, pad)
+    bar:SetMinMaxValues(0, 1)
+    bar:SetValue(0)
+    f.bar = bar
+
+    local textFs = Font(bar, 9, "LEFT")
+    textFs:SetPoint("LEFT", bar, "LEFT", 4, 0)
+    textFs:SetHeight(12)
+    textFs:SetTextColor(1, 1, 1)
+    f.textFs = textFs
+
+    local pctFs = Font(bar, 9, "RIGHT")
+    pctFs:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
+    pctFs:SetWidth(40)
+    pctFs:SetHeight(12)
+    pctFs:SetTextColor(0.9, 0.9, 0.9)
+    f.pctFs = pctFs
+
+    f:Hide()
+    B:RegisterMover(f, "revive", L["Revive Bar"], "CENTER", "CENTER", 0, 160)
+    self.revive = f
+    table.insert(self.lookFrames, f)
+end
+
+-- What the revive bar shows for AZS_REVIVE: text, fill 0..1, whether the
+-- text already holds the percentage. nil when nobody is being revived.
+local function ReviveView(rev)
+    if type(rev) ~= "table" then return nil end
+    local lang = B.LANG
+    if tonumber(rev.down) == 1 then
+        local share = tonumber(rev.share) or 0
+        if rev.by and rev.by ~= "" then
+            return B:GameFormat("revive_by", lang, { name = rev.by }), share, false
+        elseif share > 0 then
+            return B:GameFormat("revive_friend", lang, { p = math.floor(share * 100) }), share, true
+        end
+        return B:GameFormat("revive_down", lang), 0, true
+    end
+    if rev.reviving and rev.reviving ~= "" then
+        return B:GameFormat("revive_other", lang, { name = rev.reviving }), tonumber(rev.rshare) or 0, false
+    end
+    return nil
+end
+
+function mod:UpdateRevive(state)
+    local f = self.revive
+    if not f then return end
+    local text, share, hasPct
+    if Opt("showRevive", true) then
+        text, share, hasPct = ReviveView(state and state.revive)
+        if not text and ((state and state.demo) or B.unlocked) then
+            -- Sample: a friend brings the hero back over four seconds.
+            share = math.mod(GetTime(), 4) / 4
+            text = B:GameFormat("revive_friend", B.LANG, { p = math.floor(share * 100) })
+            hasPct = true
+        end
+    end
+    if not text then
+        f:Hide()
+        return
+    end
+    if share < 0 then share = 0 elseif share > 1 then share = 1 end
+    local r, g, b = OptColor("reviveColor", REVIVE_COLOR)
+    B:SetBarColor(f.bar, r, g, b)
+    f.bar:SetValue(share)
+    f.textFs:SetText(text)
+    if hasPct then
+        f.pctFs:SetText("")
+    else
+        f.pctFs:SetText(string.format("%d%%", math.floor(share * 100)))
+    end
+    f:Show()
 end
 
 -- Size, text size and element visibility from the module settings.
@@ -398,6 +500,15 @@ function mod:ApplyOptions()
         if hasIcon == nil then hasIcon = true end
         self.AnchorBar(hasIcon)
     end
+
+    local rf = self.revive
+    if rf then
+        local rw = Opt("reviveWidth", 240)
+        rf:SetWidth(rw)
+        rf.textFs:SetWidth(rw - 48)
+    end
+    -- Ours replaces the game's revive bar only while it is switched on.
+    B:SyncHud()
 end
 
 -- The mover overlay is a child of the bar, which is hidden between casts:
@@ -417,6 +528,7 @@ function mod:Update(state)
         castBar.buiPreview = nil
         castBar:Hide()
     end
+    self:UpdateRevive(state)
 end
 
 B:RegisterModule("castbar", mod)
