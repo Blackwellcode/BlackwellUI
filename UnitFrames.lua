@@ -551,6 +551,70 @@ local function HoverTint(owner, region, alpha)
     return hl
 end
 
+-- Left click targets the unit, right click opens the game's own unit menu
+-- (raid target icons, invite, trade ...). The stock frames stay hidden, but
+-- their dropdowns are initialised by the game and still work.
+local function OpenUnitMenu(menuName)
+    local dd = menuName and getglobal(menuName)
+    if dd and type(ToggleDropDownMenu) == "function" then
+        ToggleDropDownMenu(1, nil, dd, "cursor")
+    end
+end
+
+local function UnitClick(unit, button, menuName)
+    if B.unlocked or not unit or not UnitExists(unit) then return end
+    if button == "RightButton" then
+        if menuName then OpenUnitMenu(menuName) end
+    elseif not UnitIsUnit(unit, "target") then
+        TargetUnit(unit)
+    end
+end
+
+-- For plain frames (no OnClick): mouse-up carries the button in arg1.
+local function MakeUnitClickable(f, unit, menuName)
+    f.unitId = unit
+    f.unitMenu = menuName
+    f:EnableMouse(true)
+    f:SetScript("OnMouseUp", function()
+        UnitClick(this.unitId, arg1, this.unitMenu)
+    end)
+end
+
+-- Raid target icon on the top edge, on its own frame above the bars.
+local RAID_ICON_TEXTURE = "Interface\\TargetingFrame\\UI-RaidTargetingIcons"
+local function AddRaidIcon(f, size)
+    local holder = CreateFrame("Frame", nil, f)
+    holder:SetWidth(size)
+    holder:SetHeight(size)
+    holder:SetPoint("CENTER", f, "TOP", 0, 0)
+    holder:SetFrameLevel(f:GetFrameLevel() + 10)
+    local tex = holder:CreateTexture(nil, "OVERLAY")
+    tex:SetAllPoints(holder)
+    tex:SetTexture(RAID_ICON_TEXTURE)
+    holder:Hide()
+    f.raidIcon = holder
+    f.raidIconTex = tex
+end
+
+-- index 1..8 (star .. skull) or nil. The atlas is a 4 x 4 grid.
+local function SetRaidIcon(f, index)
+    local holder = f and f.raidIcon
+    if not holder then return end
+    index = tonumber(index)
+    if not index or index < 1 or index > 8 then
+        holder:Hide()
+        return
+    end
+    if type(SetRaidTargetIconTexture) == "function" then
+        SetRaidTargetIconTexture(f.raidIconTex, index)
+    else
+        local col = math.mod(index - 1, 4)
+        local row = math.floor((index - 1) / 4)
+        f.raidIconTex:SetTexCoord(col * 0.25, (col + 1) * 0.25, row * 0.25, (row + 1) * 0.25)
+    end
+    holder:Show()
+end
+
 local function SuppressBlizzardFrame(f)
     if not f then return end
     f:Hide()
@@ -660,6 +724,8 @@ function mod:Create()
         shBar:SetFrameLevel(xpBar:GetFrameLevel() + 1)
     end
 
+    MakeUnitClickable(hero, "player", "PlayerFrameDropDown")
+    AddRaidIcon(hero, 18)
     B:RegisterMover(hero, "hero", L["Hero Frame"], "BOTTOM", "BOTTOM", -220, 140)
     self.hero = hero
 
@@ -781,6 +847,8 @@ function mod:Create()
     tgt.debuffBars = debuffBars
     tgt.debuffs = debuffBars
 
+    MakeUnitClickable(tgt, "target", "TargetFrameDropDown")
+    AddRaidIcon(tgt, 18)
     tgt:Hide()
     B:RegisterMover(tgt, "target", "Target Frame", "BOTTOM", "BOTTOM", 220, 140)
     self.target = tgt
@@ -817,6 +885,7 @@ function mod:Create()
     totPBar:SetPoint("TOPRIGHT", totHpBar, "BOTTOMRIGHT", 0, -1)
     tot.pBar = totPBar
 
+    MakeUnitClickable(tot, "targettarget", nil)
     tot:Hide()
     self.tot = tot
 
@@ -852,6 +921,7 @@ function mod:Create()
     petPBar:SetPoint("TOPRIGHT", petHpBar, "BOTTOMRIGHT", 0, -1)
     pet.pBar = petPBar
 
+    MakeUnitClickable(pet, "pet", "PetFrameDropDown")
     pet:Hide()
     self.pet = pet
 
@@ -986,15 +1056,14 @@ function mod:Create()
 
         pf:EnableMouse(true)
         if pf.RegisterForClicks then
-            pf:RegisterForClicks("LeftButtonUp")
+            pf:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         end
         pf.unitId = "party" .. i
+        pf.unitMenu = "PartyMemberFrame" .. i .. "DropDown"
         pf:SetScript("OnClick", function()
-            local unit = this.unitId
-            if unit and UnitExists(unit) then
-                TargetUnit(unit)
-            end
+            UnitClick(this.unitId, arg1, this.unitMenu)
         end)
+        AddRaidIcon(pf, 14)
         pf:SetScript("OnEnter", function()
             if this.hl then this.hl:Show() end
             local unit = this.unitId
@@ -1714,6 +1783,35 @@ function mod:Update(state)
     --  5. Update Party Frames
     ---------------------------------------------------------------------------
     self:UpdateParty(state)
+    self:UpdateRaidIcons(state)
+end
+
+-- Raid target icons on hero, target and party frames; samples in preview.
+local function RaidIndex(unit)
+    if type(GetRaidTargetIndex) ~= "function" or not UnitExists(unit) then return nil end
+    return GetRaidTargetIndex(unit)
+end
+
+function mod:UpdateRaidIcons(state)
+    local isDemo = (state and state.demo) or B.unlocked
+    local Index = RaidIndex
+    if isDemo then
+        SetRaidIcon(self.hero, 1)
+        SetRaidIcon(self.target, 8)
+    else
+        SetRaidIcon(self.hero, Index("player"))
+        SetRaidIcon(self.target, Index("target"))
+    end
+    for i = 1, 4 do
+        local f = self.partyFrames and self.partyFrames[i]
+        if f then
+            if isDemo then
+                SetRaidIcon(f, (i == 2) and 2 or nil)
+            else
+                SetRaidIcon(f, Index("party" .. i))
+            end
+        end
+    end
 end
 
 function mod:UpdateParty(state)

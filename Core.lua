@@ -14,7 +14,7 @@ BlackwellUI = {}
 local B = BlackwellUI
 BlackwallUI = BlackwellUI -- Backwards compatibility alias
 
-B.version = "2.8.0-azs"
+B.version = "2.8.1-azs"
 B.media = "Interface\\AddOns\\BlackwellUI\\media\\"
 B.WHITE = "Interface\\Buttons\\WHITE8X8"
 B.SOLID = "Interface\\Buttons\\WHITE8X8"
@@ -2377,7 +2377,7 @@ end
 --  Stock run HUD (AZS_SetHudShown). The setting is a CVar the game keeps, so it
 --  is written only when it differs from what we want: never in a loop.
 -------------------------------------------------------------------------------
-B.HUD_PARTS = { "clock", "bosses", "tally", "build", "meter", "banners", "loot", "flag", "levels" }
+B.HUD_PARTS = { "clock", "bosses", "tally", "build", "meter", "banners", "loot", "flag", "levels", "revive" }
 B.HUD_REPLACED_BY = {
     clock = "timer",
     bosses = "unitframes",
@@ -2386,6 +2386,7 @@ B.HUD_REPLACED_BY = {
     meter = "meter",
     flag = "pins",
     levels = "build",
+    revive = "castbar",
 }
 -- CVars behind the stock HUD parts (from config.toml); banners/loot are
 -- reached only through AZS_SetHudShown.
@@ -2397,10 +2398,15 @@ B.HUD_CVARS = {
     meter = "hudMeter",
     flag = "hudFlag",
     levels = "hudLevels",
+    revive = "hudRevive",
 }
 
 function B:WantStockHud(part)
     local mod = self.HUD_REPLACED_BY[part]
+    -- The revive bar is an option of the always-on cast bar module.
+    if part == "revive" and not self:ModOpt("castbar", "showRevive", true) then
+        return true
+    end
     if mod then
         return not (self.db.replaceHud and self:IsEnabled(mod))
     end

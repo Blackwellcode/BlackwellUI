@@ -27,6 +27,11 @@ STRINGS = [
     ("rank", "Rank {n}"),
     ("yards", "common.yards"),
     ("list_sep", "common.list_sep"),
+    # Party revive bar (AZS_REVIVE)
+    ("revive_down", "You are down: a friend must stand next to you."),
+    ("revive_by", "{name} is bringing you back"),
+    ("revive_friend", "A friend is bringing you back: {p}%"),
+    ("revive_other", "Bringing {name} back"),
     ("school_Physical", "Physical"),
     ("school_Holy", "Holy"),
     ("school_Fire", "Fire"),
