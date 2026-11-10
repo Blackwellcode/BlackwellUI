@@ -210,6 +210,29 @@ These modules take over Blizzard frames, so switching them off needs a `/reload`
 **I found a bug.**<br>
 Please [open an issue](https://github.com/Blackwellcode/BlackwellUI/issues/new/choose) with your BlackwellUI version (shown in `/bw`), Windows or browser client, the Lua error text if there is one (`/err` opens the script log), and the result of `/bw selftest`.
 
+<details>
+<summary><b>For developers: how BlackwellUI is built</b></summary>
+
+```mermaid
+flowchart TD
+    E["Azeroth Survivors engine<br/>AZS_* getters"] --> GS["B:GetState()"]
+    OU["OnUpdate, throttled to 10 per second"] --> T["B:Tick()"]
+    GS --> T
+    T -->|"pcall(mod:Update, state)"| M["Modules<br/>Meter · Timer · UnitFrames · Pins · …"]
+    REG["B:RegisterModule(key, mod)"] --> M
+    M -->|"mod.options"| O["Options.lua<br/>one generated page per module"]
+    O -->|"B.db.mod[module][key]"| DB[("SavedVariables<br/>BlackwellUIDB")]
+    DB -->|"mod:ApplyOptions()"| M
+    L["Locales<br/>13 translation files"] --> M
+    TOOLS["Python tools<br/>gen_spellicons · gen_abilitynames · gen_gamestrings"] -->|"generated Lua tables"| M
+```
+
+- Every module runs isolated: an error in one module is reported once and does not stop the others.
+- Options pages, scaling, opacity and visibility rules are generated from each module's declarations, so a new module gets a settings page without UI code.
+- The code targets Lua 5.0 (WoW 1.12.1 client): no `%` operator, no `#` length operator, `table.getn` and `arg` instead.
+
+</details>
+
 ---
 
 ## Support the project

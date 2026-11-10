@@ -14,3 +14,7 @@ $RECYCLE.BIN/
 # Temporary / backup
 *.bak
 *.tmp
+
+# Python bytecode (tools/)
+__pycache__/
+*.pyc
