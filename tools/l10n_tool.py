@@ -148,7 +148,10 @@ def catalog(root):
             for a in args:
                 if re.search(r"[A-Za-z]", a) and not re.fullmatch(r"[a-z][a-zA-Z0-9_]*", a):
                     keys.add(a)
-    keys ={k for k in keys if k.strip() and k not in {"<", ">", "-", "+", "x"}}
+    # Constant-style identifiers (StaticPopup ids such as BLACKWELLUI_RESET_LAYOUT)
+    # are call arguments, never shown text.
+    keys = {k for k in keys if k.strip() and k not in {"<", ">", "-", "+", "x"}
+            and not re.fullmatch(r"[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+", k)}
     return sorted(keys, key=lambda k: k.lower())
 
 

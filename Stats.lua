@@ -111,7 +111,7 @@ function mod:Create()
     end
     f.rows = rows
 
-    B:RegisterMover(f, "stats", L["Run Multipliers"], "TOPLEFT", "TOPLEFT", 12, -140)
+    B:RegisterMover(f, "stats", L["Run multipliers"], "TOPLEFT", "TOPLEFT", 12, -140)
 end
 
 -- Sizes, fonts, padding and header from the module settings. Safe to call

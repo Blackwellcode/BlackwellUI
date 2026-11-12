@@ -411,7 +411,7 @@ function mod:CreateReviveBar(root)
     f.pctFs = pctFs
 
     f:Hide()
-    B:RegisterMover(f, "revive", L["Revive Bar"], "CENTER", "CENTER", 0, 160)
+    B:RegisterMover(f, "revive", L["Revive bar"], "CENTER", "CENTER", 0, 160)
     self.revive = f
     table.insert(self.lookFrames, f)
 end

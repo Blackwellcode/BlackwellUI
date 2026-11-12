@@ -13,7 +13,7 @@
 local B = BlackwellUI
 local L = B.L
 local mod = {}
-mod.label = "Rare Spawn Timers"
+mod.label = "Rare spawn timers"
 
 local RARE_FRAME_WIDTH = 170
 local MAX_RARE_ROWS = 10
@@ -106,7 +106,7 @@ function mod:Create()
             if not d then return end
             GameTooltip:SetOwner(this, "ANCHOR_LEFT")
             GameTooltip:ClearLines()
-            GameTooltip:AddLine(d.name or L["Rare Guardian"], 1, 1, 1)
+            GameTooltip:AddLine(d.name or L["Rare guardian"], 1, 1, 1)
 
             if d.state == "awake" then
                 GameTooltip:AddLine(L["Status: In Combat (Awake)"], 1.0, 0.35, 0.35)
@@ -139,7 +139,7 @@ function mod:Create()
 
     f:Hide()
     -- Default placement: Docked next to Minimap (-196, -12)
-    B:RegisterMover(f, "rares", L["Rare Spawn Timers"], "TOPRIGHT", "TOPRIGHT", -196, -12)
+    B:RegisterMover(f, "rares", L["Rare spawn timers"], "TOPRIGHT", "TOPRIGHT", -196, -12)
 end
 
 function mod:Update(state)

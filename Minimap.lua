@@ -116,7 +116,8 @@ function mod:HideBlizzardArt()
                 f:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 5000, 5000)
             end
             if f.UnregisterAllEvents then
-                pcall(f.UnregisterAllEvents, f)
+                local ok, err = pcall(f.UnregisterAllEvents, f)
+                if not ok then B:ReportError("minimap:events", err) end
             end
             if f.EnableMouse then
                 f:EnableMouse(false)
@@ -211,13 +212,15 @@ function mod:Create()
         -- Mask to 1.12 square if supported
         local smt = rawget(Minimap, "SetMaskTexture")
         if type(smt) == "function" then
-            pcall(smt, Minimap, B.WHITE)
+            local ok, err = pcall(smt, Minimap, B.WHITE)
+            if not ok then B:ReportError("minimap:mask", err) end
         end
 
         -- Explicitly restore Rotating Player Arrow
         local sam = rawget(Minimap, "SetArrowModel")
         if type(sam) == "function" then
-            pcall(sam, Minimap, "Interface\\Minimap\\Rotating-MinimapArrow.mdx")
+            local ok, err = pcall(sam, Minimap, "Interface\\Minimap\\Rotating-MinimapArrow.mdx")
+            if not ok then B:ReportError("minimap:arrow", err) end
         end
 
         -- Elevate any child Model frames (such as player position arrow) above the backdrop

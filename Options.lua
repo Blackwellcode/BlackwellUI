@@ -476,6 +476,18 @@ StaticPopupDialogs["BLACKWELLUI_RESET_LAYOUT"] = {
     whileDead = 1,
     hideOnEscape = 1,
 }
+StaticPopupDialogs["BLACKWELLUI_RESET_SETTINGS"] = {
+    text = "",
+    button1 = "",
+    button2 = "",
+    OnAccept = function()
+        B.db.mod = {}
+        B:PromptSettingReload()
+    end,
+    timeout = 0,
+    whileDead = 1,
+    hideOnEscape = 1,
+}
 StaticPopupDialogs["BLACKWELLUI_LANGUAGE_RELOAD"] = {
     text = "",
     button1 = "",
@@ -496,6 +508,21 @@ local function ShowPopup(key, text, accept, cancel)
         return true
     end
     return false
+end
+
+-- Both reset paths (options button and /bw reset) ask first. Without the
+-- popup system (never seen in benilla) the action runs directly, as before.
+function B:ConfirmResetLayout()
+    if not ShowPopup("BLACKWELLUI_RESET_LAYOUT", L["BlackwellUI: move every frame back to its default position?"], L["Reset"], L["Cancel"]) then
+        self:ResetPositions()
+    end
+end
+
+function B:ConfirmResetModuleSettings()
+    if not ShowPopup("BLACKWELLUI_RESET_SETTINGS", L["Reset all module settings? Every module option returns to its default. This can't be undone."], L["Reset settings"], L["Keep settings"]) then
+        self.db.mod = {}
+        self:PromptSettingReload()
+    end
 end
 
 -- The language is read when frames are built; switching it needs a reload.
@@ -568,8 +595,7 @@ local function BuildGeneral(page)
         end
     end)
     AddActionButton(page, "Reset all module settings", 200, function()
-        B.db.mod = {}
-        B:PromptSettingReload()
+        B:ConfirmResetModuleSettings()
     end)
     AddNote(page, "Before uninstalling, switch off Combat text (its module page) and Replace the stock run HUD here, so the game gets its own settings back.")
 end
@@ -1036,9 +1062,7 @@ local function BuildOptionsFrame()
     local reloadBtn = CreateButton(f, 96, 24, "Reload UI", function() ReloadUI() end)
     reloadBtn:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 10)
     local resetBtn = CreateButton(f, 110, 24, "Reset layout", function()
-        if not ShowPopup("BLACKWELLUI_RESET_LAYOUT", L["BlackwellUI: move every frame back to its default position?"], L["Reset"], L["Cancel"]) then
-            B:ResetPositions()
-        end
+        B:ConfirmResetLayout()
     end)
     resetBtn:SetPoint("RIGHT", reloadBtn, "LEFT", -8, 0)
     local editBtn = CreateButton(f, 120, 24, "Edit layout", function()
@@ -1306,7 +1330,7 @@ local function HandleSlashCmd(msg)
         B:SetUnlocked(false)
         B:Print(L["UI locked."])
     elseif cmd == "reset" then
-        B:ResetPositions()
+        B:ConfirmResetLayout()
     elseif cmd == "demo" then
         B.db.demo = not B.db.demo
         B:Tick()
@@ -1371,12 +1395,38 @@ end
 SlashCmdList["BLACKWELLUI"] = HandleSlashCmd
 SlashCmdList["BLACKWALLUI"] = HandleSlashCmd
 
-SLASH_MSBT1 = "/msbt"
-SlashCmdList["MSBT"] = function(msg)
-    HandleSlashCmd("sct " .. (msg or ""))
+-- Convenience aliases /msbt and /splates belong to other addons
+-- (MikScrollingBattleText, ShaguPlates). They are registered only after every
+-- addon has loaded (PLAYER_LOGIN) and only if no other addon claims the same
+-- command, so BlackwellUI never takes them over.
+local function SlashTaken(command)
+    command = string.lower(command)
+    for key in pairs(SlashCmdList) do
+        local i = 1
+        while true do
+            local text = getglobal("SLASH_" .. key .. i)
+            if not text then break end
+            if string.lower(text) == command then return true end
+            i = i + 1
+        end
+    end
+    return false
 end
 
-SLASH_SPLATES1 = "/splates"
-SlashCmdList["SPLATES"] = function(msg)
-    HandleSlashCmd("plates " .. (msg or ""))
+local function RegisterAlias(key, command, target)
+    if SlashCmdList[key] or SlashTaken(command) then return false end
+    _G["SLASH_" .. key .. "1"] = command
+    SlashCmdList[key] = function()
+        HandleSlashCmd(target)
+    end
+    return true
 end
+B.RegisterSlashAlias = RegisterAlias
+
+local aliasWatcher = CreateFrame("Frame")
+aliasWatcher:RegisterEvent("PLAYER_LOGIN")
+aliasWatcher:SetScript("OnEvent", function()
+    RegisterAlias("BLACKWELLUI_MSBT", "/msbt", "sct")
+    RegisterAlias("BLACKWELLUI_SPLATES", "/splates", "plates")
+    this:UnregisterEvent("PLAYER_LOGIN")
+end)
