@@ -1,6 +1,6 @@
 # Third-party notices
 
-BlackwellUI is Copyright (c) 2026 Pierre ("Blackwellcode"), all rights reserved (see [LICENSE](LICENSE)). The components below are **not** covered by that license. They are included or used under their own terms.
+BlackwellUI is Copyright (c) 2026 Blackwell Code ("Blackwellcode"), all rights reserved (see [LICENSE](LICENSE)). The components below are **not** covered by that license. They are included or used under their own terms.
 
 ## Bundled fonts
 

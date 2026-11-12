@@ -1,6 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Core.lua
---  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
+--  Copyright (c) 2026 Blackwell Code. All rights reserved. See LICENSE.
 --  Cyberpunk-grade HUD & Analytics Engine for Azeroth Survivors (WoW 1.12.1).
 --  Lua 5.0 strict: no '#', no '%', no string methods, no '...'.
 --  Script handlers use the 1.12 globals this / event / arg1.
@@ -2531,7 +2531,7 @@ local function BuildDemo()
         bossMeterTotal = 415000,
         bossMeterDps = 792,
         party = {
-            { name = "Pierre", class = "warrior", dmg = 1845200, dps = 3521, share = 42, top = "Whirlwind", topdps = 1565 },
+            { name = "Blackwell", class = "warrior", dmg = 1845200, dps = 3521, share = 42, top = "Whirlwind", topdps = 1565 },
             { name = "Valandil", class = "mage", dmg = 1420000, dps = 2710, share = 32, top = "Blizzard", topdps = 1200 },
             { name = "Eluna", class = "priest", dmg = 620000, dps = 1183, share = 14, top = "Holy Nova", topdps = 650 },
             { name = "Sylvana", class = "rogue", dmg = 510000, dps = 973, share = 12, top = "Fan of Knives", topdps = 520 },

@@ -1,6 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Chat.lua
---  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
+--  Copyright (c) 2026 Blackwell Code. All rights reserved. See LICENSE.
 --  Chat panel in the active style, mousewheel scrolling, styled EditBox,
 --  hides scroll buttons, optional timestamps and tab pills.
 --  Lua 5.0 / WoW 1.12.1: no '#', no '%', no string methods.

@@ -1,6 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Minimap.lua
---  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
+--  Copyright (c) 2026 Blackwell Code. All rights reserved. See LICENSE.
 --  Authentic Minimap:
 --  - Clean square minimap (140 x 140 by default): rounded frame in the round
 --    style, 1px black border in the sharp style

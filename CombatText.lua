@@ -1,6 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  CombatText.lua
---  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
+--  Copyright (c) 2026 Blackwell Code. All rights reserved. See LICENSE.
 --  Scrolling Battle Text Engine (MSBT Style) for WoW 1.12.1.
 --  Features:
 --    - 4 Draggable Zones: Incoming (Left), Outgoing (Right), Static (Top), Alerts (Bottom)

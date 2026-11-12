@@ -1,6 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Options.lua
---  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
+--  Copyright (c) 2026 Blackwell Code. All rights reserved. See LICENSE.
 --  Control center (/bw): sidebar with General, Appearance and Tooltips, then
 --  one page per module, generated from the module's own settings
 --  (mod.options, see Core.lua RegisterModule). Pages scroll with the mouse

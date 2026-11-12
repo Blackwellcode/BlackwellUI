@@ -1,6 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Pins.lua
---  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
+--  Copyright (c) 2026 Blackwell Code. All rights reserved. See LICENSE.
 --  Cyberpunk Minimap Radar & Pins Engine:
 --  - Real-time field radar for Caches (AZS_CHESTS) and Guardian Lairs (AZS_GetLairs)
 --  - Square minimap edge clamping with distance and directional calculation

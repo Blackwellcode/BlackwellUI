@@ -1,6 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Equipment.lua
---  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
+--  Copyright (c) 2026 Blackwell Code. All rights reserved. See LICENSE.
 --  Picked Equipment & Items HUD:
 --  - Positioned between Chat Panel and Hero Unit Frame
 --  - Displays picked equipment items (Trinkets, Rings, Weapons, Armor, Cards)

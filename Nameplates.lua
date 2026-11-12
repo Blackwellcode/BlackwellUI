@@ -1,6 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Nameplates.lua
---  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
+--  Copyright (c) 2026 Blackwell Code. All rights reserved. See LICENSE.
 --  Cyberpunk-styled Nameplates in the manner of Plater / SurvivorPlates.
 --  Features:
 --    - Unit kind sizing: Normal (100x9), Elite (130x11), Guardian (150x12), Boss (170x14)

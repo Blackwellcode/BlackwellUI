@@ -1,6 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  UnitFrames.lua
---  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
+--  Copyright (c) 2026 Blackwell Code. All rights reserved. See LICENSE.
 --  Cyberpunk HUD Unit Frames:
 --  - Hero & Target frames (210 x 46): tall 35px health bar + 6px sleek power bar
 --  - Player class-colored or cyber-accent health bar with dark slate backdrop

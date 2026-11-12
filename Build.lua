@@ -1,6 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Build.lua
---  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
+--  Copyright (c) 2026 Blackwell Code. All rights reserved. See LICENSE.
 --  Cyberpunk Cooldown Manager / Active Build Spells & Aura Buff Tracker.
 --  - Centered layout between Hero and Target frames
 --  - 36x36 crisp square tiles with 1px black border

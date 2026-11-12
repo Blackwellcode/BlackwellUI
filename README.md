@@ -247,7 +247,7 @@ Stars help other players find the addon, too.
 
 ## License
 
-BlackwellUI is free to download and play with, but it is **not** open source: Copyright (c) 2026 Pierre ([Blackwellcode](https://github.com/Blackwellcode)), all rights reserved. You may install and use it, read the code and show it in videos and streams. Re-uploading, bundling, publishing modified versions or reusing its code or assets needs written permission. Details in [LICENSE](LICENSE).
+BlackwellUI is free to download and play with, but it is **not** open source: Copyright (c) 2026 Blackwell Code ([Blackwellcode](https://github.com/Blackwellcode)), all rights reserved. You may install and use it, read the code and show it in videos and streams. Re-uploading, bundling, publishing modified versions or reusing its code or assets needs written permission. Details in [LICENSE](LICENSE).
 
 Bundled fonts (Barlow Semi Condensed, Fira Sans) are under the SIL Open Font License; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 

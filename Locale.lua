@@ -1,6 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Locale.lua
---  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
+--  Copyright (c) 2026 Blackwell Code. All rights reserved. See LICENSE.
 --  Language detection and the L[] string table.
 --  - The game keeps its UI language in the CVar azsLanguage (en, de, fr, es,
 --    pt, pl, cs, ro, tr, ru, uk, zh, ja, ko) and sets it on every start.

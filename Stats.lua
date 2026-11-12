@@ -1,6 +1,6 @@
 -------------------------------------------------------------------------------
 --  BlackwellUI for Azeroth Survivors  -  Stats.lua
---  Copyright (c) 2026 Pierre (Blackwellcode). All rights reserved. See LICENSE.
+--  Copyright (c) 2026 Blackwell Code. All rights reserved. See LICENSE.
 --  Active Player Multipliers & Run Stats panel (Left Side).
 --  - Round panel (round style) or dark translucent window with 1px border (sharp)
 --  - Real-time multipliers parsed from AZS_STATS (Damage, CDR, Crit, Area, etc.)
