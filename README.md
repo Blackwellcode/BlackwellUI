@@ -167,7 +167,7 @@ BlackwellUI hides the stock run HUD and Blizzard's floating damage numbers. Thos
 |---|---|
 | `/bw` | Open the control center (also `/bui`, `/blackwell`) |
 | `/bw unlock` · `/bw lock` | Enter / leave edit mode |
-| `/bw reset` | Reset all frame positions |
+| `/bw reset` | Reset all frame positions (asks first) |
 | `/bw grid` | Toggle the alignment grid in edit mode |
 | `/bw demo` | Preview mode with sample data, useful for building a layout |
 | `/bw hud` | Toggle replacing the stock run HUD |
@@ -179,6 +179,8 @@ BlackwellUI hides the stock run HUD and Blizzard's floating damage numbers. Thos
 | `/bw selftest` | Try every setting once and report errors (settings are restored afterwards) |
 | `/bw layoutcheck` | List HUD frames that overlap |
 | `/bw help` | List all commands in chat |
+
+`/msbt` and `/splates` work as shortcuts for `/bw sct` and `/bw plates`, but only when no other addon uses those commands.
 
 ---
 
@@ -242,6 +244,24 @@ BlackwellUI is free. If it makes your runs better, a coffee keeps the updates co
 <a href="https://buymeacoffee.com/blackwellcode"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="48" width="174"></a>
 
 Stars help other players find the addon, too.
+
+---
+
+## Development
+
+The repository is the development copy; the game loads a separate git worktree on the branch `live`, so unfinished work never reaches the client:
+
+```powershell
+# once: worktree for the client, linked into the AddOns folder
+git worktree add F:\aktiv\blackwellui-live -b live main
+New-Item -ItemType Junction -Path "$env:USERPROFILE\Documents\AzerothSurvivors\benilla-config\AddOns\BlackwellUI" -Target 'F:\aktiv\blackwellui-live'
+
+# every change: test gate in the repository, then fast-forward the live copy
+bash tools/check.sh
+git -C F:\aktiv\blackwellui-live merge --ff-only main
+```
+
+`tools/check.sh` runs the Lua syntax check, the Lua 5.0 / 1.12 API scanner, the TOC check, the translation check and two offline harnesses (core logic and every module against a simulated client). Release archives come from `python -I tools/build_zip.py . BlackwellUI.zip`.
 
 ---
 

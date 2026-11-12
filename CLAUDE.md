@@ -3,8 +3,9 @@
 ## Projektübersicht
 BlackwellUI ist eine modulare Cyberpunk/Sci-Fi HUD- und Analytics-Engine für **Azeroth Survivors** (Roguelite auf Basis des Vanilla WoW 1.12.1 Clients, Engine „benilla“). Das Addon läuft sowohl im nativen Windows-Client (`AzerothSurvivors.exe`) als auch im WebGPU/WebAssembly (WASM) Browser-Client.
 
-* **Repository:** `c:\Git\wenilla\benilla-config\AddOns\BlackwellUI`
-* **Sync-Pfad Client:** `C:\Users\Pierre\Documents\AzerothSurvivors\benilla-config\AddOns\BlackwellUI`
+* **Repository (Entwicklung):** `F:\aktiv\blackwellui`, Branch `main`
+* **Live-Stand im Client:** `F:\aktiv\blackwellui-live`, git worktree auf Branch `live`
+* **Client-Pfad:** `%USERPROFILE%\Documents\AzerothSurvivors\benilla-config\AddOns\BlackwellUI` ist eine Directory Junction auf den Live-Worktree (nicht auf das Entwicklungs-Repo)
 * **Aktuelle Version:** 2.8.1-azs
 * **TOC:** `BlackwellUI.toc` (Interface 11200, SavedVariables `BlackwellUIDB`)
 * **Global Namespace:** `B` bzw. `BlackwellUI`
@@ -26,7 +27,8 @@ Es läuft die Lua 5.0 Runtime der Vanilla 1.12.1 Engine. Folgende Regeln sind zw
 2. **FrameXML & UI-APIs:**
    * **KEIN `SetSize(w, h)`:** Immer separat `SetWidth(w)` und `SetHeight(h)`.
    * **KEIN `SetColorTexture`:** Immer `tex:SetTexture(...)` mit `tex:SetVertexColor(r, g, b, a)` oder `B:Solid(...)` (`WHITE8X8`).
-   * **KEIN `C_Timer`:** Updates laufen über den 0.1s OnUpdate-Ticker von `Core.lua` (`Core:Tick()`).
+   * **KEIN `C_Timer`:** Updates laufen über den 0.1s OnUpdate-Ticker von `Core.lua` (`Core:Tick()`). Ereignisse rufen `B:RequestTick()` (Dirty-Flag, der Ticker bündelt es, max. 20 Hz), nie `B:Tick()` direkt.
+   * **Tabellen im Takt wiederverwenden:** In `mod:Update` und OnUpdate keine neuen Tabellen je Tick (Puffer + Zähler, überzählige Einträge auf `nil`). Wiederverwendete Listen nie mit `table.insert` füllen: Lua 5.0 merkt sich die Länge dann per `setn`, und spätere Index-Zuweisungen zählt `table.getn` nicht mehr mit.
    * **KEIN `hooksecurefunc`:** Klassisches Function-Hooking (`local orig = Target; Target = function(...) orig(...) end`).
    * **Event-Handler:** Standardmäßig `this`, `event`, `arg1`..`arg9`.
 
@@ -75,11 +77,15 @@ Die Daten werden via `AZSApiFrame` oder Events bereitgestellt:
 
 ## Entwickler-Workflows & Befehle
 
-### 1. Synchronisation mit lokalem Client
-Nach Code-Änderungen in das Spielverzeichnis syncen:
+### 1. Entwicklung und Live-Stand im Client
+Entwickelt wird in `F:\aktiv\blackwellui` (Branch `main`, Arbeit auf Feature-Branches oder Worktrees). Der Spielclient lädt den Worktree `F:\aktiv\blackwellui-live` (Branch `live`) über die Junction; halbe Zwischenstände landen so nicht im Spiel. Übernahme nach bestandenem Test-Gate (Abschnitt 4):
 ```powershell
-robocopy "c:\Git\wenilla\benilla-config\AddOns\BlackwellUI" "C:\Users\Pierre\Documents\AzerothSurvivors\benilla-config\AddOns\BlackwellUI" /MIR /XD .git .github media\screenshots /XF .gitignore
+git -C F:\aktiv\blackwellui-live merge --ff-only main
 ```
+Danach im Spiel `/reload`. Kein `robocopy` (`/MIR` über eine Junction spiegelt ins Ziel).
+* Prüfen: `(Get-Item "$env:USERPROFILE\Documents\AzerothSurvivors\benilla-config\AddOns\BlackwellUI").LinkType` liefert `Junction`, `.Target` zeigt auf `F:\aktiv\blackwellui-live`.
+* Junction entfernen, ohne das Ziel anzufassen: `cmd /c rmdir "%USERPROFILE%\Documents\AzerothSurvivors\benilla-config\AddOns\BlackwellUI"` (nie `Remove-Item -Recurse`).
+* Neu anlegen: `New-Item -ItemType Junction -Path "$env:USERPROFILE\Documents\AzerothSurvivors\benilla-config\AddOns\BlackwellUI" -Target 'F:\aktiv\blackwellui-live'`
 
 ### 2. Release & Tagging
 ```powershell
@@ -91,15 +97,21 @@ git push origin v2.X.X-azs
 ```
 
 ### 3. Release-Archiv erstellen (GitHub Release)
+`tools/build_zip.py` packt nur, was das Spiel lädt (Ordner `BlackwellUI/`, ohne `.git`, `tools`, `CLAUDE.md`, `_`-Ordner wie `_work` und `*.zip`):
 ```powershell
-$target = "BlackwellUI"
-Compress-Archive -Path "c:\Git\wenilla\benilla-config\AddOns\BlackwellUI" -DestinationPath "BlackwellUI.zip" -Force
+python -I tools/build_zip.py . BlackwellUI.zip
 gh release create v2.X.X-azs BlackwellUI.zip --title "BlackwellUI v2.X.X-azs" --notes "Release Notes"
 ```
 
+### 4. Test-Gate (vor jedem Merge nach `main` und vor der Übernahme nach `live`)
+```bash
+bash tools/check.sh
+```
+Schritte: `luac -p` aller Lua-Dateien, `tools/lua50scan.py` (Lua-5.0-/1.12-Verstöße, Exit 1 bei Treffern; geprüfte Ausnahmen mit Kommentar `-- lua50scan: ok`), `toc_check.py` (Skill domain-wow-dev), `tools/l10n_tool.py catalog/check`, `tools/harness.lua` (Core) und `tools/harness_modules.lua` (alle TOC-Dateien gegen einen simulierten Client). Abschluss nur bei `GATE: OK`. Laufzeit im Client (CPU, Speicher) misst das Gate nicht.
+
 ---
 
-## Pierre's Leitprinzipien
+## Leitprinzipien
 1. **Zero Hallucination:** Niemals APIs, Parameter oder Dateipfade erfinden. Bei Unsicherheit Code oder Binary-Strings prüfen.
 2. **Defensive Programmierung:** Alle Methodenaufrufe auf Drittobjekten oder Modulen mit `if type(...) == "function"` absichern.
 3. **Keine Silent Failures:** Fehler niemals mit `except: pass` oder leeren Blöcken verschlucken.
