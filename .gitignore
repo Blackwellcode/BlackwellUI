@@ -18,3 +18,7 @@ $RECYCLE.BIN/
 # Python bytecode (tools/)
 __pycache__/
 *.pyc
+
+# Release archives and local work folder
+*.zip
+_work/
