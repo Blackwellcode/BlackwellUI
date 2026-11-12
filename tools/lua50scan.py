@@ -3,6 +3,9 @@
 Tokenizes Lua source (strings, long strings, comments stripped) and reports
 constructs that do not exist in Lua 5.0 or the 1.12.1 FrameXML API.
 Usage: python -I lua50scan.py <addon_dir>
+Scans the addon folder and Locales/. A line that carries the comment
+"-- lua50scan: ok" is a reviewed, guarded use and is not reported.
+Exit code 1 when anything is reported (test gate).
 """
 import os
 import re
@@ -89,6 +92,8 @@ def scan_file(path):
     raw = src.split("\n")
     hits = []
     for ln, line in enumerate(lines, 1):
+        if "-- lua50scan: ok" in raw[ln - 1]:
+            continue
         for name, rx in RULES:
             for m in rx.finditer(line):
                 hits.append((ln, name, m.group(0), raw[ln - 1].strip()[:140]))
@@ -103,14 +108,22 @@ def scan_file(path):
 def main():
     root = sys.argv[1]
     total = 0
-    for fn in sorted(os.listdir(root)):
-        if not fn.endswith(".lua") or fn in SKIP_FILES:
+    files = 0
+    for sub in ("", "Locales"):
+        folder = os.path.join(root, sub)
+        if not os.path.isdir(folder):
             continue
-        hits = scan_file(os.path.join(root, fn))
-        total += len(hits)
-        for ln, name, tok, text in hits:
-            print(f"{fn}:{ln}: [{name}] {tok!r} :: {text}")
-    print(f"TOTAL {total}")
+        for fn in sorted(os.listdir(folder)):
+            if not fn.endswith(".lua") or fn in SKIP_FILES:
+                continue
+            rel = os.path.join(sub, fn) if sub else fn
+            hits = scan_file(os.path.join(folder, fn))
+            files += 1
+            total += len(hits)
+            for ln, name, tok, text in hits:
+                print(f"{rel}:{ln}: [{name}] {tok!r} :: {text}")
+    print(f"TOTAL {total} ({files} files)")
+    sys.exit(1 if total else 0)
 
 
 if __name__ == "__main__":
