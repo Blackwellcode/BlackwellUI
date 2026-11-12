@@ -789,12 +789,10 @@ local function SkinPlate(plate)
         UpdatePlate(plate)
     end)
 
-    -- Attach per-frame watcher child frame for instantaneous response to movement/targeting
-    local watcher = CreateFrame("Frame", nil, plate)
-    watcher:SetScript("OnUpdate", function()
-        UpdatePlate(plate)
-    end)
-    plate.buiWatcher = watcher
+    -- No per-plate OnUpdate: the module's scanner refreshes every visible
+    -- plate (SCAN_INTERVAL) and OnShow above refreshes a plate the moment it
+    -- appears. One watcher per plate used to run UpdatePlate every frame on
+    -- top of the scanner.
 
     -- Initial evaluation
     UpdatePlate(plate)
@@ -807,12 +805,26 @@ function mod:Create()
         HideAllPlates()
     end
 
+    -- Scans WorldFrame's children SCAN_INTERVAL seconds apart instead of every
+    -- frame. The child list is collected again only when the child count
+    -- changed (the client reuses its plate frames), so a steady scene
+    -- allocates nothing.
+    local SCAN_INTERVAL = 0.1
+    local scanAcc = SCAN_INTERVAL
+    local children, childCount = nil, -1
     local scanner = CreateFrame("Frame", "BUI_NameplateScanner", UIParent)
     scanner:SetScript("OnUpdate", function()
         if not B:IsEnabled("nameplates") or not NAMEPLATES_ON then return end
         if not WorldFrame then return end
+        scanAcc = scanAcc + (arg1 or 0)
+        if scanAcc < SCAN_INTERVAL then return end
+        scanAcc = 0
 
-        local children = { WorldFrame:GetChildren() }
+        local count = (WorldFrame.GetNumChildren and WorldFrame:GetNumChildren()) or nil
+        if not children or not count or count ~= childCount then
+            children = { WorldFrame:GetChildren() }
+            childCount = count or -1
+        end
         local n = table.getn(children)
         for i = 1, n do
             local c = children[i]

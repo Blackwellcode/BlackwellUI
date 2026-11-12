@@ -49,7 +49,7 @@ local function Opt(key, default)
     return B:ModOpt("character", key, default)
 end
 
-local modFunc = math.mod or math.fmod
+local modFunc = math.mod or math.fmod -- lua50scan: ok (math.mod first; fmod only on 5.1+ clients)
 
 local QUALITY_COLORS = {
     [0] = { r = 0.62, g = 0.62, b = 0.62 }, -- Poor / Gray
@@ -690,7 +690,7 @@ local function BuildModernCharacterFrame()
     end
 
     -- 1. Combat Enhancements
-    AddCategoryHeader("Combat Enhancements")
+    AddCategoryHeader("Combat enhancements")
     AddStatRow("health", "Max Health")
     AddStatRow("dmg", "Damage Multiplier")
     AddStatRow("crit", "Critical Strike")
@@ -1314,6 +1314,7 @@ function mod:Create()
     watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
     watcher:SetScript("OnEvent", function()
         if not B:IsEnabled("character") then return end
+        if event == "UNIT_INVENTORY_CHANGED" and arg1 ~= "player" then return end
         BuildModernCharacterFrame()
         HideCharacterTabs()
         SuppressAZSMoreStats()

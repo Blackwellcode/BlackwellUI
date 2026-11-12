@@ -459,10 +459,26 @@ end
 -------------------------------------------------------------------------------
 --  Cooldown & Proc Watcher
 -------------------------------------------------------------------------------
+-- The spellbook scan feeds the "READY NOW!" alerts only. It runs when
+-- SPELL_UPDATE_COOLDOWN flagged it (several events in one frame cost one scan,
+-- at most every CD_SCAN_MIN seconds) and, while a cooldown is running, once
+-- per CD_SCAN_FALLBACK seconds to catch its end. Nothing runs while ability
+-- alerts are off. Entries keep their table: start/duration are updated in
+-- place, and "active" marks whether the spell is on cooldown.
+local CD_SCAN_MIN = 0.1
+local CD_SCAN_FALLBACK = 1.0
 local activeCooldowns = {}
-local lastCdScan = 0
+local activeCount = 0
+local cdDirty = false
+local cdSinceScan = 0
+
+local function AlertsWanted()
+    return B:IsEnabled("combattext") and not (B.db and B.db.sctAlerts == false)
+end
 
 local function CheckCooldowns()
+    cdDirty = false
+    cdSinceScan = 0
     if type(GetSpellName) ~= "function" or type(GetSpellCooldown) ~= "function" then return end
     local book = BOOKTYPE_SPELL or "spell"
     local now = (type(GetTime) == "function" and GetTime()) or 0
@@ -471,19 +487,46 @@ local function CheckCooldowns()
     while true do
         local name = GetSpellName(i, book)
         if not name then break end
-        local start, duration, enable = GetSpellCooldown(i, book)
+        local start, duration = GetSpellCooldown(i, book)
+        local info = activeCooldowns[name]
         if start and duration and duration > 2.0 then
             -- Spell is on genuine cooldown (>2.0s to avoid GCD triggers)
-            activeCooldowns[name] = { start = start, duration = duration }
-        elseif activeCooldowns[name] then
+            if not info then
+                info = {}
+                activeCooldowns[name] = info
+            end
+            if not info.active then
+                info.active = true
+                activeCount = activeCount + 1
+            end
+            info.start, info.duration = start, duration
+        elseif info and info.active then
             -- Cooldown finished
-            local info = activeCooldowns[name]
             if start == 0 or (now >= info.start + info.duration) then
-                activeCooldowns[name] = nil
+                info.active = false
+                activeCount = activeCount - 1
                 mod:AddAlert(name, "READY")
             end
         end
         i = i + 1
+    end
+end
+
+-- Called from the driver's OnUpdate with the frame time.
+local function CooldownWatch(dt)
+    cdSinceScan = cdSinceScan + dt
+    if not AlertsWanted() then
+        -- Alerts off: forget running cooldowns so switching alerts back on
+        -- does not announce cooldowns that ended meanwhile.
+        cdDirty = false
+        if activeCount > 0 then
+            for _, info in pairs(activeCooldowns) do info.active = false end
+            activeCount = 0
+        end
+        return
+    end
+    if (cdDirty and cdSinceScan >= CD_SCAN_MIN) or (activeCount > 0 and cdSinceScan >= CD_SCAN_FALLBACK) then
+        CheckCooldowns()
     end
 end
 
@@ -722,7 +765,7 @@ function mod:Create()
                 mod:AddAura(faded, false, true)
             end
         elseif event == "SPELL_UPDATE_COOLDOWN" then
-            CheckCooldowns()
+            cdDirty = true
         elseif event == "UNIT_HEALTH" and arg1 == "target" then
             if UnitExists("target") and not UnitIsDead("target") and UnitCanAttack("player", "target") then
                 local hp = UnitHealth("target") or 0
@@ -737,7 +780,6 @@ function mod:Create()
         end
     end)
 
-    local lastUpdate = 0
     driver:SetScript("OnUpdate", function()
         if not B:IsEnabled("combattext") then return end
         local dt = arg1 or 0.016
@@ -749,12 +791,8 @@ function mod:Create()
         UpdateStaticPool(poolStatic, dt)
         UpdateAlertsPool(poolAlerts, dt)
 
-        -- Periodic cooldown check fallback
-        lastUpdate = lastUpdate + dt
-        if lastUpdate > 0.20 then
-            lastUpdate = 0
-            CheckCooldowns()
-        end
+        -- Event-driven cooldown scan (see CooldownWatch)
+        CooldownWatch(dt)
     end)
 
     driver:SetScript("OnHide", function()

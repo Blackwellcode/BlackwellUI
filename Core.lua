@@ -2452,6 +2452,14 @@ end
 --  Run state: live AZS_* data, or a preview while /bui demo or unlocked
 -------------------------------------------------------------------------------
 local live = {}
+-- Shared read-only fallbacks: the run state is rebuilt 10 times a second, so a
+-- missing AZS_* value must not allocate a fresh table each tick. Modules only
+-- read the state tables (none writes into them).
+local EMPTY = {}
+local TARGET_NONE = { kind = "none" }
+local NO_FRAMES = {}
+-- Elite list reused across ticks (entries are refilled in place).
+local elitesBuf = {}
 local demo = nil
 local demoStart = nil
 
@@ -2681,59 +2689,74 @@ function B:GetState()
     s.time = (type(AZS_GetRunTime) == "function" and AZS_GetRunTime()) or (AZS_RUN and tonumber(AZS_RUN.t)) or 0
     self:DetectRunStart(phase, tonumber(s.time) or 0)
     s.length = (type(AZS_GetRunLength) == "function" and AZS_GetRunLength()) or (AZS_RUN and tonumber(AZS_RUN.dur)) or 900
-    s.zone = AZS_ZONE or {}
-    s.run = AZS_RUN or {}
-    s.bosses = (type(AZS_GetBosses) == "function" and AZS_GetBosses()) or {}
-    s.guardians = (type(AZS_GetGuardians) == "function" and AZS_GetGuardians()) or {}
-    local elites = {}
-    local units = (type(AZS_UNITS) == "table" and AZS_UNITS) or {}
+    s.zone = AZS_ZONE or EMPTY
+    s.run = AZS_RUN or EMPTY
+    s.bosses = (type(AZS_GetBosses) == "function" and AZS_GetBosses()) or EMPTY
+    s.guardians = (type(AZS_GetGuardians) == "function" and AZS_GetGuardians()) or EMPTY
+    -- Elites: entries are reused; the list is filled by index (no table.insert,
+    -- so Lua 5.0's table.getn keeps counting the live entries) and trailing
+    -- slots from a longer previous list are cleared.
+    local elites = elitesBuf
+    local nElites = 0
+    local units = (type(AZS_UNITS) == "table" and AZS_UNITS) or EMPTY
     for i = 1, table.getn(units) do
         local u = units[i]
         if type(u) == "table" and u.kind == "elite" then
-            table.insert(elites, { id = u.id, name = u.name, hp = u.hp, hpm = u.hpm })
+            nElites = nElites + 1
+            local e = elites[nElites]
+            if not e then
+                e = {}
+                elites[nElites] = e
+            end
+            e.id, e.name, e.hp, e.hpm = u.id, u.name, u.hp, u.hpm
         end
+    end
+    local j = nElites + 1
+    while elites[j] ~= nil do
+        elites[j] = nil
+        j = j + 1
     end
     s.elites = elites
     s.units = units
-    s.schedule = AZS_SCHEDULE or {}
-    s.upcoming = (type(AZS_GetUpcomingBosses) == "function" and AZS_GetUpcomingBosses()) or {}
-    s.spells = AZS_SPELLS or {}
+    s.schedule = AZS_SCHEDULE or EMPTY
+    s.upcoming = (type(AZS_GetUpcomingBosses) == "function" and AZS_GetUpcomingBosses()) or EMPTY
+    s.spells = AZS_SPELLS or EMPTY
     s.spellsAge = Age(AZS_SPELLS_UPDATED, phase)
-    s.buffs = AZS_BUFFS or {}
+    s.buffs = AZS_BUFFS or EMPTY
     s.buffsAge = Age(AZS_BUFFS_UPDATED, phase)
     local meter, total, dps = nil, 0, 0
     if type(AZS_GetMeter) == "function" then
         meter, total, dps = AZS_GetMeter()
     end
-    s.meter = (type(meter) == "table" and meter) or (type(AZS_METER) == "table" and AZS_METER) or {}
+    s.meter = (type(meter) == "table" and meter) or (type(AZS_METER) == "table" and AZS_METER) or EMPTY
     s.meterTotal = tonumber(total) or 0
     s.meterDps = tonumber(dps) or 0
     local bossMeter, bossTotal, bossDps = nil, 0, 0
     if type(AZS_GetBossMeter) == "function" then
         bossMeter, bossTotal, bossDps = AZS_GetBossMeter()
     end
-    s.bossMeter = (type(bossMeter) == "table" and bossMeter) or (type(AZS_BOSSMETER) == "table" and AZS_BOSSMETER) or {}
+    s.bossMeter = (type(bossMeter) == "table" and bossMeter) or (type(AZS_BOSSMETER) == "table" and AZS_BOSSMETER) or EMPTY
     s.bossMeterTotal = tonumber(bossTotal) or 0
     s.bossMeterDps = tonumber(bossDps) or 0
     local healMeter, healTotal, healDps = nil, 0, 0
     if type(AZS_GetHealing) == "function" then
         healMeter, healTotal, healDps = AZS_GetHealing()
     end
-    s.healing = (type(healMeter) == "table" and healMeter) or (type(AZS_HEALING) == "table" and AZS_HEALING) or {}
+    s.healing = (type(healMeter) == "table" and healMeter) or (type(AZS_HEALING) == "table" and AZS_HEALING) or EMPTY
     s.healingTotal = tonumber(healTotal) or 0
     s.healingDps = tonumber(healDps) or 0
     local partyMeter, partyTotal, partyDps = nil, 0, 0
     if type(AZS_GetPartyMeter) == "function" then
         partyMeter, partyTotal, partyDps = AZS_GetPartyMeter()
     end
-    s.party = (type(partyMeter) == "table" and partyMeter) or (type(AZS_PARTY) == "table" and AZS_PARTY) or {}
+    s.party = (type(partyMeter) == "table" and partyMeter) or (type(AZS_PARTY) == "table" and AZS_PARTY) or EMPTY
     s.partyTotal = tonumber(partyTotal) or 0
     s.partyDps = tonumber(partyDps) or 0
-    s.taken = AZS_TAKEN or {}
-    s.lairs = (type(AZS_GetLairs) == "function" and AZS_GetLairs()) or (type(AZS_LAIRS) == "table" and AZS_LAIRS) or {}
+    s.taken = AZS_TAKEN or EMPTY
+    s.lairs = (type(AZS_GetLairs) == "function" and AZS_GetLairs()) or (type(AZS_LAIRS) == "table" and AZS_LAIRS) or EMPTY
     s.lairsUpdated = AZS_LAIRS_UPDATED
-    s.revive = AZS_REVIVE or {}
-    s.target = AZS_TARGET or { kind = "none" }
+    s.revive = AZS_REVIVE or EMPTY
+    s.target = AZS_TARGET or TARGET_NONE
     return s
 end
 
@@ -2774,11 +2797,21 @@ function B:ResetModOpts(modKey)
     end
 end
 
+-- Callers only read the returned list. The one-frame list for modules
+-- without lookFrames is cached on the module and rebuilt only when mod.frame
+-- changes, so the 10 Hz visibility pass allocates nothing.
 function B:GetLookFrames(mod)
-    if mod.noLook then return {} end
+    if mod.noLook then return NO_FRAMES end
     if type(mod.lookFrames) == "table" then return mod.lookFrames end
-    if mod.frame then return { mod.frame } end
-    return {}
+    if mod.frame then
+        local cache = mod.buiLookCache
+        if not cache or cache[1] ~= mod.frame then
+            cache = { mod.frame }
+            mod.buiLookCache = cache
+        end
+        return cache
+    end
+    return NO_FRAMES
 end
 
 -- Scale from the module's settings; opacity and visibility run per tick.
@@ -2871,8 +2904,16 @@ function B:IsModuleActive(mod)
     return self:IsEnabled(mod.key)
 end
 
+-- Events ask for an early tick through RequestTick instead of running the
+-- whole module pass themselves: the boot ticker picks the flag up on the next
+-- frame (at most 20 times a second), so a burst of events costs one tick.
+function B:RequestTick()
+    self.tickDirty = true
+end
+
 function B:Tick()
     if not self.built then return end
+    self.tickDirty = false
 
     if self.db and self.db.autoScale then
         local curW = (UIParent and UIParent:GetWidth()) or 0
@@ -3201,7 +3242,7 @@ boot:SetScript("OnUpdate", function()
     local dt = arg1 or 0
     acc = acc + dt
     hudAcc = hudAcc + dt
-    if acc >= 0.1 then
+    if acc >= 0.1 or (B.tickDirty and acc >= 0.05) then
         acc = 0
         B:Tick()
     end

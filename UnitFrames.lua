@@ -1006,7 +1006,7 @@ function mod:Create()
     enc.rows = rows
 
     enc:Hide()
-    B:RegisterMover(enc, "encounters", L["Elites & Bosses"], "TOPRIGHT", "TOPRIGHT", -12, -340)
+    B:RegisterMover(enc, "encounters", L["Elites & bosses"], "TOPRIGHT", "TOPRIGHT", -12, -340)
     self.enc = enc
 
     ---------------------------------------------------------------------------
@@ -1084,7 +1084,7 @@ function mod:Create()
     self.partyFrames = partyFrames
 
     partyRoot:Hide()
-    B:RegisterMover(partyRoot, "party", L["Party Frames"], "BOTTOM", "BOTTOM", 0, 68)
+    B:RegisterMover(partyRoot, "party", L["Party frames"], "BOTTOM", "BOTTOM", 0, 68)
 
     -- Separately placed frames: Core's scale / opacity / visibility act on these
     -- (pet and target of target are children of hero and target).
@@ -1094,8 +1094,12 @@ function mod:Create()
     ufWatcher:RegisterEvent("PLAYER_TARGET_CHANGED")
     ufWatcher:RegisterEvent("UNIT_AURA")
     ufWatcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+    -- Only the player's and the target's auras are drawn here. Party/pet aura
+    -- changes are ignored, and every event only flags an early tick that the
+    -- core ticker coalesces (a burst of aura events costs one tick).
     ufWatcher:SetScript("OnEvent", function()
-        if B and B.Tick then B:Tick() end
+        if event == "UNIT_AURA" and arg1 ~= "player" and arg1 ~= "target" then return end
+        if B and B.RequestTick then B:RequestTick() end
     end)
     self.ufWatcher = ufWatcher
 

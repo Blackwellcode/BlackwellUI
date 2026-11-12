@@ -756,11 +756,105 @@ end
 -------------------------------------------------------------------------------
 --  Data Extraction & Update Logic
 -------------------------------------------------------------------------------
+-- Row pool: the list is rebuilt from the engine data 10 times a second. Row
+-- tables, proc entries and lookup maps are reused instead of allocated per
+-- tick; the list is filled by index (no table.insert, so Lua 5.0's
+-- table.getn keeps counting the live rows) and trailing rows are cleared.
+local rowPool = {}
+local list = {}
+local listN = 0
+local mergedMap = {}
+local foundMap = {}
+local THEME_PARTY = { r = 0.30, g = 0.75, b = 1.00 }
+local NONE = {}
+
+local function ClearMap(m)
+    for k in pairs(m) do m[k] = nil end
+end
+
+local function NewRow(name, dmg, dps)
+    listN = listN + 1
+    local e = rowPool[listN]
+    if not e then
+        e = { procs = {}, procPool = {} }
+        rowPool[listN] = e
+    end
+    e.name, e.dmg, e.dps = name, dmg, dps
+    e.class, e.top, e.topdps, e.hits, e.crits = nil, nil, nil, nil, nil
+    e.baseDmg, e.procDmg, e.share = nil, nil, nil
+    local p = e.procs
+    local i = 1
+    while p[i] ~= nil do
+        p[i] = nil
+        i = i + 1
+    end
+    e.nProcs = 0
+    list[listN] = e
+    return e
+end
+
+local function AddProc(e, name, dmg)
+    local n = e.nProcs + 1
+    e.nProcs = n
+    local pe = e.procPool[n]
+    if not pe then
+        pe = {}
+        e.procPool[n] = pe
+    end
+    pe.name, pe.dmg = name, dmg
+    e.procs[n] = pe
+end
+
+local function FinishList()
+    local j = listN + 1
+    while list[j] ~= nil do
+        list[j] = nil
+        j = j + 1
+    end
+end
+
+local function ByAmountDesc(a, b)
+    return (tonumber(a.dmg) or 0) > (tonumber(b.dmg) or 0)
+end
+
+-- Everything the drawn rows depend on. When none of it changed since the last
+-- draw, the rows, header and tabs are left as they are (no SetText, no
+-- string.format). runSec is compared in whole seconds, so idle rows redraw at
+-- most once a second for the rate column.
+local drawn = { valid = false }
+
+local function SameAsDrawn(mode, rawMode, demo, n, total, rate, sec, visibleRows)
+    local d = drawn
+    return d.valid and d.mode == mode and d.rawMode == rawMode and d.drill == B.meterDrilldown
+        and d.merge == (B.db.mergeItemProcs and true or false)
+        and d.session == ((B.meterOffsets and B.meterOffsets.active) and true or false)
+        and d.scroll == B.meterScrollOffset and d.rows == visibleRows and d.demo == demo
+        and d.n == n and d.total == total and d.rate == rate and d.sec == sec and d.lang == B.LANG
+end
+
+local function RememberDrawn(mode, rawMode, demo, n, total, rate, sec, visibleRows)
+    local d = drawn
+    d.valid = true
+    d.mode, d.rawMode, d.drill = mode, rawMode, B.meterDrilldown
+    d.merge = B.db.mergeItemProcs and true or false
+    d.session = (B.meterOffsets and B.meterOffsets.active) and true or false
+    d.scroll, d.rows, d.demo = B.meterScrollOffset, visibleRows, demo
+    d.n, d.total, d.rate, d.sec, d.lang = n, total, rate, sec, B.LANG
+end
+
+-- Forces the next update to redraw (options, collapse, run start).
+function mod:Invalidate()
+    drawn.valid = false
+end
+
 function mod:Update(state)
     local f = self.frame
     if not f then return end
 
-    if B.meterCollapsed then return end
+    if B.meterCollapsed then
+        drawn.valid = false
+        return
+    end
 
     -- Time calculation
     local curT = 0
@@ -784,6 +878,298 @@ function mod:Update(state)
         mode = "damage"
         B.db.meterMode = "damage"
     end
+
+    ---------------------------------------------------------------------------
+    --  Pull Active Data
+    ---------------------------------------------------------------------------
+    listN = 0
+    local totalAmt = 0
+    local totalRate = 0
+    local rateLabel = "DPS"
+    local amtColLabel = "Damage"
+    local maxVal = 0
+    local hdrTitle = "DAMAGE"
+    local themeR, themeG, themeB = 1.0, 0.75, 0.20
+
+    if B.meterDrilldown then
+        -- DRILLDOWN VIEW: Spells of selected party member
+        local pName = B.meterDrilldown
+        local pKey = string.lower(pName)
+        hdrTitle = string.upper(pName)
+        amtColLabel = "Damage"
+        rateLabel = "DPS"
+        themeR, themeG, themeB = 0.30, 0.75, 1.00
+
+        local tracked = B.meterPartySpells[pKey]
+        ClearMap(foundMap)
+
+        for sName, sData in pairs(tracked or NONE) do
+            local d = sData.dmg or 0
+            if d > 0 then
+                local e = NewRow(sData.name or sName, d, math.floor(d / runSec))
+                e.hits = sData.hits
+                e.crits = sData.crits
+                totalAmt = totalAmt + d
+                foundMap[string.lower(sName)] = true
+                if d > maxVal then maxVal = d end
+            end
+        end
+
+        -- Check if server reported a top ability not yet in tracked combat log
+        local partyData = state.party or NONE
+        for i = 1, table.getn(partyData) do
+            local p = partyData[i]
+            if p and p.name and string.lower(p.name) == pKey then
+                if p.top and p.top ~= "" and not foundMap[string.lower(p.top)] then
+                    local topDps = tonumber(p.topdps) or 0
+                    local estDmg = topDps * runSec
+                    local e = NewRow(p.top, estDmg, topDps)
+                    e.hits = 0
+                    e.crits = 0
+                    totalAmt = totalAmt + estDmg
+                    if estDmg > maxVal then maxVal = estDmg end
+                end
+                break
+            end
+        end
+
+        totalRate = math.floor(totalAmt / runSec)
+
+    elseif mode == "party" then
+        -- MULTIPLAYER PARTY VIEW
+        hdrTitle = "PARTY DAMAGE"
+        amtColLabel = "Damage"
+        rateLabel = "DPS"
+        themeR, themeG, themeB = 0.30, 0.75, 1.00
+
+        local rawParty = (state.demo and state.party) or (type(AZS_GetPartyMeter) == "function" and AZS_GetPartyMeter()) or state.party or {}
+        if type(rawParty) ~= "table" then rawParty = {} end
+
+        for i = 1, table.getn(rawParty) do
+            local item = rawParty[i]
+            if type(item) == "table" and item.name then
+                local rawD = tonumber(item.dmg) or 0
+                local pName = item.name
+                local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.party and B.meterOffsets.party[pName]) or 0
+                local d = rawD - base
+                if d < 0 then d = 0 end
+                if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
+                    local e = NewRow(pName, d, tonumber(item.dps) or math.floor(d / runSec))
+                    e.class = item.class
+                    e.top = item.top
+                    e.topdps = tonumber(item.topdps) or 0
+                    totalAmt = totalAmt + d
+                    if d > maxVal then maxVal = d end
+                end
+            end
+        end
+        totalRate = math.floor(totalAmt / runSec)
+
+    elseif mode == "healing" then
+        -- HEALING VIEW
+        hdrTitle = "HEALING DONE"
+        amtColLabel = "Healing"
+        rateLabel = "HPS"
+        themeR, themeG, themeB = 0.25, 0.90, 0.45
+
+        local rawHeal = (state.demo and state.healing) or (type(AZS_GetHealing) == "function" and AZS_GetHealing()) or state.healing or {}
+        if type(rawHeal) ~= "table" then rawHeal = {} end
+
+        for i = 1, table.getn(rawHeal) do
+            local item = rawHeal[i]
+            if type(item) == "table" then
+                local rawH = tonumber(item.healing or item.dmg) or 0
+                local sName = item.name or "Unknown"
+                local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.healing and B.meterOffsets.healing[sName]) or 0
+                local hVal = rawH - base
+                if hVal < 0 then hVal = 0 end
+                if hVal > 0 or not (B.meterOffsets and B.meterOffsets.active) then
+                    NewRow(sName, hVal, math.floor(hVal / runSec))
+                    totalAmt = totalAmt + hVal
+                    if hVal > maxVal then maxVal = hVal end
+                end
+            end
+        end
+        totalRate = math.floor(totalAmt / runSec)
+
+    elseif mode == "boss" then
+        -- BOSS DAMAGE VIEW
+        hdrTitle = "BOSS DAMAGE"
+        amtColLabel = "Damage"
+        rateLabel = "DPS"
+        themeR, themeG, themeB = 1.00, 0.35, 0.15
+
+        local rawBoss = (state.demo and state.bossMeter) or (type(AZS_GetBossMeter) == "function" and AZS_GetBossMeter()) or state.bossMeter or {}
+        if type(rawBoss) ~= "table" then rawBoss = {} end
+
+        ClearMap(mergedMap)
+        for i = 1, table.getn(rawBoss) do
+            local item = rawBoss[i]
+            if type(item) == "table" then
+                local rawD = tonumber(item.dmg) or 0
+                local sName = item.name or "Unknown"
+                local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.boss and B.meterOffsets.boss[sName]) or 0
+                local d = rawD - base
+                if d < 0 then d = 0 end
+                if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
+                    totalAmt = totalAmt + d
+                    if B.db.mergeItemProcs then
+                        local itemPrefix, spellSuffix = SplitProcName(sName)
+                        if itemPrefix then
+                            local k = string.lower(spellSuffix)
+                            local existing = mergedMap[k]
+                            if existing then
+                                existing.dmg = existing.dmg + d
+                                existing.procDmg = (existing.procDmg or 0) + d
+                                AddProc(existing, itemPrefix, d)
+                            else
+                                local entry = NewRow(spellSuffix, d, nil)
+                                entry.baseDmg = 0
+                                entry.procDmg = d
+                                AddProc(entry, itemPrefix, d)
+                                mergedMap[k] = entry
+                            end
+                        else
+                            local k = string.lower(sName)
+                            local existing = mergedMap[k]
+                            if existing then
+                                existing.dmg = existing.dmg + d
+                                existing.baseDmg = (existing.baseDmg or 0) + d
+                            else
+                                local entry = NewRow(sName, d, nil)
+                                entry.baseDmg = d
+                                entry.procDmg = 0
+                                mergedMap[k] = entry
+                            end
+                        end
+                    else
+                        NewRow(sName, d, math.floor(d / runSec))
+                    end
+                end
+            end
+        end
+        if B.db.mergeItemProcs then
+            for i = 1, listN do
+                list[i].dps = math.floor((list[i].dmg or 0) / runSec)
+            end
+        end
+        totalRate = math.floor(totalAmt / runSec)
+
+    elseif mode == "taken" then
+        -- DAMAGE TAKEN VIEW
+        hdrTitle = "DAMAGE TAKEN"
+        amtColLabel = "Taken"
+        rateLabel = "DPS"
+        themeR, themeG, themeB = 0.90, 0.25, 0.25
+
+        local rawTaken = state.taken or {}
+        if type(rawTaken) ~= "table" then rawTaken = {} end
+
+        for i = 1, table.getn(rawTaken) do
+            local item = rawTaken[i]
+            if type(item) == "table" then
+                local rawD = tonumber(item.dmg) or 0
+                local src = item.source or "Unknown"
+                local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.taken and B.meterOffsets.taken[src]) or 0
+                local d = rawD - base
+                if d < 0 then d = 0 end
+                if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
+                    NewRow(src, d, math.floor(d / runSec))
+                    totalAmt = totalAmt + d
+                    if d > maxVal then maxVal = d end
+                end
+            end
+        end
+        totalRate = math.floor(totalAmt / runSec)
+
+    else
+        -- DAMAGE DONE (Primary)
+        if rawMode == "aoe" then
+            hdrTitle = "AOE DAMAGE"
+        else
+            hdrTitle = "DAMAGE DONE"
+        end
+        amtColLabel = "Damage"
+        rateLabel = "DPS"
+        themeR, themeG, themeB = 1.00, 0.75, 0.20
+
+        local rawMeter = (state.demo and state.meter) or (type(AZS_GetMeter) == "function" and AZS_GetMeter()) or state.meter or {}
+        if type(rawMeter) ~= "table" then rawMeter = {} end
+
+        ClearMap(mergedMap)
+        for i = 1, table.getn(rawMeter) do
+            local item = rawMeter[i]
+            if type(item) == "table" then
+                local rawD = tonumber(item.dmg) or 0
+                local sName = item.name or "Unknown"
+                local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.done and B.meterOffsets.done[sName]) or 0
+                local d = rawD - base
+                if d < 0 then d = 0 end
+                if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
+                    totalAmt = totalAmt + d
+                    if B.db.mergeItemProcs then
+                        local itemPrefix, spellSuffix = SplitProcName(sName)
+                        if itemPrefix then
+                            local k = string.lower(spellSuffix)
+                            local existing = mergedMap[k]
+                            if existing then
+                                existing.dmg = existing.dmg + d
+                                existing.procDmg = (existing.procDmg or 0) + d
+                                AddProc(existing, itemPrefix, d)
+                            else
+                                local entry = NewRow(spellSuffix, d, nil)
+                                entry.baseDmg = 0
+                                entry.procDmg = d
+                                AddProc(entry, itemPrefix, d)
+                                mergedMap[k] = entry
+                            end
+                        else
+                            local k = string.lower(sName)
+                            local existing = mergedMap[k]
+                            if existing then
+                                existing.dmg = existing.dmg + d
+                                existing.baseDmg = (existing.baseDmg or 0) + d
+                            else
+                                local entry = NewRow(sName, d, nil)
+                                entry.baseDmg = d
+                                entry.procDmg = 0
+                                mergedMap[k] = entry
+                            end
+                        end
+                    else
+                        NewRow(sName, d, math.floor(d / runSec))
+                    end
+                end
+            end
+        end
+        if B.db.mergeItemProcs then
+            for i = 1, listN do
+                list[i].dps = math.floor((list[i].dmg or 0) / runSec)
+            end
+        end
+        totalRate = math.floor(totalAmt / runSec)
+    end
+
+    FinishList()
+    -- Sort descending by amount
+    table.sort(list, ByAmountDesc)
+
+    local maxVal = (list[1] and list[1].dmg) or 0
+
+    local totalEntries = listN
+    f.maxEntries = totalEntries
+    local visibleRows = VisibleRows()
+    if B.meterScrollOffset > totalEntries - visibleRows then
+        B.meterScrollOffset = math.max(0, totalEntries - visibleRows)
+    end
+
+    local isDemo = (state and state.demo) and true or false
+    local sec = math.floor(runSec)
+    if SameAsDrawn(mode, rawMode, isDemo, totalEntries, totalAmt, totalRate, sec, visibleRows) then
+        return
+    end
+    RememberDrawn(mode, rawMode, isDemo, totalEntries, totalAmt, totalRate, sec, visibleRows)
+    self.draws = (self.draws or 0) + 1
 
     ---------------------------------------------------------------------------
     --  Update Tab Bar
@@ -818,336 +1204,6 @@ function mod:Update(state)
         PaintMergeButton(f.header.mergeBtn)
     end
 
-    ---------------------------------------------------------------------------
-    --  Pull Active Data
-    ---------------------------------------------------------------------------
-    local list = {}
-    local totalAmt = 0
-    local totalRate = 0
-    local rateLabel = "DPS"
-    local amtColLabel = "Damage"
-    local maxVal = 0
-    local hdrTitle = "DAMAGE"
-    local themeR, themeG, themeB = 1.0, 0.75, 0.20
-
-    if B.meterDrilldown then
-        -- DRILLDOWN VIEW: Spells of selected party member
-        local pName = B.meterDrilldown
-        local pKey = string.lower(pName)
-        hdrTitle = string.upper(pName)
-        amtColLabel = "Damage"
-        rateLabel = "DPS"
-        themeR, themeG, themeB = 0.30, 0.75, 1.00
-
-        local tracked = B.meterPartySpells[pKey] or {}
-        local foundMap = {}
-
-        for sName, sData in pairs(tracked) do
-            local d = sData.dmg or 0
-            if d > 0 then
-                table.insert(list, {
-                    name = sData.name or sName,
-                    dmg = d,
-                    dps = math.floor(d / runSec),
-                    hits = sData.hits,
-                    crits = sData.crits,
-                })
-                totalAmt = totalAmt + d
-                foundMap[string.lower(sName)] = true
-                if d > maxVal then maxVal = d end
-            end
-        end
-
-        -- Check if server reported a top ability not yet in tracked combat log
-        local partyData = state.party or {}
-        for i = 1, table.getn(partyData) do
-            local p = partyData[i]
-            if p and p.name and string.lower(p.name) == pKey then
-                if p.top and p.top ~= "" and not foundMap[string.lower(p.top)] then
-                    local topDps = tonumber(p.topdps) or 0
-                    local estDmg = topDps * runSec
-                    table.insert(list, {
-                        name = p.top,
-                        dmg = estDmg,
-                        dps = topDps,
-                        hits = 0,
-                        crits = 0,
-                    })
-                    totalAmt = totalAmt + estDmg
-                    if estDmg > maxVal then maxVal = estDmg end
-                end
-                break
-            end
-        end
-
-        totalRate = math.floor(totalAmt / runSec)
-
-    elseif mode == "party" then
-        -- MULTIPLAYER PARTY VIEW
-        hdrTitle = "PARTY DAMAGE"
-        amtColLabel = "Damage"
-        rateLabel = "DPS"
-        themeR, themeG, themeB = 0.30, 0.75, 1.00
-
-        local rawParty = (state.demo and state.party) or (type(AZS_GetPartyMeter) == "function" and AZS_GetPartyMeter()) or state.party or {}
-        if type(rawParty) ~= "table" then rawParty = {} end
-
-        for i = 1, table.getn(rawParty) do
-            local item = rawParty[i]
-            if type(item) == "table" and item.name then
-                local rawD = tonumber(item.dmg) or 0
-                local pName = item.name
-                local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.party and B.meterOffsets.party[pName]) or 0
-                local d = rawD - base
-                if d < 0 then d = 0 end
-                if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
-                    table.insert(list, {
-                        name = pName,
-                        class = item.class,
-                        dmg = d,
-                        dps = tonumber(item.dps) or math.floor(d / runSec),
-                        top = item.top,
-                        topdps = tonumber(item.topdps) or 0,
-                    })
-                    totalAmt = totalAmt + d
-                    if d > maxVal then maxVal = d end
-                end
-            end
-        end
-        totalRate = math.floor(totalAmt / runSec)
-
-    elseif mode == "healing" then
-        -- HEALING VIEW
-        hdrTitle = "HEALING DONE"
-        amtColLabel = "Healing"
-        rateLabel = "HPS"
-        themeR, themeG, themeB = 0.25, 0.90, 0.45
-
-        local rawHeal = (state.demo and state.healing) or (type(AZS_GetHealing) == "function" and AZS_GetHealing()) or state.healing or {}
-        if type(rawHeal) ~= "table" then rawHeal = {} end
-
-        for i = 1, table.getn(rawHeal) do
-            local item = rawHeal[i]
-            if type(item) == "table" then
-                local rawH = tonumber(item.healing or item.dmg) or 0
-                local sName = item.name or "Unknown"
-                local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.healing and B.meterOffsets.healing[sName]) or 0
-                local hVal = rawH - base
-                if hVal < 0 then hVal = 0 end
-                if hVal > 0 or not (B.meterOffsets and B.meterOffsets.active) then
-                    table.insert(list, {
-                        name = sName,
-                        dmg = hVal,
-                        dps = math.floor(hVal / runSec),
-                    })
-                    totalAmt = totalAmt + hVal
-                    if hVal > maxVal then maxVal = hVal end
-                end
-            end
-        end
-        totalRate = math.floor(totalAmt / runSec)
-
-    elseif mode == "boss" then
-        -- BOSS DAMAGE VIEW
-        hdrTitle = "BOSS DAMAGE"
-        amtColLabel = "Damage"
-        rateLabel = "DPS"
-        themeR, themeG, themeB = 1.00, 0.35, 0.15
-
-        local rawBoss = (state.demo and state.bossMeter) or (type(AZS_GetBossMeter) == "function" and AZS_GetBossMeter()) or state.bossMeter or {}
-        if type(rawBoss) ~= "table" then rawBoss = {} end
-
-        local mergedMap = {}
-        for i = 1, table.getn(rawBoss) do
-            local item = rawBoss[i]
-            if type(item) == "table" then
-                local rawD = tonumber(item.dmg) or 0
-                local sName = item.name or "Unknown"
-                local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.boss and B.meterOffsets.boss[sName]) or 0
-                local d = rawD - base
-                if d < 0 then d = 0 end
-                if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
-                    totalAmt = totalAmt + d
-                    if B.db.mergeItemProcs then
-                        local itemPrefix, spellSuffix = SplitProcName(sName)
-                        if itemPrefix then
-                            local k = string.lower(spellSuffix)
-                            local existing = mergedMap[k]
-                            if existing then
-                                existing.dmg = existing.dmg + d
-                                existing.procDmg = (existing.procDmg or 0) + d
-                                if not existing.procs then existing.procs = {} end
-                                table.insert(existing.procs, { name = itemPrefix, dmg = d })
-                            else
-                                local entry = {
-                                    name = spellSuffix,
-                                    dmg = d,
-                                    baseDmg = 0,
-                                    procDmg = d,
-                                    procs = { { name = itemPrefix, dmg = d } },
-                                }
-                                mergedMap[k] = entry
-                                table.insert(list, entry)
-                            end
-                        else
-                            local k = string.lower(sName)
-                            local existing = mergedMap[k]
-                            if existing then
-                                existing.dmg = existing.dmg + d
-                                existing.baseDmg = (existing.baseDmg or 0) + d
-                            else
-                                local entry = {
-                                    name = sName,
-                                    dmg = d,
-                                    baseDmg = d,
-                                    procDmg = 0,
-                                    procs = {},
-                                }
-                                mergedMap[k] = entry
-                                table.insert(list, entry)
-                            end
-                        end
-                    else
-                        table.insert(list, {
-                            name = sName,
-                            dmg = d,
-                            dps = math.floor(d / runSec),
-                        })
-                    end
-                end
-            end
-        end
-        if B.db.mergeItemProcs then
-            for i = 1, table.getn(list) do
-                list[i].dps = math.floor((list[i].dmg or 0) / runSec)
-            end
-        end
-        totalRate = math.floor(totalAmt / runSec)
-
-    elseif mode == "taken" then
-        -- DAMAGE TAKEN VIEW
-        hdrTitle = "DAMAGE TAKEN"
-        amtColLabel = "Taken"
-        rateLabel = "DPS"
-        themeR, themeG, themeB = 0.90, 0.25, 0.25
-
-        local rawTaken = state.taken or {}
-        if type(rawTaken) ~= "table" then rawTaken = {} end
-
-        for i = 1, table.getn(rawTaken) do
-            local item = rawTaken[i]
-            if type(item) == "table" then
-                local rawD = tonumber(item.dmg) or 0
-                local src = item.source or "Unknown"
-                local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.taken and B.meterOffsets.taken[src]) or 0
-                local d = rawD - base
-                if d < 0 then d = 0 end
-                if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
-                    table.insert(list, {
-                        name = src,
-                        dmg = d,
-                        dps = math.floor(d / runSec),
-                    })
-                    totalAmt = totalAmt + d
-                    if d > maxVal then maxVal = d end
-                end
-            end
-        end
-        totalRate = math.floor(totalAmt / runSec)
-
-    else
-        -- DAMAGE DONE (Primary)
-        if rawMode == "aoe" then
-            hdrTitle = "AOE DAMAGE"
-        else
-            hdrTitle = "DAMAGE DONE"
-        end
-        amtColLabel = "Damage"
-        rateLabel = "DPS"
-        themeR, themeG, themeB = 1.00, 0.75, 0.20
-
-        local rawMeter = (state.demo and state.meter) or (type(AZS_GetMeter) == "function" and AZS_GetMeter()) or state.meter or {}
-        if type(rawMeter) ~= "table" then rawMeter = {} end
-
-        local mergedMap = {}
-        for i = 1, table.getn(rawMeter) do
-            local item = rawMeter[i]
-            if type(item) == "table" then
-                local rawD = tonumber(item.dmg) or 0
-                local sName = item.name or "Unknown"
-                local base = (B.meterOffsets and B.meterOffsets.active and B.meterOffsets.done and B.meterOffsets.done[sName]) or 0
-                local d = rawD - base
-                if d < 0 then d = 0 end
-                if d > 0 or not (B.meterOffsets and B.meterOffsets.active) then
-                    totalAmt = totalAmt + d
-                    if B.db.mergeItemProcs then
-                        local itemPrefix, spellSuffix = SplitProcName(sName)
-                        if itemPrefix then
-                            local k = string.lower(spellSuffix)
-                            local existing = mergedMap[k]
-                            if existing then
-                                existing.dmg = existing.dmg + d
-                                existing.procDmg = (existing.procDmg or 0) + d
-                                if not existing.procs then existing.procs = {} end
-                                table.insert(existing.procs, { name = itemPrefix, dmg = d })
-                            else
-                                local entry = {
-                                    name = spellSuffix,
-                                    dmg = d,
-                                    baseDmg = 0,
-                                    procDmg = d,
-                                    procs = { { name = itemPrefix, dmg = d } },
-                                }
-                                mergedMap[k] = entry
-                                table.insert(list, entry)
-                            end
-                        else
-                            local k = string.lower(sName)
-                            local existing = mergedMap[k]
-                            if existing then
-                                existing.dmg = existing.dmg + d
-                                existing.baseDmg = (existing.baseDmg or 0) + d
-                            else
-                                local entry = {
-                                    name = sName,
-                                    dmg = d,
-                                    baseDmg = d,
-                                    procDmg = 0,
-                                    procs = {},
-                                }
-                                mergedMap[k] = entry
-                                table.insert(list, entry)
-                            end
-                        end
-                    else
-                        table.insert(list, {
-                            name = sName,
-                            dmg = d,
-                            dps = math.floor(d / runSec),
-                        })
-                    end
-                end
-            end
-        end
-        if B.db.mergeItemProcs then
-            for i = 1, table.getn(list) do
-                list[i].dps = math.floor((list[i].dmg or 0) / runSec)
-            end
-        end
-        totalRate = math.floor(totalAmt / runSec)
-    end
-
-    -- Sort descending by amount
-    table.sort(list, function(a, b) return (tonumber(a.dmg) or 0) > (tonumber(b.dmg) or 0) end)
-
-    local maxVal = (list[1] and list[1].dmg) or 0
-
-    local totalEntries = table.getn(list)
-    f.maxEntries = totalEntries
-    local visibleRows = VisibleRows()
-    if B.meterScrollOffset > totalEntries - visibleRows then
-        B.meterScrollOffset = math.max(0, totalEntries - visibleRows)
-    end
 
     ---------------------------------------------------------------------------
     --  Update Header Texts & Column Labels
@@ -1199,7 +1255,7 @@ function mod:Update(state)
 
             -- Status bar color
             if mode == "party" and not B.meterDrilldown then
-                local cCol = B:ResolveClassColor(item.class) or { r = 0.30, g = 0.75, b = 1.00 }
+                local cCol = B:ResolveClassColor(item.class) or THEME_PARTY
                 r.bar:SetFillColor(cCol.r, cCol.g, cCol.b)
             elseif dataIdx == 1 then
                 r.bar:SetFillColor(themeR, themeG, themeB)
@@ -1276,6 +1332,7 @@ end
 -- Session offsets, drilldown spells and crit records are per run.
 function mod:OnRunStart()
     B:ResetMeter(true)
+    drawn.valid = false
 end
 
 
@@ -1306,6 +1363,7 @@ mod.options = {
 function mod:ApplyOptions()
     local f = self.frame
     if not f then return end
+    drawn.valid = false
     local width = B:ModOpt("meter", "width", METER_WIDTH)
     f:SetWidth(width)
 

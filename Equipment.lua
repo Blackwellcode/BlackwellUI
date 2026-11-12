@@ -348,8 +348,131 @@ local function CreateEquipmentFrame()
     return f
 end
 
+-------------------------------------------------------------------------------
+--  Item cache: rebuilt on inventory / bag events, drawn from the cache
+-------------------------------------------------------------------------------
+-- The scan walks every equipped slot and bag slot; it used to run 10 times a
+-- second. Now it runs when BAG_UPDATE / UNIT_INVENTORY_CHANGED("player") /
+-- PLAYER_ENTERING_WORLD flag it, when the scan inputs change (slot count, bags
+-- option, preview), and as a slow safety net every RESCAN_FALLBACK seconds in
+-- case the engine skips an event. Entry tables are reused between scans.
+local RESCAN_FALLBACK = 2
+local cache = {}
+local cacheN = 0
+local cacheDirty = true
+local renderDirty = true
+local lastScan = -RESCAN_FALLBACK
+local lastMax, lastBags, lastPreview = nil, nil, nil
+
+local function QualityFromLink(link)
+    if not link then return nil end
+    local _, _, colorCode = string.find(link, "|cff(%x%x%x%x%x%x)")
+    if not colorCode then return nil end
+    local hex = string.lower(colorCode)
+    if hex == "9d9d9d" then return 0
+    elseif hex == "ffffff" then return 1
+    elseif hex == "1eff00" then return 2
+    elseif hex == "0070dd" then return 3
+    elseif hex == "a335ee" then return 4
+    elseif hex == "ff8000" then return 5
+    end
+    return nil
+end
+
+-- Next cache entry with every field reset (entries are reused).
+local function NextEntry()
+    cacheN = cacheN + 1
+    local e = cache[cacheN]
+    if not e then
+        e = {}
+        cache[cacheN] = e
+    end
+    e.kind, e.slotId, e.bag, e.bagSlot = nil, nil, nil, nil
+    e.texture, e.link, e.quality, e.count, e.demoData = nil, nil, nil, nil, nil
+    return e
+end
+
+local function ScanItems(maxSlots, showBags, preview)
+    cacheN = 0
+
+    -- 1. Equipped inventory slots
+    if type(GetInventoryItemTexture) == "function" then
+        local nSlots = table.getn(INVENTORY_SLOTS)
+        for i = 1, nSlots do
+            if cacheN >= maxSlots then break end
+            local slotId = INVENTORY_SLOTS[i]
+            local tex = GetInventoryItemTexture("player", slotId)
+            if tex and tex ~= "" then
+                local link = (type(GetInventoryItemLink) == "function" and GetInventoryItemLink("player", slotId)) or nil
+                local quality = (type(GetInventoryItemQuality) == "function" and GetInventoryItemQuality("player", slotId)) or 1
+                if (not quality or quality < 0) and link then
+                    quality = QualityFromLink(link) or quality
+                end
+                local e = NextEntry()
+                e.kind = "inv"
+                e.slotId = slotId
+                e.texture = tex
+                e.link = link
+                e.quality = quality or 1
+            end
+        end
+    end
+
+    -- 2. Bags if slots remain
+    if showBags and cacheN < maxSlots and type(GetContainerNumSlots) == "function" and type(GetContainerItemInfo) == "function" then
+        for bag = 0, 4 do
+            local numSlots = GetContainerNumSlots(bag) or 0
+            for bSlot = 1, numSlots do
+                if cacheN >= maxSlots then break end
+                local tex, count = GetContainerItemInfo(bag, bSlot)
+                if tex and tex ~= "" then
+                    local link = (type(GetContainerItemLink) == "function" and GetContainerItemLink(bag, bSlot)) or nil
+                    local e = NextEntry()
+                    e.kind = "bag"
+                    e.bag = bag
+                    e.bagSlot = bSlot
+                    e.texture = tex
+                    e.link = link
+                    e.quality = QualityFromLink(link) or 1
+                    e.count = count
+                end
+            end
+            if cacheN >= maxSlots then break end
+        end
+    end
+
+    -- 3. Demo / unlocked preview
+    if cacheN == 0 and preview then
+        local nDemo = table.getn(DEMO_ITEMS)
+        for dIdx = 1, nDemo do
+            if cacheN >= maxSlots then break end
+            local d = DEMO_ITEMS[dIdx]
+            local e = NextEntry()
+            e.kind = "demo"
+            e.demoData = d
+            e.texture = d.icon
+            e.quality = d.quality
+        end
+    end
+end
+
+-- Forces a rescan on the next update (offline harness, other modules).
+function mod:Invalidate()
+    cacheDirty = true
+end
+
 function mod:Create()
     self.frame = CreateEquipmentFrame()
+
+    local watcher = CreateFrame("Frame")
+    watcher:RegisterEvent("BAG_UPDATE")
+    watcher:RegisterEvent("UNIT_INVENTORY_CHANGED")
+    watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+    watcher:SetScript("OnEvent", function()
+        if event == "UNIT_INVENTORY_CHANGED" and arg1 ~= "player" then return end
+        cacheDirty = true
+    end)
+    self.watcher = watcher
 end
 
 -- Grid size, slot size, fonts and header visibility.
@@ -357,6 +480,8 @@ function mod:ApplyOptions()
     local f = self.frame
     if not f then return end
     LayoutSlots(f)
+    cacheDirty = true
+    renderDirty = true
 
     local off = Opt("fontSize", 0)
     f.header.title.buiSize = 9 + off
@@ -390,98 +515,28 @@ function mod:Update(state)
     end
 
     local maxSlots = SlotCount()
-    local items = {}
-    local nItems = 0
-
-    -- 1. Scan equipped inventory slots
-    if type(GetInventoryItemTexture) == "function" then
-        local nSlots = table.getn(INVENTORY_SLOTS)
-        for i = 1, nSlots do
-            if nItems >= maxSlots then break end
-            local slotId = INVENTORY_SLOTS[i]
-            local tex = GetInventoryItemTexture("player", slotId)
-            if tex and tex ~= "" then
-                local link = (type(GetInventoryItemLink) == "function" and GetInventoryItemLink("player", slotId)) or nil
-                local quality = (type(GetInventoryItemQuality) == "function" and GetInventoryItemQuality("player", slotId)) or 1
-                if (not quality or quality < 0) and link then
-                    local _, _, colorCode = string.find(link, "|cff(%x%x%x%x%x%x)")
-                    if colorCode then
-                        local hex = string.lower(colorCode)
-                        if hex == "9d9d9d" then quality = 0
-                        elseif hex == "ffffff" then quality = 1
-                        elseif hex == "1eff00" then quality = 2
-                        elseif hex == "0070dd" then quality = 3
-                        elseif hex == "a335ee" then quality = 4
-                        elseif hex == "ff8000" then quality = 5
-                        end
-                    end
-                end
-                nItems = nItems + 1
-                items[nItems] = {
-                    kind = "inv",
-                    slotId = slotId,
-                    texture = tex,
-                    link = link,
-                    quality = quality or 1,
-                }
-            end
-        end
+    local showBags = Opt("showBags", true) and true or false
+    local preview = ((B.db and B.db.demo) or B.unlocked) and true or false
+    local now = (type(GetTime) == "function" and GetTime()) or 0
+    if maxSlots ~= lastMax or showBags ~= lastBags or preview ~= lastPreview then
+        cacheDirty = true
     end
-
-    -- 2. Scan bags if slots remain
-    if Opt("showBags", true) and nItems < maxSlots and type(GetContainerNumSlots) == "function" and type(GetContainerItemInfo) == "function" then
-        for bag = 0, 4 do
-            local numSlots = GetContainerNumSlots(bag) or 0
-            for bSlot = 1, numSlots do
-                if nItems >= maxSlots then break end
-                local tex, count = GetContainerItemInfo(bag, bSlot)
-                if tex and tex ~= "" then
-                    local link = (type(GetContainerItemLink) == "function" and GetContainerItemLink(bag, bSlot)) or nil
-                    local quality = 1
-                    if link then
-                        local _, _, colorCode = string.find(link, "|cff(%x%x%x%x%x%x)")
-                        if colorCode then
-                            local hex = string.lower(colorCode)
-                            if hex == "9d9d9d" then quality = 0
-                            elseif hex == "ffffff" then quality = 1
-                            elseif hex == "1eff00" then quality = 2
-                            elseif hex == "0070dd" then quality = 3
-                            elseif hex == "a335ee" then quality = 4
-                            elseif hex == "ff8000" then quality = 5
-                            end
-                        end
-                    end
-                    nItems = nItems + 1
-                    items[nItems] = {
-                        kind = "bag",
-                        bag = bag,
-                        bagSlot = bSlot,
-                        texture = tex,
-                        link = link,
-                        quality = quality,
-                        count = count,
-                    }
-                end
-            end
-            if nItems >= maxSlots then break end
-        end
+    if not cacheDirty and now - lastScan >= RESCAN_FALLBACK then
+        cacheDirty = true
     end
-
-    -- 3. Demo / Unlocked Preview
-    if nItems == 0 and (B.demo or B.unlocked) then
-        local nDemo = table.getn(DEMO_ITEMS)
-        for dIdx = 1, nDemo do
-            if nItems >= maxSlots then break end
-            nItems = nItems + 1
-            local d = DEMO_ITEMS[dIdx]
-            items[nItems] = {
-                kind = "demo",
-                demoData = d,
-                texture = d.icon,
-                quality = d.quality,
-            }
-        end
+    if cacheDirty then
+        ScanItems(maxSlots, showBags, preview)
+        cacheDirty = false
+        lastScan = now
+        lastMax, lastBags, lastPreview = maxSlots, showBags, preview
+        renderDirty = true
+        self.scans = (self.scans or 0) + 1
     end
+    if not renderDirty then return end
+    renderDirty = false
+
+    local items = cache
+    local nItems = cacheN
 
     -- Update Header Count Badge
     f.header.count:SetText(string.format("(%d/%d)", nItems, maxSlots))
@@ -521,13 +576,14 @@ function mod:Update(state)
                 if qualityRing then
                     local q = itm.quality or 1
                     local qCol = QUALITY_COLORS[q] or QUALITY_COLORS[1]
+                    local qr, qg, qb = qCol.r, qCol.g, qCol.b
                     if type(GetItemQualityColor) == "function" then
-                        local qr, qg, qb = GetItemQualityColor(q)
-                        if qr and qg and qb then
-                            qCol = { r = qr, g = qg, b = qb }
+                        local cr, cg, cb = GetItemQualityColor(q)
+                        if cr and cg and cb then
+                            qr, qg, qb = cr, cg, cb
                         end
                     end
-                    SetSlotColor(slot, qCol.r, qCol.g, qCol.b, 1)
+                    SetSlotColor(slot, qr, qg, qb, 1)
                 elseif slot.ring then
                     SetSlotColor(slot, NEUTRAL_ROUND.r, NEUTRAL_ROUND.g, NEUTRAL_ROUND.b, NEUTRAL_ROUND.a)
                 else

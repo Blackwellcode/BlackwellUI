@@ -1949,18 +1949,32 @@ end
 local activeBuildTile = nil
 local writtenSignature = nil
 
+-- Tooltip line FontStrings are looked up once per line index (no name
+-- concatenation per call) and the parts buffer is reused; table.concat gets
+-- explicit bounds, so stale parts beyond num never count.
+local tipLeft, tipRight = {}, {}
+local sigParts = {}
+
+local function TipLine(l)
+    local left = tipLeft[l]
+    if not left then
+        left = getglobal("GameTooltipTextLeft" .. l)
+        tipLeft[l] = left
+        tipRight[l] = getglobal("GameTooltipTextRight" .. l)
+    end
+    return left, tipRight[l]
+end
+
 local function Signature()
     local num = GetTooltipNumLines(GameTooltip)
     if num < 1 then return "" end
-    local parts = {}
     for l = 1, num do
-        local left = getglobal("GameTooltipTextLeft" .. l)
-        local right = getglobal("GameTooltipTextRight" .. l)
+        local left, right = TipLine(l)
         local lText = (left and left:GetText()) or ""
         local rText = (right and right:IsShown() and right:GetText()) or ""
-        table.insert(parts, lText .. "~" .. rText)
+        sigParts[l] = lText .. "~" .. rText
     end
-    return table.concat(parts, "^")
+    return table.concat(sigParts, "^", 1, num)
 end
 
 -- Thin 1px rule separators across GameTooltip
@@ -2518,15 +2532,22 @@ function mod:Create()
     f.tiles = tiles
 
     -- Live Tooltip Watcher: only updates if external game engine rewrites tooltip
+    -- Checked 10 times a second, not every frame: Signature() reads every
+    -- tooltip line.
     local tipWatcher = CreateFrame("Frame", nil, f)
+    local tipAcc = 0
     tipWatcher:SetScript("OnUpdate", function()
         if not GameTooltip:IsVisible() or not activeBuildTile then
             if tooltipRulesUsed > 0 then
                 HideRules()
             end
             writtenSignature = nil
+            tipAcc = 0
             return
         end
+        tipAcc = tipAcc + (arg1 or 0)
+        if tipAcc < 0.1 then return end
+        tipAcc = 0
         local sig = Signature()
         if sig == writtenSignature or sig == "" then
             return
